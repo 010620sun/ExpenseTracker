@@ -42,7 +42,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -53,9 +54,20 @@ select {
 
 button:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+textarea:focus-visible {
   outline: 3px solid rgba(77, 111, 221, 0.28);
   outline-offset: 2px;
+}
+
+.sr-only {
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
 }
 
 .app-shell {
@@ -431,10 +443,16 @@ select:focus-visible {
   transform: translateY(-1px);
 }
 
-.primary-button:disabled {
+.primary-button:disabled,
+.primary-button[aria-disabled="true"] {
   cursor: wait;
   opacity: 0.66;
   transform: none;
+}
+
+.primary-button[aria-disabled="true"]:hover {
+  background: var(--accent);
+  box-shadow: 0 8px 18px rgba(237, 104, 74, 0.2);
 }
 
 .desktop-add {
@@ -468,6 +486,53 @@ select:focus-visible {
   font-weight: 660;
   letter-spacing: -0.045em;
   margin: 0;
+}
+
+.month-heading-copy {
+  min-width: 0;
+}
+
+.month-title-row {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+}
+
+.month-controls {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  display: inline-flex;
+  padding: 3px;
+}
+
+.month-controls button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 17px;
+  height: 30px;
+  justify-content: center;
+  min-width: 30px;
+  padding: 0 8px;
+}
+
+.month-controls button:hover {
+  background: #edf0ec;
+  color: var(--ink);
+}
+
+.month-controls .month-today {
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  border-right: 1px solid var(--line);
+  font-size: 9px;
+  font-weight: 720;
+  min-width: auto;
 }
 
 .rate-note {
@@ -520,6 +585,388 @@ select:focus-visible {
   color: #89948f;
   font-size: 9px;
   line-height: 1.35;
+}
+
+.calendar-workspace {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(300px, 0.72fr);
+  margin-bottom: 14px;
+}
+
+.calendar-panel {
+  min-width: 0;
+  padding: 20px;
+}
+
+.calendar-panel-heading,
+.day-agenda-heading {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+}
+
+.calendar-panel-heading h2,
+.day-agenda-heading h2 {
+  font-size: 17px;
+  font-weight: 720;
+  letter-spacing: -0.03em;
+  margin: 0 0 5px;
+}
+
+.calendar-panel-heading p,
+.day-agenda-heading p {
+  color: var(--muted);
+  font-size: 9px;
+  margin: 0;
+}
+
+.calendar-today-button {
+  background: #edf3f0;
+  border: 1px solid #dce8e2;
+  border-radius: 9px;
+  color: var(--green);
+  font-size: 9px;
+  font-weight: 730;
+  min-height: 32px;
+  padding: 0 11px;
+}
+
+.calendar-table-wrap {
+  margin: 15px -4px -4px;
+  min-width: 0;
+}
+
+.calendar-table {
+  border-collapse: separate;
+  border-spacing: 4px;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.calendar-table th {
+  color: #89948f;
+  font-size: 8px;
+  font-weight: 720;
+  padding: 2px 4px 5px;
+  text-align: right;
+}
+
+.calendar-table td {
+  height: 104px;
+  padding: 0;
+  vertical-align: top;
+}
+
+.calendar-table td.outside-month {
+  opacity: 0.42;
+}
+
+.calendar-day {
+  background: #f8f9f6;
+  border: 1px solid #e7eae5;
+  border-radius: 11px;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  padding: 7px;
+  text-align: left;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+  width: 100%;
+}
+
+.calendar-day:hover {
+  border-color: #bdccc6;
+  box-shadow: 0 7px 18px rgba(34, 67, 58, 0.08);
+  transform: translateY(-1px);
+}
+
+.calendar-day.selected {
+  background: #f2f7f4;
+  border-color: #5d8a7d;
+  box-shadow: 0 0 0 2px rgba(49, 95, 82, 0.11);
+}
+
+.calendar-day-number {
+  align-items: center;
+  display: flex;
+  font-size: 10px;
+  font-weight: 730;
+  justify-content: space-between;
+  min-height: 18px;
+}
+
+.calendar-day-number i {
+  background: var(--accent);
+  border-radius: 999px;
+  color: #fff;
+  font-size: 6px;
+  font-style: normal;
+  font-weight: 760;
+  padding: 3px 5px;
+}
+
+.calendar-entry-previews {
+  display: grid;
+  gap: 3px;
+  margin-top: 5px;
+  min-width: 0;
+}
+
+.calendar-entry-preview {
+  align-items: center;
+  background: #fff0ec;
+  border-radius: 5px;
+  color: #8e4636;
+  display: flex;
+  font-size: 7px;
+  gap: 4px;
+  min-width: 0;
+  padding: 3px 4px;
+}
+
+.calendar-entry-preview.income {
+  background: #eaf4ef;
+  color: var(--green);
+}
+
+.calendar-entry-preview i {
+  border-radius: 50%;
+  flex: 0 0 auto;
+  height: 5px;
+  width: 5px;
+}
+
+.calendar-entry-preview b {
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-entry-previews small {
+  color: var(--muted);
+  font-size: 7px;
+  padding-left: 3px;
+}
+
+.calendar-entry-count {
+  display: none;
+}
+
+.calendar-day-totals {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 5px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.calendar-day-totals b {
+  color: #a64b39;
+  font-size: 7px;
+  font-weight: 730;
+}
+
+.calendar-day-totals b.income {
+  color: var(--green);
+}
+
+.day-agenda {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 20px;
+}
+
+.day-agenda-heading h2 {
+  font-size: 15px;
+  line-height: 1.25;
+  max-width: 220px;
+}
+
+.day-add-button {
+  align-items: center;
+  background: var(--accent);
+  border: 0;
+  border-radius: 11px;
+  color: #fff;
+  display: flex;
+  flex: 0 0 auto;
+  font-size: 21px;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+.day-add-button:hover {
+  background: var(--accent-dark);
+}
+
+.day-summary-cards {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+  margin: 15px 0;
+}
+
+.day-summary-cards > div {
+  background: #fff1ed;
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.day-summary-cards > div.income {
+  background: #eaf4ef;
+}
+
+.day-summary-cards span {
+  color: var(--muted);
+  font-size: 7px;
+}
+
+.day-summary-cards strong {
+  color: #a64b39;
+  font-size: 10px;
+}
+
+.day-summary-cards .income strong {
+  color: var(--green);
+}
+
+.day-agenda-list {
+  display: grid;
+  gap: 7px;
+  max-height: 470px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.day-agenda-entry {
+  align-items: center;
+  background: #f8f9f6;
+  border: 1px solid #e8ebe6;
+  border-radius: 11px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 5px;
+}
+
+.day-entry-main {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  min-width: 0;
+  padding: 3px;
+  text-align: left;
+}
+
+.day-entry-main .transaction-glyph {
+  height: 30px;
+  width: 30px;
+}
+
+.day-entry-copy {
+  min-width: 0;
+}
+
+.day-entry-copy strong,
+.day-entry-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.day-entry-copy strong {
+  font-size: 11px;
+}
+
+.day-entry-copy small {
+  color: var(--muted);
+  font-size: 9px;
+  margin-top: 3px;
+}
+
+.day-entry-value {
+  color: #a64b39;
+  font-size: 10px;
+  font-weight: 730;
+  text-align: right;
+}
+
+.day-entry-value.income {
+  color: var(--green);
+}
+
+.day-entry-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.day-entry-actions button {
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  color: #7c8985;
+  font-size: 13px;
+  height: 32px;
+  padding: 0;
+  width: 32px;
+}
+
+.day-entry-actions button:hover {
+  background: #e7ece8;
+  color: var(--ink);
+}
+
+.day-entry-actions button.danger:hover {
+  background: #fcebe7;
+  color: var(--accent-dark);
+}
+
+.day-agenda-empty {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 190px;
+  text-align: center;
+}
+
+.day-agenda-empty > span {
+  align-items: center;
+  background: #edf0ec;
+  border-radius: 50%;
+  display: flex;
+  font-size: 18px;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+
+.day-agenda-empty p {
+  font-size: 10px;
+  margin: 12px 0 10px;
+}
+
+.day-agenda-empty button {
+  background: transparent;
+  border: 0;
+  color: var(--green);
+  font-size: 9px;
+  font-weight: 730;
 }
 
 .metric-grid {
@@ -905,7 +1352,7 @@ select:focus-visible {
   border-bottom: 1px solid #edf0ec;
   display: grid;
   gap: 14px;
-  grid-template-columns: 34px minmax(150px, 1.3fr) 68px minmax(100px, 0.8fr) minmax(110px, 0.85fr) 26px;
+  grid-template-columns: 34px minmax(150px, 1.3fr) 68px minmax(100px, 0.8fr) minmax(110px, 0.85fr) 26px 26px;
   min-height: 67px;
   padding: 8px 21px;
 }
@@ -963,12 +1410,13 @@ select:focus-visible {
   color: var(--green);
 }
 
+.edit-transaction,
 .delete-transaction {
   background: transparent;
   border: 0;
   border-radius: 7px;
   color: #9ba5a2;
-  font-size: 18px;
+  font-size: 15px;
   height: 28px;
   opacity: 0;
   padding: 0;
@@ -976,9 +1424,16 @@ select:focus-visible {
   width: 28px;
 }
 
+.transaction-row:hover .edit-transaction,
+.edit-transaction:focus-visible,
 .transaction-row:hover .delete-transaction,
 .delete-transaction:focus-visible {
   opacity: 1;
+}
+
+.edit-transaction:hover {
+  background: #e7ece8;
+  color: var(--green);
 }
 
 .delete-transaction:hover {
@@ -1121,7 +1576,8 @@ select:focus-visible {
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
   background: #fff;
   border: 1px solid #dfe3dd;
   border-radius: 11px;
@@ -1132,12 +1588,20 @@ select:focus-visible {
   width: 100%;
 }
 
+.field textarea {
+  min-height: 88px;
+  padding-bottom: 12px;
+  padding-top: 12px;
+  resize: vertical;
+}
+
 .field input::placeholder {
   color: #adb5b1;
 }
 
 .field input:focus,
-.field select:focus {
+.field select:focus,
+.field textarea:focus {
   border-color: #6f8f86;
   box-shadow: 0 0 0 3px rgba(59, 111, 96, 0.1);
 }
@@ -1234,6 +1698,8 @@ select:focus-visible {
 @media (max-width: 1180px) {
   .main-content { padding-left: 27px; padding-right: 27px; }
   .sync-state { display: none; }
+  .calendar-workspace { grid-template-columns: 1fr; }
+  .day-agenda-list { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: none; }
   .metric-grid { grid-template-columns: repeat(2, 1fr); }
   .metric-card { min-height: 145px; }
   .insights-grid { grid-template-columns: 1fr; }
@@ -1268,9 +1734,9 @@ select:focus-visible {
   .mobile-add:hover { transform: translate(-50%, -1px); }
   .month-heading { align-items: flex-start; gap: 18px; padding-top: 25px; }
   .rate-note { padding-bottom: 0; }
-  .transaction-row { grid-template-columns: 34px minmax(130px, 1fr) minmax(100px, auto) 25px; }
+  .transaction-row { grid-template-columns: 34px minmax(130px, 1fr) minmax(100px, auto) 25px 25px; }
   .transaction-row time, .original-value { display: none; }
-  .delete-transaction { opacity: 1; }
+  .edit-transaction, .delete-transaction { opacity: 1; }
 }
 
 @media (max-width: 620px) {
@@ -1280,7 +1746,27 @@ select:focus-visible {
   .language-switch button:last-child::after { content: "KO"; font-size: 10px; }
   .month-heading { flex-direction: column; gap: 12px; }
   .month-heading h2 { font-size: 27px; }
+  .month-title-row { align-items: flex-start; flex-direction: column; gap: 9px; }
   .rate-note { max-width: 100%; text-align: left; }
+  .calendar-panel { padding: 13px; }
+  .calendar-panel-heading { align-items: center; }
+  .calendar-panel-heading p { max-width: 220px; }
+  .calendar-table-wrap { margin-left: -2px; margin-right: -2px; }
+  .calendar-table { border-spacing: 2px; }
+  .calendar-table th { padding-left: 1px; padding-right: 1px; text-align: center; }
+  .calendar-table td { height: 70px; }
+  .calendar-day { border-radius: 8px; padding: 5px 4px; }
+  .calendar-day-number { font-size: 9px; }
+  .calendar-day-number i { font-size: 0; height: 6px; padding: 0; width: 6px; }
+  .calendar-entry-previews { display: none; }
+  .calendar-day-totals { display: none; }
+  .calendar-entry-count { align-items: center; align-self: flex-end; background: #eef1ed; border-radius: 999px; color: var(--muted); display: flex; font-size: 9px; font-weight: 760; height: 19px; justify-content: center; margin-top: auto; width: 19px; }
+  .day-agenda { padding: 18px; }
+  .day-agenda-list { grid-template-columns: 1fr; }
+  .day-entry-main { grid-template-columns: 30px minmax(0, 1fr); }
+  .day-entry-value { font-size: 11px; grid-column: 2; text-align: left; }
+  .day-entry-actions button { height: 40px; width: 40px; }
+  .day-add-button { height: 44px; width: 44px; }
   .metric-grid { grid-template-columns: 1fr; }
   .metric-card { min-height: 138px; }
   .metric-featured { min-height: 164px; }
@@ -1291,9 +1777,10 @@ select:focus-visible {
   .currency-chart-wrap { gap: 24px; }
   .donut { height: 125px; width: 125px; }
   .transactions-heading { padding: 18px; }
-  .transaction-row { gap: 9px; padding: 8px 13px; }
+  .transaction-row { gap: 9px; grid-template-columns: 34px minmax(0, 1fr) minmax(82px, auto) 25px; padding: 8px 13px; }
   .transaction-name strong { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .transaction-drawer { padding: 24px 19px; top: auto; height: min(92vh, 760px); border-radius: 24px 24px 0 0; }
+  .delete-transaction { display: none; }
+  .transaction-drawer { padding: 24px 19px max(24px, env(safe-area-inset-bottom)); top: auto; height: min(92vh, 760px); border-radius: 24px 24px 0 0; }
   @keyframes slide-in { from { transform: translateY(100%); } }
   .drawer-header h2 { font-size: 25px; }
   .amount-row, .field-row { grid-template-columns: 1fr; }

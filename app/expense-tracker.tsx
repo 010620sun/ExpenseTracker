@@ -3,6 +3,8 @@
 import {
   type CSSProperties,
   type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -17,20 +19,26 @@ type LedgerTransaction = {
   id: string;
   kind: TransactionKind;
   occurredOn: string;
+  amount?: string;
   originalAmountMinor: number;
   originalCurrency: CurrencyCode;
   originalExponent: number;
   fxRate: string;
+  exchangeRateSource?: "identity" | "manual" | "sample" | "frankfurter";
+  rateDate?: string | null;
   baseAmountMinor: number;
   baseCurrency: "USD";
   category: string;
   description: string;
   note?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 type TransactionApiResponse = {
   data?: LedgerTransaction[] | LedgerTransaction;
   transaction?: LedgerTransaction;
+  pagination?: { nextCursor?: string | null };
   error?: { code?: string; field?: string };
 };
 
@@ -220,6 +228,7 @@ const COPY = {
     drawerTitle: "Add a transaction",
     drawerSubtitle: "Keep the original amount. We’ll save its USD rate for a stable history.",
     amountError: "Enter an amount greater than 0.",
+    dateError: "Choose a valid transaction date.",
     requiredError: "Add a merchant or description.",
     saved: "Transaction added.",
     deleted: "Transaction removed.",
@@ -298,6 +307,7 @@ const COPY = {
     drawerTitle: "거래 추가",
     drawerSubtitle: "원 결제 금액과 당시 USD 환율을 함께 저장해 과거 기록을 안정적으로 유지합니다.",
     amountError: "0보다 큰 금액을 입력하세요.",
+    dateError: "올바른 거래 날짜를 선택하세요.",
     requiredError: "사용처나 설명을 입력하세요.",
     saved: "거래가 추가되었습니다.",
     deleted: "거래가 삭제되었습니다.",
@@ -321,6 +331,67 @@ const COPY = {
     menu: "내비게이션 열기",
     deleteLabel: "{merchant} 삭제",
     convertedTo: "{currency} 기준",
+  },
+} as const;
+
+const CALENDAR_COPY = {
+  en: {
+    calendar: "Monthly calendar",
+    calendarHint: "Select a date to review, add, or edit entries.",
+    previousMonth: "Previous month",
+    nextMonth: "Next month",
+    thisMonth: "This month",
+    today: "Today",
+    selectedDay: "Selected day",
+    transactionCount: "{count} transactions",
+    addOnDate: "Add on {date}",
+    noTransactions: "No transactions on this day.",
+    moreTransactions: "+{count} more",
+    edit: "Edit",
+    editLabel: "Edit {merchant}",
+    editTransaction: "Edit transaction",
+    editSubtitle: "Update the entry while keeping its historical exchange-rate snapshot.",
+    update: "Save changes",
+    updating: "Saving changes…",
+    updated: "Transaction updated.",
+    historicalRate: "Saved historical rate",
+    changedConflict: "This entry changed elsewhere. Reopen it and try again.",
+    confirmDelete: "Delete {merchant}? This cannot be undone.",
+    expenseTotal: "Expense",
+    incomeTotal: "Income",
+    note: "Note",
+    notePlaceholder: "Optional details",
+    openDate: "Open {date}",
+    daySummary: "{count} entries, {expense} expense, {income} income",
+  },
+  ko: {
+    calendar: "월별 달력",
+    calendarHint: "날짜를 선택해 거래를 확인하고 추가하거나 수정하세요.",
+    previousMonth: "이전 달",
+    nextMonth: "다음 달",
+    thisMonth: "이번 달",
+    today: "오늘",
+    selectedDay: "선택한 날짜",
+    transactionCount: "거래 {count}건",
+    addOnDate: "{date}에 거래 추가",
+    noTransactions: "이 날짜에는 거래가 없습니다.",
+    moreTransactions: "외 {count}건",
+    edit: "수정",
+    editLabel: "{merchant} 수정",
+    editTransaction: "거래 수정",
+    editSubtitle: "과거 환율 기록은 유지하면서 거래 내용을 변경합니다.",
+    update: "변경사항 저장",
+    updating: "변경사항 저장 중…",
+    updated: "거래가 수정되었습니다.",
+    historicalRate: "저장된 과거 환율",
+    changedConflict: "다른 곳에서 변경된 거래입니다. 다시 열어 수정해 주세요.",
+    confirmDelete: "{merchant} 거래를 삭제할까요? 이 작업은 되돌릴 수 없습니다.",
+    expenseTotal: "지출",
+    incomeTotal: "수입",
+    note: "메모",
+    notePlaceholder: "선택 사항",
+    openDate: "{date} 열기",
+    daySummary: "거래 {count}건, 지출 {expense}, 수입 {income}",
   },
 } as const;
 
@@ -353,6 +424,20 @@ function formatCurrency(
     currencyDisplay: "narrowSymbol",
     minimumFractionDigits: CURRENCIES[currency].exponent,
     maximumFractionDigits: CURRENCIES[currency].exponent,
+  }).format(amount);
+}
+
+function formatCompactCurrency(
+  amount: number,
+  currency: CurrencyCode,
+  language: Language,
+) {
+  return new Intl.NumberFormat(language === "ko" ? "ko-KR" : "en-US", {
+    style: "currency",
+    currency,
+    currencyDisplay: "narrowSymbol",
+    notation: "compact",
+    maximumFractionDigits: 1,
   }).format(amount);
 }
 
@@ -423,7 +508,84 @@ function categoryGlyph(category: string) {
   return glyphs[category] ?? "O";
 }
 
-export function ExpenseTracker({ firstName }: { firstName: string | null }) {
+function shiftIsoDate(date: string, days: number) {
+  const shifted = new Date(`${date}T00:00:00Z`);
+  shifted.setUTCDate(shifted.getUTCDate() + days);
+  return shifted.toISOString().slice(0, 10);
+}
+
+function localIsoDate(date = new Date()) {
+  return [
+    String(date.getFullYear()).padStart(4, "0"),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function shiftMonth(month: string, amount: number) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const shifted = new Date(Date.UTC(year, monthNumber - 1 + amount, 1));
+  return shifted.toISOString().slice(0, 7);
+}
+
+function daysInMonth(month: string) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  return new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+}
+
+function dateInMonth(month: string, preferredDay: number) {
+  const day = Math.min(Math.max(preferredDay, 1), daysInMonth(month));
+  return `${month}-${String(day).padStart(2, "0")}`;
+}
+
+function calendarDates(month: string) {
+  const first = `${month}-01`;
+  const firstWeekday = new Date(`${first}T00:00:00Z`).getUTCDay();
+  const gridStart = shiftIsoDate(first, -firstWeekday);
+  return Array.from({ length: 42 }, (_, index) => {
+    const iso = shiftIsoDate(gridStart, index);
+    return {
+      iso,
+      day: Number(iso.slice(8, 10)),
+      inMonth: iso.startsWith(month),
+    };
+  });
+}
+
+function amountForInput(transaction: LedgerTransaction) {
+  if (transaction.amount) return transaction.amount;
+  const exponent = transaction.originalExponent;
+  if (exponent === 0) return String(transaction.originalAmountMinor);
+  const scale = 10 ** exponent;
+  const whole = Math.floor(transaction.originalAmountMinor / scale);
+  const fraction = String(transaction.originalAmountMinor % scale).padStart(
+    exponent,
+    "0",
+  );
+  return `${whole}.${fraction}`;
+}
+
+function byNewestTransaction(a: LedgerTransaction, b: LedgerTransaction) {
+  const dateComparison = b.occurredOn.localeCompare(a.occurredOn);
+  if (dateComparison !== 0) return dateComparison;
+  return (b.updatedAt ?? b.createdAt ?? b.id).localeCompare(
+    a.updatedAt ?? a.createdAt ?? a.id,
+  );
+}
+
+function isPersistedTransaction(transaction: LedgerTransaction) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    transaction.id,
+  );
+}
+
+export function ExpenseTracker({
+  firstName,
+  today,
+}: {
+  firstName: string | null;
+  today: string;
+}) {
   const [language, setLanguage] = useState<Language>("en");
   const [baseCurrency, setBaseCurrency] = useState<CurrencyCode>("USD");
   const [ratesToUsd, setRatesToUsd] =
@@ -437,7 +599,12 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
   const [transactions, setTransactions] =
     useState<LedgerTransaction[]>(FALLBACK_TRANSACTIONS);
   const [isSyncing, setIsSyncing] = useState(true);
+  const [currentDate, setCurrentDate] = useState(today);
+  const [viewMonth, setViewMonth] = useState(today.slice(0, 7));
+  const [selectedDate, setSelectedDate] = useState(today);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] =
+    useState<LedgerTransaction | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState("");
   const [kind, setKind] = useState<TransactionKind>("expense");
@@ -445,14 +612,25 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<CurrencyCode>("KRW");
   const [category, setCategory] = useState("dining");
-  const [occurredOn, setOccurredOn] = useState("2026-08-06");
+  const [note, setNote] = useState("");
+  const [occurredOn, setOccurredOn] = useState(today);
   const [formError, setFormError] = useState("");
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const descriptionRef = useRef<HTMLInputElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+  const drawerTriggerRef = useRef<HTMLElement | null>(null);
+  const drawerReturnDateRef = useRef(today);
+  const isSavingRef = useRef(false);
+  const calendarButtonRefs = useRef<Record<string, HTMLButtonElement | null>>(
+    {},
+  );
   const copy = COPY[language];
+  const calendarCopy = CALENDAR_COPY[language];
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
+      const localToday = localIsoDate();
+      setCurrentDate(localToday);
       const storedLanguage = window.localStorage.getItem("globeledger-language");
       const storedCurrency = window.localStorage.getItem(
         "globeledger-base-currency",
@@ -463,10 +641,17 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
       if (storedCurrency && storedCurrency in CURRENCIES) {
         setBaseCurrency(storedCurrency as CurrencyCode);
       }
+      if (localToday !== today) {
+        setTransactions([]);
+        setViewMonth(localToday.slice(0, 7));
+        setSelectedDate(localToday);
+        setOccurredOn(localToday);
+        setIsSyncing(true);
+      }
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, []);
+  }, [today]);
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -551,28 +736,68 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    const month = occurredOn.slice(0, 7);
 
     async function loadTransactions() {
       try {
-        const response = await fetch(`/api/transactions?month=${month}&limit=50`, {
-          signal: controller.signal,
-          cache: "no-store",
-        });
-        if (!response.ok) throw new Error("LOAD_FAILED");
-        const payload = (await response.json()) as TransactionApiResponse;
-        if (Array.isArray(payload.data)) setTransactions(payload.data);
+        const collected: LedgerTransaction[] = [];
+        let cursor: string | null = null;
+        let pageCount = 0;
+
+        do {
+          const search = new URLSearchParams({
+            month: viewMonth,
+            limit: "100",
+          });
+          if (cursor) search.set("cursor", cursor);
+          const response = await fetch(`/api/transactions?${search}`, {
+            signal: controller.signal,
+            cache: "no-store",
+          });
+          if (!response.ok) throw new Error("LOAD_FAILED");
+          const payload = (await response.json()) as TransactionApiResponse;
+          if (!Array.isArray(payload.data)) throw new Error("INVALID_LEDGER");
+          collected.push(...payload.data);
+          cursor = payload.pagination?.nextCursor ?? null;
+          pageCount += 1;
+          if (pageCount > 20) throw new Error("LEDGER_PAGE_LIMIT");
+        } while (cursor);
+
+        setTransactions(collected.sort(byNewestTransaction));
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
+        setTransactions((current) =>
+          current.filter(
+            (transaction) => transaction.occurredOn.slice(0, 7) === viewMonth,
+          ),
+        );
         setToast(copy.previewMode);
       } finally {
-        setIsSyncing(false);
+        if (!controller.signal.aborted) setIsSyncing(false);
       }
     }
 
     void loadTransactions();
     return () => controller.abort();
-  }, [occurredOn, copy.previewMode]);
+  }, [viewMonth, copy.previewMode]);
+
+  const closeDrawer = useCallback(() => {
+    if (isSavingRef.current) return;
+    setIsDrawerOpen(false);
+    setFormError("");
+    const trigger = drawerTriggerRef.current ?? addButtonRef.current;
+    drawerTriggerRef.current = null;
+    window.setTimeout(() => {
+      if (trigger?.isConnected) {
+        trigger.focus();
+        return;
+      }
+      (
+        calendarButtonRefs.current[drawerReturnDateRef.current] ??
+        addButtonRef.current
+      )?.focus();
+    }, 0);
+    setEditingTransaction(null);
+  }, []);
 
   useEffect(() => {
     if (!isDrawerOpen) return;
@@ -581,7 +806,25 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
     descriptionRef.current?.focus();
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") closeDrawer();
+      if (event.key === "Escape") {
+        closeDrawer();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = drawerRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable?.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
 
     window.addEventListener("keydown", handleKeyDown);
@@ -589,13 +832,21 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isDrawerOpen]);
+  }, [closeDrawer, isDrawerOpen]);
 
   useEffect(() => {
     if (!toast) return;
     const timeout = window.setTimeout(() => setToast(""), 4200);
     return () => window.clearTimeout(timeout);
   }, [toast]);
+
+  const monthlyTransactions = useMemo(
+    () =>
+      transactions.filter(
+        (transaction) => transaction.occurredOn.slice(0, 7) === viewMonth,
+      ),
+    [transactions, viewMonth],
+  );
 
   const totals = useMemo(() => {
     let expenseUsdMinor = 0;
@@ -604,7 +855,7 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
     const categories = new Map<string, number>();
     const currencyTotals = new Map<CurrencyCode, number>();
 
-    for (const transaction of transactions) {
+    for (const transaction of monthlyTransactions) {
       currencies.add(transaction.originalCurrency);
       if (transaction.kind === "income") {
         incomeUsdMinor += transaction.baseAmountMinor;
@@ -629,7 +880,38 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
       categories: [...categories.entries()].sort((a, b) => b[1] - a[1]),
       currencyTotals: [...currencyTotals.entries()].sort((a, b) => b[1] - a[1]),
     };
-  }, [transactions]);
+  }, [monthlyTransactions]);
+
+  const transactionsByDate = useMemo(() => {
+    const grouped = new Map<string, LedgerTransaction[]>();
+    for (const transaction of monthlyTransactions) {
+      const entries = grouped.get(transaction.occurredOn) ?? [];
+      entries.push(transaction);
+      grouped.set(transaction.occurredOn, entries);
+    }
+    for (const entries of grouped.values()) entries.sort(byNewestTransaction);
+    return grouped;
+  }, [monthlyTransactions]);
+  const monthCalendarDates = useMemo(
+    () => calendarDates(viewMonth),
+    [viewMonth],
+  );
+  const selectedTransactions = useMemo(
+    () => transactionsByDate.get(selectedDate) ?? [],
+    [selectedDate, transactionsByDate],
+  );
+  const selectedDayTotals = useMemo(() => {
+    let expenseUsdMinor = 0;
+    let incomeUsdMinor = 0;
+    for (const transaction of selectedTransactions) {
+      if (transaction.kind === "income") {
+        incomeUsdMinor += transaction.baseAmountMinor;
+      } else {
+        expenseUsdMinor += transaction.baseAmountMinor;
+      }
+    }
+    return { expenseUsdMinor, incomeUsdMinor };
+  }, [selectedTransactions]);
 
   const budgetUsdMinor = 350_000;
   const remainingUsdMinor = Math.max(0, budgetUsdMinor - totals.expenseUsdMinor);
@@ -651,33 +933,151 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
     return `conic-gradient(${stops.join(", ")})`;
   }, [totals.currencyTotals]);
 
-  const conversionRate = ratesToUsd[currency] / ratesToUsd[baseCurrency];
+  const usesStoredRate = Boolean(
+    editingTransaction &&
+      currency === editingTransaction.originalCurrency &&
+      Number.isFinite(Number(editingTransaction.fxRate)) &&
+      Number(editingTransaction.fxRate) > 0,
+  );
+  const formRateToUsd = usesStoredRate
+    ? Number(editingTransaction?.fxRate)
+    : ratesToUsd[currency];
+  const conversionRate = formRateToUsd / ratesToUsd[baseCurrency];
   const convertedPreview = Number(amount) ? Number(amount) * conversionRate : 0;
   const hasFrankfurterRate =
     rateMeta.status === "updated" || rateMeta.status === "stale";
   const selectedRateSource =
-    currency === "USD"
+    usesStoredRate
+      ? currency === "USD"
+        ? "identity"
+        : "manual"
+      : currency === "USD"
       ? "identity"
       : hasFrankfurterRate
         ? "frankfurter"
         : "manual";
-  const selectedRateDate = currency !== "USD" && hasFrankfurterRate
+  const selectedRateDate = !usesStoredRate && currency !== "USD" && hasFrankfurterRate
     ? rateMeta.rateDates[currency] ?? rateMeta.asOf
     : null;
 
-  function closeDrawer() {
-    setIsDrawerOpen(false);
-    setFormError("");
-    window.setTimeout(() => addButtonRef.current?.focus(), 0);
+  function rememberDrawerTrigger() {
+    drawerTriggerRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : addButtonRef.current;
   }
 
-  function openDrawer() {
+  function openAddDrawer(date = selectedDate) {
+    rememberDrawerTrigger();
+    drawerReturnDateRef.current = date;
+    setEditingTransaction(null);
+    setKind("expense");
+    setDescription("");
+    setAmount("");
+    setCurrency("KRW");
+    setCategory("dining");
+    setNote("");
+    setOccurredOn(date);
     setIsDrawerOpen(true);
     setFormError("");
   }
 
+  function openEditDrawer(transaction: LedgerTransaction) {
+    if (!isPersistedTransaction(transaction)) {
+      setToast(copy.previewMode);
+      return;
+    }
+    rememberDrawerTrigger();
+    drawerReturnDateRef.current = transaction.occurredOn;
+    setEditingTransaction(transaction);
+    setKind(transaction.kind);
+    setDescription(transaction.description);
+    setAmount(amountForInput(transaction));
+    setCurrency(transaction.originalCurrency);
+    setCategory(
+      transaction.kind === "income" ? "income" : transaction.category,
+    );
+    setNote(transaction.note ?? "");
+    setOccurredOn(transaction.occurredOn);
+    setIsDrawerOpen(true);
+    setFormError("");
+  }
+
+  function moveToMonth(month: string, date: string) {
+    setIsSyncing(true);
+    setTransactions([]);
+    setViewMonth(month);
+    setSelectedDate(date);
+  }
+
+  function navigateMonth(amount: number) {
+    const nextMonth = shiftMonth(viewMonth, amount);
+    const preferredDay = Number(selectedDate.slice(8, 10));
+    moveToMonth(nextMonth, dateInMonth(nextMonth, preferredDay));
+  }
+
+  function selectCalendarDate(date: string) {
+    const month = date.slice(0, 7);
+    if (month !== viewMonth) {
+      moveToMonth(month, date);
+      return;
+    }
+    setSelectedDate(date);
+  }
+
+  function focusCalendarDate(date: string) {
+    selectCalendarDate(date);
+    window.setTimeout(() => calendarButtonRefs.current[date]?.focus(), 0);
+  }
+
+  function handleCalendarKeyDown(
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    date: string,
+  ) {
+    let target: string | null = null;
+    if (event.key === "ArrowLeft") target = shiftIsoDate(date, -1);
+    if (event.key === "ArrowRight") target = shiftIsoDate(date, 1);
+    if (event.key === "ArrowUp") target = shiftIsoDate(date, -7);
+    if (event.key === "ArrowDown") target = shiftIsoDate(date, 7);
+    if (event.key === "Home") {
+      target = shiftIsoDate(
+        date,
+        -new Date(`${date}T00:00:00Z`).getUTCDay(),
+      );
+    }
+    if (event.key === "End") {
+      target = shiftIsoDate(
+        date,
+        6 - new Date(`${date}T00:00:00Z`).getUTCDay(),
+      );
+    }
+    if (event.key === "PageUp" || event.key === "PageDown") {
+      const nextMonth = shiftMonth(
+        date.slice(0, 7),
+        event.key === "PageUp" ? -1 : 1,
+      );
+      target = dateInMonth(nextMonth, Number(date.slice(8, 10)));
+    }
+    if (!target) return;
+    event.preventDefault();
+    focusCalendarDate(target);
+  }
+
+  function goToToday() {
+    if (currentDate.slice(0, 7) === viewMonth) {
+      setSelectedDate(currentDate);
+      window.setTimeout(
+        () => calendarButtonRefs.current[currentDate]?.focus(),
+        0,
+      );
+      return;
+    }
+    moveToMonth(currentDate.slice(0, 7), currentDate);
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isSavingRef.current) return;
     const numericAmount = Number(amount);
     if (!description.trim()) {
       setFormError(copy.requiredError);
@@ -688,24 +1088,35 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
       setFormError(copy.amountError);
       return;
     }
+    if (!isIsoDate(occurredOn)) {
+      setFormError(copy.dateError);
+      return;
+    }
 
+    isSavingRef.current = true;
     setIsSaving(true);
     setFormError("");
     try {
-      const response = await fetch("/api/transactions", {
-        method: "POST",
+      const endpoint = editingTransaction
+        ? `/api/transactions?id=${encodeURIComponent(editingTransaction.id)}`
+        : "/api/transactions";
+      const response = await fetch(endpoint, {
+        method: editingTransaction ? "PATCH" : "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           kind,
           occurredOn,
           amount,
           currency,
-          rate: String(ratesToUsd[currency]),
+          rate: String(formRateToUsd),
           rateSource: selectedRateSource,
           rateDate: selectedRateDate,
           category: kind === "income" ? "income" : category,
           description: description.trim(),
-          clientRequestId: crypto.randomUUID(),
+          note: note.trim(),
+          ...(editingTransaction
+            ? { expectedUpdatedAt: editingTransaction.updatedAt }
+            : { clientRequestId: crypto.randomUUID() }),
         }),
       });
       const payload = (await response.json()) as TransactionApiResponse;
@@ -717,36 +1128,76 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
         ? payload.data[0]
         : payload.data ?? payload.transaction;
       if (savedTransaction) {
-        setTransactions((current) =>
-          [savedTransaction, ...current].sort((a, b) =>
-            b.occurredOn.localeCompare(a.occurredOn),
-          ),
-        );
+        const savedMonth = savedTransaction.occurredOn.slice(0, 7);
+        drawerReturnDateRef.current = savedTransaction.occurredOn;
+        setTransactions((current) => {
+          const withoutSaved = current.filter(
+            (transaction) => transaction.id !== savedTransaction.id,
+          );
+          return savedMonth === viewMonth
+            ? [savedTransaction, ...withoutSaved].sort(byNewestTransaction)
+            : [savedTransaction];
+        });
+        setSelectedDate(savedTransaction.occurredOn);
+        if (savedMonth !== viewMonth) {
+          setIsSyncing(true);
+          setViewMonth(savedMonth);
+        }
       }
       setDescription("");
       setAmount("");
-      setToast(copy.saved);
+      setNote("");
+      setToast(editingTransaction ? calendarCopy.updated : copy.saved);
+      isSavingRef.current = false;
+      setIsSaving(false);
       closeDrawer();
     } catch (error) {
       setFormError(
-        error instanceof Error && error.message === "UNAUTHENTICATED"
-          ? copy.signInNeeded
+        error instanceof Error
+          ? error.message === "UNAUTHENTICATED"
+            ? copy.signInNeeded
+            : error.message === "TRANSACTION_CHANGED"
+              ? calendarCopy.changedConflict
+              : copy.saveFailed
           : copy.saveFailed,
       );
     } finally {
+      isSavingRef.current = false;
       setIsSaving(false);
     }
   }
 
   async function deleteTransaction(transaction: LedgerTransaction) {
+    if (!isPersistedTransaction(transaction)) {
+      setToast(copy.previewMode);
+      return;
+    }
+    if (
+      !window.confirm(
+        template(calendarCopy.confirmDelete, {
+          merchant: transaction.description,
+        }),
+      )
+    ) {
+      return;
+    }
     const previous = transactions;
     setTransactions((current) => current.filter((item) => item.id !== transaction.id));
+    window.setTimeout(
+      () =>
+        (
+          calendarButtonRefs.current[transaction.occurredOn] ??
+          addButtonRef.current
+        )?.focus(),
+      0,
+    );
     try {
       const response = await fetch(
         `/api/transactions?id=${encodeURIComponent(transaction.id)}`,
         { method: "DELETE" },
       );
       if (!response.ok) throw new Error("DELETE_FAILED");
+      if (editingTransaction?.id === transaction.id) closeDrawer();
       setToast(copy.deleted);
     } catch {
       setTransactions(previous);
@@ -758,7 +1209,21 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
   const monthLabel = new Intl.DateTimeFormat(locale, {
     month: "long",
     year: "numeric",
-  }).format(new Date(`${occurredOn.slice(0, 7)}-01T12:00:00`));
+    timeZone: "UTC",
+  }).format(new Date(`${viewMonth}-01T00:00:00Z`));
+  const selectedDateLabel = new Intl.DateTimeFormat(locale, {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${selectedDate}T00:00:00Z`));
+  const weekdayLabels = Array.from({ length: 7 }, (_, index) =>
+    new Intl.DateTimeFormat(locale, {
+      weekday: "short",
+      timeZone: "UTC",
+    }).format(new Date(Date.UTC(2026, 7, 2 + index))),
+  );
   const rateDateLabel = rateMeta.asOf
     ? new Intl.DateTimeFormat(locale, {
         year: "numeric",
@@ -867,16 +1332,23 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
                 ))}
               </select>
             </label>
-            <button className="primary-button desktop-add" onClick={openDrawer} ref={addButtonRef}>
+            <button className="primary-button desktop-add" onClick={() => openAddDrawer()} ref={addButtonRef}>
               <span aria-hidden="true">＋</span> {copy.addExpense}
             </button>
           </div>
         </header>
 
         <section className="month-heading" aria-labelledby="month-overview-title">
-          <div>
+          <div className="month-heading-copy">
             <span className="eyebrow">{copy.overview}</span>
-            <h2 id="month-overview-title">{monthLabel}</h2>
+            <div className="month-title-row">
+              <h2 id="month-overview-title" aria-live="polite">{monthLabel}</h2>
+              <div className="month-controls" role="group" aria-label={calendarCopy.calendar}>
+                <button type="button" onClick={() => navigateMonth(-1)} aria-label={calendarCopy.previousMonth}>‹</button>
+                <button type="button" className="month-today" onClick={goToToday}>{calendarCopy.thisMonth}</button>
+                <button type="button" onClick={() => navigateMonth(1)} aria-label={calendarCopy.nextMonth}>›</button>
+              </div>
+            </div>
           </div>
           <div
             className={`rate-note rate-note-${rateMeta.status}`}
@@ -896,6 +1368,183 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
               )}
             </span>
           </div>
+        </section>
+
+        <section className="calendar-workspace" aria-label={calendarCopy.calendar}>
+          <article className="panel calendar-panel" aria-busy={isSyncing}>
+            <div className="calendar-panel-heading">
+              <div>
+                <span className="eyebrow">{calendarCopy.calendar}</span>
+                <h2>{monthLabel}</h2>
+                <p>{calendarCopy.calendarHint}</p>
+              </div>
+              <button type="button" className="calendar-today-button" onClick={goToToday}>
+                {calendarCopy.today}
+              </button>
+            </div>
+            <div className="calendar-table-wrap">
+              <table className="calendar-table">
+                <caption className="sr-only">{calendarCopy.calendar}: {monthLabel}</caption>
+                <thead>
+                  <tr>
+                    {weekdayLabels.map((weekday) => (
+                      <th key={weekday} scope="col">{weekday}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: 6 }, (_, weekIndex) => (
+                    <tr key={weekIndex}>
+                      {monthCalendarDates
+                        .slice(weekIndex * 7, weekIndex * 7 + 7)
+                        .map((calendarDate) => {
+                          const dayEntries =
+                            transactionsByDate.get(calendarDate.iso) ?? [];
+                          let expenseUsdMinor = 0;
+                          let incomeUsdMinor = 0;
+                          for (const transaction of dayEntries) {
+                            if (transaction.kind === "income") {
+                              incomeUsdMinor += transaction.baseAmountMinor;
+                            } else {
+                              expenseUsdMinor += transaction.baseAmountMinor;
+                            }
+                          }
+                          const expense = formatCompactCurrency(
+                            inBaseCurrency(expenseUsdMinor, baseCurrency, ratesToUsd),
+                            baseCurrency,
+                            language,
+                          );
+                          const income = formatCompactCurrency(
+                            inBaseCurrency(incomeUsdMinor, baseCurrency, ratesToUsd),
+                            baseCurrency,
+                            language,
+                          );
+                          const dayLabel = new Intl.DateTimeFormat(locale, {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                            timeZone: "UTC",
+                          }).format(new Date(`${calendarDate.iso}T00:00:00Z`));
+                          return (
+                            <td
+                              className={calendarDate.inMonth ? "" : "outside-month"}
+                              key={calendarDate.iso}
+                            >
+                              <button
+                                type="button"
+                                data-calendar-date={calendarDate.iso}
+                                className={calendarDate.iso === selectedDate ? "calendar-day selected" : "calendar-day"}
+                                aria-current={calendarDate.iso === currentDate ? "date" : undefined}
+                                aria-label={`${template(calendarCopy.openDate, { date: dayLabel })}. ${template(calendarCopy.daySummary, { count: dayEntries.length, expense, income })}`}
+                                aria-pressed={calendarDate.iso === selectedDate}
+                                tabIndex={calendarDate.iso === selectedDate ? 0 : -1}
+                                ref={(node) => {
+                                  calendarButtonRefs.current[calendarDate.iso] = node;
+                                }}
+                                onClick={() =>
+                                  calendarDate.inMonth
+                                    ? selectCalendarDate(calendarDate.iso)
+                                    : focusCalendarDate(calendarDate.iso)
+                                }
+                                onKeyDown={(event) => handleCalendarKeyDown(event, calendarDate.iso)}
+                              >
+                                <span className="calendar-day-number">
+                                  {calendarDate.day}
+                                  {calendarDate.iso === currentDate && <i>{calendarCopy.today}</i>}
+                                </span>
+                                <span className="calendar-entry-previews" aria-hidden="true">
+                                  {dayEntries.slice(0, 2).map((transaction) => (
+                                    <span className={transaction.kind === "income" ? "calendar-entry-preview income" : "calendar-entry-preview"} key={transaction.id}>
+                                      <i style={{ backgroundColor: CATEGORY_COLORS[transaction.category] ?? CATEGORY_COLORS.other }} />
+                                      <b>{transaction.description}</b>
+                                    </span>
+                                  ))}
+                                  {dayEntries.length > 2 && (
+                                    <small>{template(calendarCopy.moreTransactions, { count: dayEntries.length - 2 })}</small>
+                                  )}
+                                </span>
+                                {dayEntries.length > 0 && (
+                                  <span className="calendar-entry-count" aria-hidden="true">
+                                    {dayEntries.length}
+                                  </span>
+                                )}
+                                {dayEntries.length > 0 && (
+                                  <span className="calendar-day-totals" aria-hidden="true">
+                                    {expenseUsdMinor > 0 && <b>−{expense}</b>}
+                                    {incomeUsdMinor > 0 && <b className="income">+{income}</b>}
+                                  </span>
+                                )}
+                              </button>
+                            </td>
+                          );
+                        })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <aside className="panel day-agenda" aria-labelledby="selected-day-title">
+            <div className="day-agenda-heading">
+              <div>
+                <span className="eyebrow">{calendarCopy.selectedDay}</span>
+                <h2 id="selected-day-title">{selectedDateLabel}</h2>
+                <p>{template(calendarCopy.transactionCount, { count: selectedTransactions.length })}</p>
+              </div>
+              <button type="button" className="day-add-button" onClick={() => openAddDrawer(selectedDate)} aria-label={template(calendarCopy.addOnDate, { date: selectedDateLabel })}>+</button>
+            </div>
+            <div className="day-summary-cards">
+              <div>
+                <span>{calendarCopy.expenseTotal}</span>
+                <strong>−{formatCurrency(inBaseCurrency(selectedDayTotals.expenseUsdMinor, baseCurrency, ratesToUsd), baseCurrency, language)}</strong>
+              </div>
+              <div className="income">
+                <span>{calendarCopy.incomeTotal}</span>
+                <strong>+{formatCurrency(inBaseCurrency(selectedDayTotals.incomeUsdMinor, baseCurrency, ratesToUsd), baseCurrency, language)}</strong>
+              </div>
+            </div>
+            {selectedTransactions.length ? (
+              <div className="day-agenda-list">
+                {selectedTransactions.map((transaction) => {
+                  const canModify = isPersistedTransaction(transaction);
+                  return (
+                  <article className="day-agenda-entry" key={transaction.id}>
+                    <button
+                      type="button"
+                      className="day-entry-main"
+                      disabled={!canModify}
+                      onClick={canModify ? () => openEditDrawer(transaction) : undefined}
+                      aria-label={canModify ? template(calendarCopy.editLabel, { merchant: transaction.description }) : transaction.description}
+                    >
+                      <span className="transaction-glyph" style={{ backgroundColor: `${CATEGORY_COLORS[transaction.category] ?? CATEGORY_COLORS.other}18`, color: CATEGORY_COLORS[transaction.category] ?? CATEGORY_COLORS.other }} aria-hidden="true">
+                        {categoryGlyph(transaction.category)}
+                      </span>
+                      <span className="day-entry-copy">
+                        <strong>{transaction.description}</strong>
+                        <small>{categoryLabel(transaction.category, language)} · {formatCurrency(originalMajor(transaction), transaction.originalCurrency, language)} {transaction.originalCurrency}</small>
+                      </span>
+                      <span className={transaction.kind === "income" ? "day-entry-value income" : "day-entry-value"}>
+                        {transaction.kind === "income" ? "+" : "−"}{formatCurrency(inBaseCurrency(transaction.baseAmountMinor, baseCurrency, ratesToUsd), baseCurrency, language)}
+                      </span>
+                    </button>
+                    {canModify && (
+                      <div className="day-entry-actions">
+                        <button type="button" className="danger" onClick={() => void deleteTransaction(transaction)} aria-label={template(copy.deleteLabel, { merchant: transaction.description })}>×</button>
+                      </div>
+                    )}
+                  </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="day-agenda-empty">
+                <span aria-hidden="true">＋</span>
+                <p>{calendarCopy.noTransactions}</p>
+                <button type="button" onClick={() => openAddDrawer(selectedDate)}>{template(calendarCopy.addOnDate, { date: selectedDateLabel })}</button>
+              </div>
+            )}
+          </aside>
         </section>
 
         <section className="metric-grid" aria-label={`${monthLabel} overview`}>
@@ -1000,9 +1649,9 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
             <div><h2>{copy.recent}</h2><p>{template(copy.recentHint, { currency: baseCurrency })}</p></div>
             <button className="text-button">{copy.allActivity} <span aria-hidden="true">→</span></button>
           </div>
-          {transactions.length ? (
+          {monthlyTransactions.length ? (
             <div className="transaction-list">
-              {transactions.slice(0, 6).map((transaction) => (
+              {monthlyTransactions.slice(0, 6).map((transaction) => (
                 <article className="transaction-row" key={transaction.id}>
                   <span
                     className="transaction-glyph"
@@ -1031,13 +1680,26 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
                     <strong>{transaction.kind === "income" ? "+" : "−"}{formatCurrency(inBaseCurrency(transaction.baseAmountMinor, baseCurrency, ratesToUsd), baseCurrency, language)}</strong>
                     <span>{template(copy.convertedTo, { currency: baseCurrency })}</span>
                   </div>
-                  <button
-                    className="delete-transaction"
-                    onClick={() => void deleteTransaction(transaction)}
-                    aria-label={template(copy.deleteLabel, { merchant: transaction.description })}
-                  >
-                    ×
-                  </button>
+                  {isPersistedTransaction(transaction) && (
+                    <>
+                      <button
+                        type="button"
+                        className="edit-transaction"
+                        onClick={() => openEditDrawer(transaction)}
+                        aria-label={template(calendarCopy.editLabel, { merchant: transaction.description })}
+                      >
+                        ✎
+                      </button>
+                      <button
+                        type="button"
+                        className="delete-transaction"
+                        onClick={() => void deleteTransaction(transaction)}
+                        aria-label={template(copy.deleteLabel, { merchant: transaction.description })}
+                      >
+                        ×
+                      </button>
+                    </>
+                  )}
                 </article>
               ))}
             </div>
@@ -1049,22 +1711,26 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
         </footer>
       </main>
 
-      <button className="primary-button mobile-add" onClick={openDrawer}>
+      <button className="primary-button mobile-add" onClick={() => openAddDrawer()}>
         <span aria-hidden="true">＋</span> {copy.addExpense}
       </button>
 
       {isDrawerOpen && (
         <div className="drawer-layer">
-          <button className="drawer-scrim" aria-label={copy.close} onClick={closeDrawer} />
-          <aside className="transaction-drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+          <button className="drawer-scrim" aria-label={copy.close} onClick={closeDrawer} disabled={isSaving} />
+          <aside ref={drawerRef} className="transaction-drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" aria-describedby="drawer-description" aria-busy={isSaving}>
             <div className="drawer-header">
-              <div><span className="eyebrow">GlobeLedger</span><h2 id="drawer-title">{copy.drawerTitle}</h2><p>{copy.drawerSubtitle}</p></div>
-              <button className="drawer-close" onClick={closeDrawer} aria-label={copy.close}>×</button>
+              <div>
+                <span className="eyebrow">GlobeLedger</span>
+                <h2 id="drawer-title">{editingTransaction ? calendarCopy.editTransaction : copy.drawerTitle}</h2>
+                <p id="drawer-description">{editingTransaction ? calendarCopy.editSubtitle : copy.drawerSubtitle}</p>
+              </div>
+              <button type="button" className="drawer-close" onClick={closeDrawer} aria-label={copy.close} disabled={isSaving}>×</button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="kind-switch" aria-label={`${copy.expense} / ${copy.income}`}>
-                <button type="button" className={kind === "expense" ? "selected" : ""} onClick={() => { setKind("expense"); if (category === "income") setCategory("dining"); }}>{copy.expense}</button>
-                <button type="button" className={kind === "income" ? "selected" : ""} onClick={() => { setKind("income"); setCategory("income"); }}>{copy.income}</button>
+                <button type="button" aria-pressed={kind === "expense"} className={kind === "expense" ? "selected" : ""} onClick={() => { setKind("expense"); if (category === "income") setCategory("dining"); }}>{copy.expense}</button>
+                <button type="button" aria-pressed={kind === "income"} className={kind === "income" ? "selected" : ""} onClick={() => { setKind("income"); setCategory("income"); }}>{copy.income}</button>
               </div>
               <label className="field">
                 <span>{copy.merchant}</span>
@@ -1086,7 +1752,7 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
                 <div><span>{copy.converted}</span><strong>{formatCurrency(convertedPreview, baseCurrency, language)} <small>{baseCurrency}</small></strong></div>
                 <p>
                   1 {currency} = {conversionRate < 0.01 ? conversionRate.toFixed(6) : conversionRate.toFixed(4)} {baseCurrency}
-                  {" · "}{currency === "USD" ? copy.identityRate : hasFrankfurterRate ? copy.rateProvider : copy.fallbackRate}
+                  {" · "}{usesStoredRate ? calendarCopy.historicalRate : currency === "USD" ? copy.identityRate : hasFrankfurterRate ? copy.rateProvider : copy.fallbackRate}
                   {selectedRateDate ? ` · ${copy.rateDate}: ${selectedRateDate}` : ""}
                   {" · "}{copy.savedRate}
                 </p>
@@ -1101,12 +1767,24 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
               )}
               <label className="field">
                 <span>{copy.date}</span>
-                <input type="date" value={occurredOn} onChange={(event) => setOccurredOn(event.target.value)} />
+                <input type="date" value={occurredOn} onChange={(event) => setOccurredOn(event.target.value)} required />
+              </label>
+              <label className="field">
+                <span>{calendarCopy.note}</span>
+                <textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder={calendarCopy.notePlaceholder} />
               </label>
               {formError && <p className="form-error" role="alert">{formError}</p>}
               <div className="drawer-actions">
-                <button type="button" className="secondary-button" onClick={closeDrawer}>{copy.cancel}</button>
-                <button type="submit" className="primary-button" disabled={isSaving}>{isSaving ? copy.saving : copy.save}</button>
+                <button type="button" className="secondary-button" onClick={closeDrawer} disabled={isSaving}>{copy.cancel}</button>
+                <button type="submit" className="primary-button" aria-disabled={isSaving}>
+                  {isSaving
+                    ? editingTransaction
+                      ? calendarCopy.updating
+                      : copy.saving
+                    : editingTransaction
+                      ? calendarCopy.update
+                      : copy.save}
+                </button>
               </div>
             </form>
           </aside>

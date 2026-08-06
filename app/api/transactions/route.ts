@@ -31,6 +31,8 @@ const BIGINT_TWO = BigInt(2);
 const BIGINT_TEN = BigInt(10);
 const MAX_AMOUNT_MINOR = BigInt("9000000000000");
 const LOCAL_DEMO_OWNER_ID = "local-demo";
+const TRANSACTION_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const NO_STORE_HEADERS = {
   "Cache-Control": "private, no-store",
 };
@@ -298,6 +300,31 @@ function isValidDate(value: string) {
     date.getUTCMonth() === month - 1 &&
     date.getUTCDate() === day
   );
+}
+
+function parseExpectedUpdatedAt(value: unknown) {
+  if (value === undefined) return null;
+  if (typeof value !== "string") {
+    throw new ApiValidationError(
+      "INVALID_EXPECTED_UPDATED_AT",
+      400,
+      "expectedUpdatedAt",
+    );
+  }
+
+  const timestamp = Date.parse(value);
+  if (
+    !Number.isSafeInteger(timestamp) ||
+    timestamp <= 0 ||
+    new Date(timestamp).toISOString() !== value
+  ) {
+    throw new ApiValidationError(
+      "INVALID_EXPECTED_UPDATED_AT",
+      400,
+      "expectedUpdatedAt",
+    );
+  }
+  return timestamp;
 }
 
 function parseMonth(value: string | null) {
@@ -965,6 +992,108 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  try {
+    if (!isSameOrigin(request)) {
+      return errorResponse("CROSS_ORIGIN_REQUEST", 403);
+    }
+
+    const ownerId = await ownerIdForRequest(request);
+    if (!ownerId) return errorResponse("AUTH_REQUIRED", 401);
+
+    const id = new URL(request.url).searchParams.get("id") ?? "";
+    if (!TRANSACTION_ID_PATTERN.test(id)) {
+      return errorResponse("INVALID_TRANSACTION_ID", 400, "id");
+    }
+
+    const body = await readJsonBody(request);
+    const expectedUpdatedAt = parseExpectedUpdatedAt(body.expectedUpdatedAt);
+    const db = getDb();
+    const existingRows = await db
+      .select()
+      .from(transactions)
+      .where(and(eq(transactions.id, id), eq(transactions.ownerId, ownerId)))
+      .limit(1);
+    const existing = existingRows[0];
+    if (!existing) return errorResponse("TRANSACTION_NOT_FOUND", 404);
+    if (
+      expectedUpdatedAt !== null &&
+      expectedUpdatedAt !== existing.updatedAtMs
+    ) {
+      return errorResponse("TRANSACTION_CHANGED", 409, "expectedUpdatedAt");
+    }
+
+    const proposedBody: JsonRecord = { ...body };
+    delete proposedBody.clientRequestId;
+    if (proposedBody.note === undefined) proposedBody.note = existing.note;
+
+    const rawCurrency = proposedBody.currency;
+    const submittedCurrency =
+      typeof rawCurrency === "string"
+        ? rawCurrency.trim().toUpperCase()
+        : rawCurrency;
+    const preserveStoredFx =
+      submittedCurrency === existing.originalCurrency;
+
+    if (preserveStoredFx) {
+      proposedBody.currency = existing.originalCurrency;
+      proposedBody.exchangeRate = existing.fxRate;
+      proposedBody.exchangeRateSource =
+        existing.originalCurrency === BASE_CURRENCY ? "identity" : "manual";
+      proposedBody.rateDate = null;
+    }
+
+    const proposed = await buildNewTransaction(ownerId, proposedBody, db);
+    const updatedAtMs = Math.max(Date.now(), existing.updatedAtMs + 1);
+    const updatedRows = await db
+      .update(transactions)
+      .set({
+        kind: proposed.kind,
+        occurredOn: proposed.occurredOn,
+        originalAmountMinor: proposed.originalAmountMinor,
+        originalCurrency: proposed.originalCurrency,
+        originalCurrencyExponent: proposed.originalCurrencyExponent,
+        fxRate: preserveStoredFx ? existing.fxRate : proposed.fxRate,
+        fxSource: preserveStoredFx ? existing.fxSource : proposed.fxSource,
+        fxRateDate: preserveStoredFx
+          ? existing.fxRateDate
+          : proposed.fxRateDate,
+        fxCapturedAtMs: preserveStoredFx
+          ? existing.fxCapturedAtMs
+          : proposed.fxCapturedAtMs,
+        baseAmountMinor: proposed.baseAmountMinor,
+        baseCurrency: proposed.baseCurrency,
+        baseCurrencyExponent: proposed.baseCurrencyExponent,
+        category: proposed.category,
+        description: proposed.description,
+        note: proposed.note,
+        updatedAtMs,
+      })
+      .where(
+        and(
+          eq(transactions.id, id),
+          eq(transactions.ownerId, ownerId),
+          eq(transactions.updatedAtMs, existing.updatedAtMs),
+        ),
+      )
+      .returning();
+    if (!updatedRows[0]) {
+      return errorResponse("TRANSACTION_CHANGED", 409, "expectedUpdatedAt");
+    }
+
+    return Response.json(
+      { data: serializeTransaction(updatedRows[0]) },
+      { headers: NO_STORE_HEADERS },
+    );
+  } catch (error) {
+    if (error instanceof ApiValidationError) {
+      return errorResponse(error.code, error.status, error.field);
+    }
+    console.error("[transactions] PATCH failed", error);
+    return errorResponse("INTERNAL_ERROR", 500);
+  }
+}
+
 export async function DELETE(request: Request) {
   try {
     if (!isSameOrigin(request)) {
@@ -975,11 +1104,7 @@ export async function DELETE(request: Request) {
     if (!ownerId) return errorResponse("AUTH_REQUIRED", 401);
 
     const id = new URL(request.url).searchParams.get("id") ?? "";
-    if (
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
-        id,
-      )
-    ) {
+    if (!TRANSACTION_ID_PATTERN.test(id)) {
       return errorResponse("INVALID_TRANSACTION_ID", 400, "id");
     }
 

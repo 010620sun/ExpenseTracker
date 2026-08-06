@@ -35,10 +35,34 @@ test("server-renders the GlobeLedger dashboard", async () => {
   assert.match(html, /Every currency, one clear picture\./);
   assert.match(html, /Frankfurter reference rates/);
   assert.match(html, /Updating reference rates/);
+  assert.match(html, /Monthly calendar/);
+  assert.match(html, /Previous month/);
+  assert.match(html, /Next month/);
   assert.match(html, /Spent this month/);
   assert.match(html, /Recent transactions/);
   assert.match(html, /한국어/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
+
+  const calendarDates = [
+    ...html.matchAll(/data-calendar-date="(\d{4}-\d{2}-\d{2})"/gu),
+  ].map((match) => match[1]);
+  assert.equal(calendarDates.length, 42);
+  assert.equal(new Set(calendarDates).size, 42);
+  assert.equal(new Date(`${calendarDates[0]}T00:00:00Z`).getUTCDay(), 0);
+  assert.equal(
+    new Date(`${calendarDates.at(-1)}T00:00:00Z`).getUTCDay(),
+    6,
+  );
+  assert.ok(
+    calendarDates.some((date) =>
+      date.startsWith(new Date().toISOString().slice(0, 7)),
+    ),
+  );
+  for (let index = 1; index < calendarDates.length; index += 1) {
+    const previous = Date.parse(`${calendarDates[index - 1]}T00:00:00Z`);
+    const current = Date.parse(`${calendarDates[index]}T00:00:00Z`);
+    assert.equal(current - previous, 86_400_000);
+  }
 });
 
 test("removes starter preview assets and pins product metadata", async () => {
