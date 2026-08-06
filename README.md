@@ -48,10 +48,12 @@ npm test
 
 ## Exchange-rate model
 
-Frankfurter v2 is the default reference-rate source. The server uses a
-one-hour freshness window, refreshes rates on demand, and stores the last
-successful result in D1. If an upstream refresh fails, the last-known-good
-result remains available with a stale status until a refresh succeeds.
+Frankfurter v2 is the default reference-rate source. The server discovers every
+currency in the provider's latest USD rate response instead of maintaining a
+fixed allowlist. It uses a one-hour freshness window, refreshes rates on demand,
+and stores the last successful complete result in D1. If an upstream refresh
+fails, the last-known-good result remains available with a stale status until a
+refresh succeeds.
 
 The application direction is always `1 original currency = rate USD`, even
 though Frankfurter returns quote units per USD. The server normalizes that

@@ -15,6 +15,13 @@
       "when": 1786007443138,
       "tag": "0001_parched_moondragon",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786031888582,
+      "tag": "0002_medical_war_machine",
+      "breakpoints": true
     }
   ]
 }

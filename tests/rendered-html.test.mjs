@@ -112,3 +112,24 @@ test("provides an expanded visual expense category picker", async () => {
   assert.match(categoryPopoverStyles[1], /position:\s*relative/u);
   assert.doesNotMatch(categoryPopoverStyles[1], /position:\s*absolute/u);
 });
+
+test("discovers every current Frankfurter currency dynamically", async () => {
+  const [ratesRoute, tracker, schema, currencyHelpers] = await Promise.all([
+    readFile(new URL("../app/api/rates/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/currency.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(ratesRoute, /searchParams\.set\("base", BASE_CURRENCY\)/u);
+  assert.doesNotMatch(ratesRoute, /searchParams\.set\("quotes"/u);
+  assert.match(ratesRoute, /payload\.length < MIN_REMOTE_CURRENCY_COUNT/u);
+  assert.match(ratesRoute, /currencies,/u);
+  assert.match(tracker, /payload\.currencies\.length < 100/u);
+  assert.match(tracker, /currencyCatalog\.map/u);
+  assert.doesNotMatch(tracker, /type CurrencyCode = keyof/u);
+  assert.match(schema, /exchange_rate_cache_quote_shape/u);
+  assert.doesNotMatch(schema, /exchange_rate_cache_supported_quote/u);
+  assert.match(currencyHelpers, /Intl\.NumberFormat/u);
+  assert.match(currencyHelpers, /Intl\.DisplayNames/u);
+});

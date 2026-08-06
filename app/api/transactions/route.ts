@@ -18,6 +18,7 @@ import {
   type NewTransaction,
   type Transaction,
 } from "@/db/schema";
+import { currencyExponent } from "@/lib/currency";
 
 export const dynamic = "force-dynamic";
 
@@ -36,50 +37,6 @@ const TRANSACTION_ID_PATTERN =
 const NO_STORE_HEADERS = {
   "Cache-Control": "private, no-store",
 };
-
-const SUPPORTED_CURRENCIES = new Set(
-  (
-    "AED AFN ALL AMD ANG AOA ARS AUD AWG AZN BAM BBD BDT BGN BHD BIF " +
-    "BMD BND BOB BRL BSD BTN BWP BYN BZD CAD CDF CHF CLP CNY COP CRC CUC " +
-    "CUP CVE CZK DJF DKK DOP DZD EGP ERN ETB EUR FJD FKP GBP GEL GHS GIP " +
-    "GMD GNF GTQ GYD HKD HNL HRK HTG HUF IDR ILS INR IQD IRR ISK JMD " +
-    "JOD JPY KES KGS KHR KMF KPW KRW KWD KYD KZT LAK LBP LKR LRD LSL " +
-    "LYD MAD MDL MGA MKD MMK MNT MOP MRU MUR MVR MWK MXN MYR MZN NAD " +
-    "NGN NIO NOK NPR NZD OMR PAB PEN PGK PHP PKR PLN PYG QAR RON RSD RUB " +
-    "RWF SAR SBD SCR SDG SEK SGD SHP SLE SLL SOS SRD SSP STN SVC SYP SZL " +
-    "THB TJS TMT TND TOP TRY TTD TWD TZS UAH UGX USD UYU UZS VES VND VUV " +
-    "WST XAF XCD XCG XDR XOF XPF XSU YER ZAR ZMW ZWG ZWL"
-  ).split(" "),
-);
-
-const ZERO_DECIMAL_CURRENCIES = new Set([
-  "BIF",
-  "CLP",
-  "DJF",
-  "GNF",
-  "ISK",
-  "JPY",
-  "KMF",
-  "KRW",
-  "PYG",
-  "RWF",
-  "UGX",
-  "VND",
-  "VUV",
-  "XAF",
-  "XOF",
-  "XPF",
-]);
-
-const THREE_DECIMAL_CURRENCIES = new Set([
-  "BHD",
-  "IQD",
-  "JOD",
-  "KWD",
-  "LYD",
-  "OMR",
-  "TND",
-]);
 
 type JsonRecord = Record<string, unknown>;
 
@@ -210,13 +167,6 @@ function isSameOrigin(request: Request) {
   } catch {
     return false;
   }
-}
-
-function currencyExponent(currency: string) {
-  if (!SUPPORTED_CURRENCIES.has(currency)) return null;
-  if (ZERO_DECIMAL_CURRENCIES.has(currency)) return 0;
-  if (THREE_DECIMAL_CURRENCIES.has(currency)) return 3;
-  return 2;
 }
 
 function parseAmount(value: unknown, exponent: number) {

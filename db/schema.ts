@@ -43,8 +43,8 @@ export const exchangeRateCache = sqliteTable(
   },
   (table) => [
     check(
-      "exchange_rate_cache_supported_quote",
-      sql`${table.quoteCurrency} IN ('KRW', 'EUR', 'JPY', 'GBP', 'SGD', 'CAD', 'AUD')`,
+      "exchange_rate_cache_quote_shape",
+      sql`length(${table.quoteCurrency}) = 3 AND ${table.quoteCurrency} = upper(${table.quoteCurrency})`,
     ),
     check(
       "exchange_rate_cache_base_usd",
@@ -91,8 +91,8 @@ export const exchangeRateSnapshots = sqliteTable(
       sql`length(${table.snapshotId}) BETWEEN 1 AND 64 AND ${table.snapshotId} = ${table.quoteCurrency} || ':' || ${table.rateDate} || ':' || ${table.usdPerUnit}`,
     ),
     check(
-      "exchange_rate_snapshots_supported_quote",
-      sql`${table.quoteCurrency} IN ('KRW', 'EUR', 'JPY', 'GBP', 'SGD', 'CAD', 'AUD')`,
+      "exchange_rate_snapshots_quote_shape",
+      sql`length(${table.quoteCurrency}) = 3 AND ${table.quoteCurrency} = upper(${table.quoteCurrency})`,
     ),
     check(
       "exchange_rate_snapshots_base_usd",

@@ -11,9 +11,18 @@ import {
   useState,
 } from "react";
 
+import { currencyExponent } from "@/lib/currency";
+
 type Language = "en" | "ko";
-type CurrencyCode = keyof typeof CURRENCIES;
+type CurrencyCode = string;
 type TransactionKind = "expense" | "income";
+
+type CurrencyMetadata = {
+  code: CurrencyCode;
+  name: string;
+  symbol: string;
+  exponent: number;
+};
 
 type LedgerTransaction = {
   id: string;
@@ -52,6 +61,7 @@ type RatesPayload = {
   stale: boolean;
   rates: Record<string, string>;
   rateDates?: Record<string, string>;
+  currencies?: CurrencyMetadata[];
 };
 
 type RatesApiResponse = RatesPayload & {
@@ -64,10 +74,10 @@ type RateMeta = {
   status: RateStatus;
   asOf: string | null;
   fetchedAt: string | null;
-  rateDates: Partial<Record<CurrencyCode, string>>;
+  rateDates: Record<CurrencyCode, string>;
 };
 
-const CURRENCIES = {
+const FALLBACK_CURRENCIES = {
   USD: { name: "US Dollar", exponent: 2, rateToUsd: 1 },
   KRW: { name: "South Korean Won", exponent: 0, rateToUsd: 0.000722 },
   EUR: { name: "Euro", exponent: 2, rateToUsd: 1.154 },
@@ -79,8 +89,17 @@ const CURRENCIES = {
 } as const;
 
 const FALLBACK_RATES_TO_USD = Object.fromEntries(
-  Object.entries(CURRENCIES).map(([code, details]) => [code, details.rateToUsd]),
+  Object.entries(FALLBACK_CURRENCIES).map(([code, details]) => [code, details.rateToUsd]),
 ) as Record<CurrencyCode, number>;
+
+const FALLBACK_CURRENCY_CATALOG: CurrencyMetadata[] = Object.entries(
+  FALLBACK_CURRENCIES,
+).map(([code, details]) => ({
+  code,
+  name: details.name,
+  symbol: code,
+  exponent: details.exponent,
+}));
 
 const CATEGORY_COLORS: Record<string, string> = {
   housing: "#ee6c4d",
@@ -446,13 +465,18 @@ function formatCurrency(
   language: Language,
 ) {
   const locale = language === "ko" ? "ko-KR" : "en-US";
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency,
-    currencyDisplay: "narrowSymbol",
-    minimumFractionDigits: CURRENCIES[currency].exponent,
-    maximumFractionDigits: CURRENCIES[currency].exponent,
-  }).format(amount);
+  const exponent = currencyExponent(currency) ?? 2;
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+      currencyDisplay: "narrowSymbol",
+      minimumFractionDigits: exponent,
+      maximumFractionDigits: exponent,
+    }).format(amount);
+  } catch {
+    return `${currency} ${amount.toFixed(exponent)}`;
+  }
 }
 
 function formatCompactCurrency(
@@ -460,13 +484,17 @@ function formatCompactCurrency(
   currency: CurrencyCode,
   language: Language,
 ) {
-  return new Intl.NumberFormat(language === "ko" ? "ko-KR" : "en-US", {
-    style: "currency",
-    currency,
-    currencyDisplay: "narrowSymbol",
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(amount);
+  try {
+    return new Intl.NumberFormat(language === "ko" ? "ko-KR" : "en-US", {
+      style: "currency",
+      currency,
+      currencyDisplay: "narrowSymbol",
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(amount);
+  } catch {
+    return `${currency} ${amount.toFixed(1)}`;
+  }
 }
 
 function originalMajor(transaction: LedgerTransaction) {
@@ -506,7 +534,7 @@ function inBaseCurrency(
   currency: CurrencyCode,
   ratesToUsd: Record<CurrencyCode, number>,
 ) {
-  return usdMinor / 100 / ratesToUsd[currency];
+  return usdMinor / 100 / (ratesToUsd[currency] ?? 1);
 }
 
 function categoryLabel(category: string, language: Language) {
@@ -628,6 +656,9 @@ export function ExpenseTracker({
 }) {
   const [language, setLanguage] = useState<Language>("en");
   const [baseCurrency, setBaseCurrency] = useState<CurrencyCode>("USD");
+  const [currencyCatalog, setCurrencyCatalog] = useState<CurrencyMetadata[]>(
+    FALLBACK_CURRENCY_CATALOG,
+  );
   const [ratesToUsd, setRatesToUsd] =
     useState<Record<CurrencyCode, number>>(FALLBACK_RATES_TO_USD);
   const [rateMeta, setRateMeta] = useState<RateMeta>({
@@ -672,6 +703,20 @@ export function ExpenseTracker({
   );
   const copy = COPY[language];
   const calendarCopy = CALENDAR_COPY[language];
+  const transactionCurrencyCatalog = useMemo(() => {
+    if (currencyCatalog.some((item) => item.code === currency)) {
+      return currencyCatalog;
+    }
+    return [
+      ...currencyCatalog,
+      {
+        code: currency,
+        name: currency,
+        symbol: currency,
+        exponent: currencyExponent(currency) ?? 2,
+      },
+    ];
+  }, [currency, currencyCatalog]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -684,8 +729,8 @@ export function ExpenseTracker({
       if (storedLanguage === "en" || storedLanguage === "ko") {
         setLanguage(storedLanguage);
       }
-      if (storedCurrency && storedCurrency in CURRENCIES) {
-        setBaseCurrency(storedCurrency as CurrencyCode);
+      if (storedCurrency && storedCurrency in FALLBACK_CURRENCIES) {
+        setBaseCurrency(storedCurrency);
       }
       if (localToday !== today) {
         setTransactions([]);
@@ -731,15 +776,34 @@ export function ExpenseTracker({
           typeof payload.rates !== "object" ||
           !payload.rateDates ||
           typeof payload.rateDates !== "object" ||
+          !Array.isArray(payload.currencies) ||
+          payload.currencies.length < 100 ||
           !isIsoDate(payload.asOf) ||
           !isIsoInstant(payload.fetchedAt)
         ) {
           throw new Error("INVALID_RATES_RESPONSE");
         }
 
-        const nextRates = { ...FALLBACK_RATES_TO_USD };
-        const rateDates: Partial<Record<CurrencyCode, string>> = {};
-        for (const code of Object.keys(CURRENCIES) as CurrencyCode[]) {
+        const nextRates: Record<CurrencyCode, number> = {};
+        const rateDates: Record<CurrencyCode, string> = {};
+        const nextCatalog: CurrencyMetadata[] = [];
+        const seenCodes = new Set<string>();
+        for (const metadata of payload.currencies) {
+          if (
+            !metadata ||
+            typeof metadata !== "object" ||
+            !/^[A-Z]{3}$/u.test(metadata.code) ||
+            seenCodes.has(metadata.code) ||
+            typeof metadata.name !== "string" ||
+            !metadata.name.trim() ||
+            typeof metadata.symbol !== "string" ||
+            !Number.isInteger(metadata.exponent) ||
+            metadata.exponent < 0 ||
+            metadata.exponent > 4
+          ) {
+            throw new Error("INVALID_CURRENCY_CATALOG");
+          }
+          const code = metadata.code;
           const rawRate = payload.rates[code];
           const parsedRate = Number(rawRate);
           const rateDate = payload.rateDates[code];
@@ -753,11 +817,24 @@ export function ExpenseTracker({
           }
           nextRates[code] = parsedRate;
           rateDates[code] = rateDate;
+          nextCatalog.push(metadata);
+          seenCodes.add(code);
         }
         if (nextRates.USD !== 1) throw new Error("INVALID_USD_RATE");
         nextRates.USD = 1;
 
         setRatesToUsd(nextRates);
+        setCurrencyCatalog(nextCatalog);
+        const storedCurrency = window.localStorage.getItem(
+          "globeledger-base-currency",
+        );
+        setBaseCurrency((current) =>
+          storedCurrency && nextRates[storedCurrency]
+            ? storedCurrency
+            : nextRates[current]
+              ? current
+              : "USD",
+        );
         setRateMeta({
           status: payload.stale ? "stale" : "updated",
           asOf: payload.asOf,
@@ -767,6 +844,10 @@ export function ExpenseTracker({
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
         setRatesToUsd(FALLBACK_RATES_TO_USD);
+        setCurrencyCatalog(FALLBACK_CURRENCY_CATALOG);
+        setBaseCurrency((current) =>
+          FALLBACK_RATES_TO_USD[current] ? current : "USD",
+        );
         setRateMeta({
           status: "error",
           asOf: null,
@@ -1027,11 +1108,14 @@ export function ExpenseTracker({
   );
   const formRateToUsd = usesStoredRate
     ? Number(editingTransaction?.fxRate)
-    : ratesToUsd[currency];
-  const conversionRate = formRateToUsd / ratesToUsd[baseCurrency];
+    : ratesToUsd[currency] ?? 1;
+  const conversionRate = formRateToUsd / (ratesToUsd[baseCurrency] ?? 1);
   const convertedPreview = Number(amount) ? Number(amount) * conversionRate : 0;
-  const hasFrankfurterRate =
-    rateMeta.status === "updated" || rateMeta.status === "stale";
+  const hasFrankfurterRate = Boolean(
+    (rateMeta.status === "updated" || rateMeta.status === "stale") &&
+      ratesToUsd[currency] &&
+      rateMeta.rateDates[currency],
+  );
   const selectedRateSource =
     usesStoredRate
       ? currency === "USD"
@@ -1450,8 +1534,8 @@ export function ExpenseTracker({
                 value={baseCurrency}
                 onChange={(event) => setBaseCurrency(event.target.value as CurrencyCode)}
               >
-                {Object.entries(CURRENCIES).map(([code, details]) => (
-                  <option key={code} value={code}>{code} · {details.name}</option>
+                {currencyCatalog.map((details) => (
+                  <option key={details.code} value={details.code}>{details.code} · {details.name}</option>
                 ))}
               </select>
             </label>
@@ -1867,7 +1951,7 @@ export function ExpenseTracker({
                 <label className="field currency-field">
                   <span>{copy.currency}</span>
                   <select value={currency} onChange={(event) => setCurrency(event.target.value as CurrencyCode)}>
-                    {Object.entries(CURRENCIES).map(([code, details]) => <option key={code} value={code}>{code} · {details.name}</option>)}
+                    {transactionCurrencyCatalog.map((details) => <option key={details.code} value={details.code}>{details.code} · {details.name}</option>)}
                   </select>
                 </label>
               </div>

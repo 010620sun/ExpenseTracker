@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { getDb, type AppDatabase } from "@/db";
 import {
@@ -6,23 +6,23 @@ import {
   exchangeRateSnapshots,
   type ExchangeRateCache,
 } from "@/db/schema";
+import {
+  currencyExponent,
+  currencyName,
+  currencySymbol,
+  isCurrencyCode,
+} from "@/lib/currency";
 
 export const dynamic = "force-dynamic";
 
 const BASE_CURRENCY = "USD";
-const REMOTE_CURRENCIES = [
-  "KRW",
-  "EUR",
-  "JPY",
-  "GBP",
-  "SGD",
-  "CAD",
-  "AUD",
-] as const;
-const REMOTE_CURRENCY_SET = new Set<string>(REMOTE_CURRENCIES);
+const MIN_REMOTE_CURRENCY_COUNT = 100;
+const MAX_REMOTE_CURRENCY_COUNT = 250;
+// D1 limits a statement to 100 bound parameters. Snapshot rows bind seven.
+const CACHE_WRITE_CHUNK_SIZE = 10;
 const CACHE_TTL_MS = 60 * 60 * 1_000;
 const FETCH_TIMEOUT_MS = 5_000;
-const MAX_RESPONSE_LENGTH = 65_536;
+const MAX_RESPONSE_LENGTH = 262_144;
 const INVERSE_DECIMAL_PLACES = 12;
 const BIGINT_ZERO = BigInt(0);
 const BIGINT_TWO = BigInt(2);
@@ -31,16 +31,21 @@ const RESPONSE_HEADERS = {
   "Cache-Control": "private, no-store",
 };
 
-type RemoteCurrency = (typeof REMOTE_CURRENCIES)[number];
-type UiCurrency = "USD" | RemoteCurrency;
 type JsonRecord = Record<string, unknown>;
 
 type NormalizedRate = {
-  quoteCurrency: RemoteCurrency;
+  quoteCurrency: string;
   usdPerUnit: string;
   rateDate: string;
   fetchedAtMs: number;
   source: "frankfurter";
+};
+
+type CurrencyMetadata = {
+  code: string;
+  name: string;
+  symbol: string;
+  exponent: number;
 };
 
 function isPlainRecord(value: unknown): value is JsonRecord {
@@ -188,7 +193,6 @@ function snapshotId(rate: Pick<NormalizedRate, "quoteCurrency" | "rateDate" | "u
 async function fetchFrankfurterRates(): Promise<NormalizedRate[]> {
   const endpoint = new URL("https://api.frankfurter.dev/v2/rates");
   endpoint.searchParams.set("base", BASE_CURRENCY);
-  endpoint.searchParams.set("quotes", REMOTE_CURRENCIES.join(","));
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -210,7 +214,11 @@ async function fetchFrankfurterRates(): Promise<NormalizedRate[]> {
     } catch {
       throw new Error("Provider returned invalid JSON");
     }
-    if (!Array.isArray(payload) || payload.length !== REMOTE_CURRENCIES.length) {
+    if (
+      !Array.isArray(payload) ||
+      payload.length < MIN_REMOTE_CURRENCY_COUNT ||
+      payload.length > MAX_REMOTE_CURRENCY_COUNT
+    ) {
       throw new Error("Provider response is incomplete");
     }
 
@@ -220,7 +228,8 @@ async function fetchFrankfurterRates(): Promise<NormalizedRate[]> {
     }
 
     const fetchedAtMs = Date.now();
-    const ratesByQuote = new Map<RemoteCurrency, NormalizedRate>();
+    const ratesByQuote = new Map<string, NormalizedRate>();
+    const seenQuotes = new Set<string>();
     for (const [index, row] of payload.entries()) {
       if (!isPlainRecord(row)) throw new Error("Provider row is invalid");
 
@@ -230,9 +239,8 @@ async function fetchFrankfurterRates(): Promise<NormalizedRate[]> {
       const token = rateTokens[index];
       if (
         row.base !== BASE_CURRENCY ||
-        typeof quote !== "string" ||
-        !REMOTE_CURRENCY_SET.has(quote) ||
-        ratesByQuote.has(quote as RemoteCurrency) ||
+        !isCurrencyCode(quote) ||
+        seenQuotes.has(quote) ||
         typeof rateDate !== "string" ||
         !isValidDate(rateDate) ||
         typeof numericRate !== "number" ||
@@ -244,9 +252,14 @@ async function fetchFrankfurterRates(): Promise<NormalizedRate[]> {
         throw new Error("Provider row failed validation");
       }
 
-      const quoteCurrency = quote as RemoteCurrency;
-      ratesByQuote.set(quoteCurrency, {
-        quoteCurrency,
+      seenQuotes.add(quote);
+      if (quote === BASE_CURRENCY) {
+        if (numericRate !== 1) throw new Error("Provider USD rate is invalid");
+        continue;
+      }
+
+      ratesByQuote.set(quote, {
+        quoteCurrency: quote,
         usdPerUnit: invertUsdToQuoteRate(token),
         rateDate,
         fetchedAtMs,
@@ -254,11 +267,9 @@ async function fetchFrankfurterRates(): Promise<NormalizedRate[]> {
       });
     }
 
-    return REMOTE_CURRENCIES.map((currency) => {
-      const rate = ratesByQuote.get(currency);
-      if (!rate) throw new Error(`Provider omitted ${currency}`);
-      return rate;
-    });
+    return [...ratesByQuote.values()].sort((left, right) =>
+      left.quoteCurrency.localeCompare(right.quoteCurrency),
+    );
   } finally {
     clearTimeout(timeout);
   }
@@ -267,9 +278,10 @@ async function fetchFrankfurterRates(): Promise<NormalizedRate[]> {
 function isValidCachedRow(
   row: ExchangeRateCache,
   now: number,
-): row is ExchangeRateCache & { quoteCurrency: RemoteCurrency } {
+): row is ExchangeRateCache & { quoteCurrency: string } {
   return (
-    REMOTE_CURRENCY_SET.has(row.quoteCurrency) &&
+    isCurrencyCode(row.quoteCurrency) &&
+    row.quoteCurrency !== BASE_CURRENCY &&
     row.baseCurrency === BASE_CURRENCY &&
     /^(?:0|[1-9]\d{0,8})(?:\.\d{1,12})?$/u.test(row.usdPerUnit) &&
     row.usdPerUnit !== "0" &&
@@ -285,102 +297,117 @@ async function readCompleteCache(db: AppDatabase, now: number) {
   const rows = await db
     .select()
     .from(exchangeRateCache)
-    .where(
-      inArray(exchangeRateCache.quoteCurrency, [...REMOTE_CURRENCIES]),
-    );
+    .where(eq(exchangeRateCache.baseCurrency, BASE_CURRENCY));
 
-  const byQuote = new Map<RemoteCurrency, ExchangeRateCache>();
+  const cohorts = new Map<number, Map<string, ExchangeRateCache>>();
   for (const row of rows) {
-    if (!isValidCachedRow(row, now)) return null;
-    byQuote.set(row.quoteCurrency, row);
+    if (!isValidCachedRow(row, now)) continue;
+    const cohort = cohorts.get(row.fetchedAtMs) ?? new Map();
+    cohort.set(row.quoteCurrency, row);
+    cohorts.set(row.fetchedAtMs, cohort);
   }
-  if (byQuote.size !== REMOTE_CURRENCIES.length) return null;
 
-  return REMOTE_CURRENCIES.map((currency) => byQuote.get(currency)!);
+  for (const [, cohort] of [...cohorts].sort(([left], [right]) => right - left)) {
+    if (
+      cohort.size >= MIN_REMOTE_CURRENCY_COUNT &&
+      cohort.size <= MAX_REMOTE_CURRENCY_COUNT
+    ) {
+      return [...cohort.values()].sort((left, right) =>
+        left.quoteCurrency.localeCompare(right.quoteCurrency),
+      );
+    }
+  }
+
+  return null;
 }
 
 async function writeCache(db: AppDatabase, rates: NormalizedRate[]) {
-  const cacheStatements = rates.map((rate) =>
-    db
-      .insert(exchangeRateCache)
-      .values({
-        quoteCurrency: rate.quoteCurrency,
-        baseCurrency: BASE_CURRENCY,
-        usdPerUnit: rate.usdPerUnit,
-        rateDate: rate.rateDate,
-        fetchedAtMs: rate.fetchedAtMs,
-        source: rate.source,
-      })
-      .onConflictDoUpdate({
-        target: exchangeRateCache.quoteCurrency,
-        set: {
+  for (let index = 0; index < rates.length; index += CACHE_WRITE_CHUNK_SIZE) {
+    const chunk = rates.slice(index, index + CACHE_WRITE_CHUNK_SIZE);
+    await db
+      .insert(exchangeRateSnapshots)
+      .values(
+        chunk.map((rate) => ({
+          snapshotId: snapshotId(rate),
+          quoteCurrency: rate.quoteCurrency,
           baseCurrency: BASE_CURRENCY,
           usdPerUnit: rate.usdPerUnit,
           rateDate: rate.rateDate,
           fetchedAtMs: rate.fetchedAtMs,
           source: rate.source,
-        },
-      }),
-  );
-  const snapshotStatements = rates.map((rate) =>
-    db
-      .insert(exchangeRateSnapshots)
-      .values({
-        snapshotId: snapshotId(rate),
-        quoteCurrency: rate.quoteCurrency,
-        baseCurrency: BASE_CURRENCY,
-        usdPerUnit: rate.usdPerUnit,
-        rateDate: rate.rateDate,
-        fetchedAtMs: rate.fetchedAtMs,
-        source: rate.source,
-      })
+        })),
+      )
       .onConflictDoUpdate({
         target: exchangeRateSnapshots.snapshotId,
-        set: { fetchedAtMs: rate.fetchedAtMs },
-      }),
-  );
+        set: { fetchedAtMs: chunk[0].fetchedAtMs },
+      });
+  }
 
-  await db.batch([
-    cacheStatements[0],
-    cacheStatements[1],
-    cacheStatements[2],
-    cacheStatements[3],
-    cacheStatements[4],
-    cacheStatements[5],
-    cacheStatements[6],
-    snapshotStatements[0],
-    snapshotStatements[1],
-    snapshotStatements[2],
-    snapshotStatements[3],
-    snapshotStatements[4],
-    snapshotStatements[5],
-    snapshotStatements[6],
-  ]);
+  for (let index = 0; index < rates.length; index += CACHE_WRITE_CHUNK_SIZE) {
+    const chunk = rates.slice(index, index + CACHE_WRITE_CHUNK_SIZE);
+    await db
+      .insert(exchangeRateCache)
+      .values(
+        chunk.map((rate) => ({
+          quoteCurrency: rate.quoteCurrency,
+          baseCurrency: BASE_CURRENCY,
+          usdPerUnit: rate.usdPerUnit,
+          rateDate: rate.rateDate,
+          fetchedAtMs: rate.fetchedAtMs,
+          source: rate.source,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: exchangeRateCache.quoteCurrency,
+        set: {
+          baseCurrency: sql.raw("excluded.base_currency"),
+          usdPerUnit: sql.raw("excluded.usd_per_unit"),
+          rateDate: sql.raw("excluded.rate_date"),
+          fetchedAtMs: sql.raw("excluded.fetched_at_ms"),
+          source: sql.raw("excluded.source"),
+        },
+      });
+  }
 }
 
 function rateResponse(
   rows: Array<NormalizedRate | ExchangeRateCache>,
   stale: boolean,
 ) {
-  const rates = { USD: "1" } as Record<UiCurrency, string>;
-  const remoteRateDates = {} as Record<RemoteCurrency, string>;
+  const rates: Record<string, string> = { USD: "1" };
+  const remoteRateDates: Record<string, string> = {};
   let fetchedAtMs = Number.MAX_SAFE_INTEGER;
 
   for (const row of rows) {
-    const quote = row.quoteCurrency as RemoteCurrency;
+    const quote = row.quoteCurrency;
     rates[quote] = row.usdPerUnit;
     remoteRateDates[quote] = row.rateDate;
     fetchedAtMs = Math.min(fetchedAtMs, row.fetchedAtMs);
   }
 
-  const asOf = REMOTE_CURRENCIES.reduce((oldest, currency) => {
-    const date = remoteRateDates[currency];
-    return !oldest || date < oldest ? date : oldest;
-  }, "");
+  const asOf = Object.values(remoteRateDates).reduce(
+    (oldest, date) => (!oldest || date < oldest ? date : oldest),
+    "",
+  );
   const rateDates = {
     USD: asOf,
     ...remoteRateDates,
-  } as Record<UiCurrency, string>;
+  };
+  const preferredOrder = new Map(
+    ["USD", "KRW", "EUR", "JPY", "GBP"].map((code, index) => [code, index]),
+  );
+  const currencies = Object.keys(rates)
+    .sort((left, right) => {
+      const leftRank = preferredOrder.get(left) ?? Number.MAX_SAFE_INTEGER;
+      const rightRank = preferredOrder.get(right) ?? Number.MAX_SAFE_INTEGER;
+      return leftRank - rightRank || left.localeCompare(right);
+    })
+    .map<CurrencyMetadata>((code) => ({
+      code,
+      name: currencyName(code),
+      symbol: currencySymbol(code),
+      exponent: currencyExponent(code) ?? 2,
+    }));
 
   return Response.json(
     {
@@ -389,6 +416,7 @@ function rateResponse(
         direction: "USD_PER_ORIGINAL",
         rates,
         rateDates,
+        currencies,
         asOf,
         fetchedAt: new Date(fetchedAtMs).toISOString(),
         stale,
