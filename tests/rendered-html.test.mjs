@@ -104,4 +104,6 @@ test("provides an expanded visual expense category picker", async () => {
   );
   assert.ok(categoryPopoverStyles);
   assert.doesNotMatch(categoryPopoverStyles[1], /overflow-y|max-height/u);
+  assert.match(categoryPopoverStyles[1], /position:\s*relative/u);
+  assert.doesNotMatch(categoryPopoverStyles[1], /position:\s*absolute/u);
 });

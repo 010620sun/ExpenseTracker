@@ -1684,11 +1684,9 @@ textarea:focus-visible {
   border: 1px solid #dfe4de;
   border-radius: 16px;
   box-shadow: 0 18px 45px rgba(22, 45, 39, 0.19);
-  left: 0;
+  margin-top: 8px;
   padding: 14px;
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
+  position: relative;
   z-index: 30;
 }
 
