@@ -78,3 +78,25 @@ test("removes starter preview assets and pins product metadata", async () => {
   assert.match(hosting, /"d1": "DB"/);
   await assert.rejects(access(new URL("../app/_sites-preview", templateRoot)));
 });
+
+test("provides an expanded visual expense category picker", async () => {
+  const [source, styles] = await Promise.all([
+    readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  const optionsBlock = source.match(
+    /const CATEGORY_OPTIONS = \[([\s\S]*?)\] as const;/u,
+  );
+  assert.ok(optionsBlock);
+  const categories = [
+    ...optionsBlock[1].matchAll(/"([a-z]+)"/gu),
+  ].map((match) => match[1]);
+  assert.equal(categories.length, 12);
+  assert.equal(new Set(categories).size, categories.length);
+  assert.deepEqual(categories.slice(0, 3), ["housing", "groceries", "dining"]);
+  assert.match(source, /className="category-popover"/u);
+  assert.match(source, /role="listbox"/u);
+  assert.match(source, /className="category-option-art"/u);
+  assert.doesNotMatch(source, /<select value=\{category\}/u);
+  assert.match(styles, /\.category-option-grid/u);
+});

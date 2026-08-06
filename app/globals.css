@@ -1229,7 +1229,8 @@ textarea:focus-visible {
   border-radius: 8px;
   color: #fff;
   display: flex;
-  font-size: 8px;
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", sans-serif;
+  font-size: 12px;
   font-weight: 800;
   height: 25px;
   justify-content: center;
@@ -1365,7 +1366,8 @@ textarea:focus-visible {
   align-items: center;
   border-radius: 10px;
   display: flex;
-  font-size: 10px;
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", sans-serif;
+  font-size: 14px;
   font-weight: 850;
   height: 34px;
   justify-content: center;
@@ -1606,6 +1608,182 @@ textarea:focus-visible {
   box-shadow: 0 0 0 3px rgba(59, 111, 96, 0.1);
 }
 
+.category-picker {
+  position: relative;
+}
+
+.category-trigger {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #dfe3dd;
+  border-radius: 11px;
+  color: var(--ink);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  min-height: 58px;
+  padding: 8px 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.category-trigger:hover {
+  border-color: #bfc9c2;
+  background: #fdfdfb;
+}
+
+.category-trigger:focus-visible {
+  border-color: #6f8f86;
+  box-shadow: 0 0 0 3px rgba(59, 111, 96, 0.1);
+  outline: 0;
+}
+
+.category-trigger-art,
+.category-option-art {
+  align-items: center;
+  border-radius: 11px;
+  display: flex;
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", sans-serif;
+  justify-content: center;
+}
+
+.category-trigger-art {
+  font-size: 18px;
+  height: 38px;
+  width: 38px;
+}
+
+.category-trigger-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.category-trigger-copy strong {
+  font-size: 11px;
+}
+
+.category-trigger-copy small {
+  color: var(--muted);
+  font-size: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-trigger-chevron {
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  transform: translateY(-2px);
+}
+
+.category-popover {
+  animation: category-popover-in 160ms ease both;
+  background: #fff;
+  border: 1px solid #dfe4de;
+  border-radius: 16px;
+  box-shadow: 0 18px 45px rgba(22, 45, 39, 0.19);
+  left: 0;
+  max-height: min(390px, 58vh);
+  overflow-y: auto;
+  padding: 14px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 30;
+}
+
+@keyframes category-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+}
+
+.category-popover-heading {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 12px;
+  padding: 0 2px;
+}
+
+.category-popover-heading strong {
+  font-size: 12px;
+}
+
+.category-popover-heading span {
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.category-option-grid {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.category-option {
+  align-items: center;
+  background: #f7f8f5;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
+  min-height: 76px;
+  padding: 8px 5px;
+  position: relative;
+  text-align: center;
+}
+
+.category-option:hover {
+  background: #f0f3ef;
+  border-color: #dce2dc;
+}
+
+.category-option:focus-visible {
+  border-color: #6f8f86;
+  box-shadow: 0 0 0 3px rgba(59, 111, 96, 0.12);
+  outline: 0;
+}
+
+.category-option.selected {
+  background: #edf4f0;
+  border-color: #adc6ba;
+}
+
+.category-option-art {
+  font-size: 19px;
+  height: 35px;
+  width: 35px;
+}
+
+.category-option > span:last-of-type {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.category-option i {
+  align-items: center;
+  background: var(--green);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  font-size: 7px;
+  font-style: normal;
+  height: 17px;
+  justify-content: center;
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 17px;
+}
+
 .field-row {
   display: grid;
   gap: 11px;
@@ -1784,6 +1962,9 @@ textarea:focus-visible {
   @keyframes slide-in { from { transform: translateY(100%); } }
   .drawer-header h2 { font-size: 25px; }
   .amount-row, .field-row { grid-template-columns: 1fr; }
+  .category-popover { padding: 12px; }
+  .category-option-grid { gap: 6px; }
+  .category-option { min-height: 72px; }
   .drawer-actions { position: sticky; bottom: -24px; background: #fbfbf8; padding: 13px 0 24px; }
 }
 
