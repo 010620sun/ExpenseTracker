@@ -34,6 +34,31 @@ type TransactionApiResponse = {
   error?: { code?: string; field?: string };
 };
 
+type RatesPayload = {
+  base?: string;
+  baseCurrency?: string;
+  direction?: string;
+  asOf: string;
+  fetchedAt: string;
+  source: string;
+  stale: boolean;
+  rates: Record<string, string>;
+  rateDates?: Record<string, string>;
+};
+
+type RatesApiResponse = RatesPayload & {
+  data?: RatesPayload;
+};
+
+type RateStatus = "updating" | "updated" | "stale" | "error";
+
+type RateMeta = {
+  status: RateStatus;
+  asOf: string | null;
+  fetchedAt: string | null;
+  rateDates: Partial<Record<CurrencyCode, string>>;
+};
+
 const CURRENCIES = {
   USD: { name: "US Dollar", exponent: 2, rateToUsd: 1 },
   KRW: { name: "South Korean Won", exponent: 0, rateToUsd: 0.000722 },
@@ -44,6 +69,10 @@ const CURRENCIES = {
   CAD: { name: "Canadian Dollar", exponent: 2, rateToUsd: 0.729 },
   AUD: { name: "Australian Dollar", exponent: 2, rateToUsd: 0.648 },
 } as const;
+
+const FALLBACK_RATES_TO_USD = Object.fromEntries(
+  Object.entries(CURRENCIES).map(([code, details]) => [code, details.rateToUsd]),
+) as Record<CurrencyCode, number>;
 
 const CATEGORY_COLORS: Record<string, string> = {
   housing: "#ee6c4d",
@@ -148,6 +177,15 @@ const COPY = {
     subtitle: "Every currency, one clear picture.",
     baseCurrency: "Base currency",
     sync: "Rates saved per transaction",
+    rateProvider: "Frankfurter reference rates",
+    rateLatest: "Latest available reference rates",
+    rateUpdating: "Updating reference rates…",
+    rateStale: "Using last available rate dated {date}",
+    rateError: "Connection failed · using fallback rates",
+    rateDate: "Rate date",
+    fetchedAt: "Fetched",
+    fallbackRate: "Fallback rate",
+    identityRate: "USD identity rate",
     syncing: "Syncing your ledger",
     synced: "Ledger synced",
     addExpense: "Add transaction",
@@ -217,6 +255,15 @@ const COPY = {
     subtitle: "모든 통화를 한눈에 명확하게.",
     baseCurrency: "기준 통화",
     sync: "거래별 환율 저장",
+    rateProvider: "Frankfurter 기준 환율",
+    rateLatest: "최신 가용 기준 환율",
+    rateUpdating: "기준 환율 업데이트 중…",
+    rateStale: "{date} 기준 마지막 가용 환율 사용 중",
+    rateError: "연결 실패 · 기본 환율 사용 중",
+    rateDate: "기준일",
+    fetchedAt: "가져온 시각",
+    fallbackRate: "기본 환율",
+    identityRate: "USD 고정 환율",
     syncing: "가계부 동기화 중",
     synced: "가계부 동기화 완료",
     addExpense: "거래 추가",
@@ -313,8 +360,40 @@ function originalMajor(transaction: LedgerTransaction) {
   return transaction.originalAmountMinor / 10 ** transaction.originalExponent;
 }
 
-function inBaseCurrency(usdMinor: number, currency: CurrencyCode) {
-  return usdMinor / 100 / CURRENCIES[currency].rateToUsd;
+function isIsoDate(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(value);
+  if (!match) return false;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
+function isIsoInstant(value: unknown): value is string {
+  if (
+    typeof value !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(value)
+  ) {
+    return false;
+  }
+
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString() === value;
+}
+
+function inBaseCurrency(
+  usdMinor: number,
+  currency: CurrencyCode,
+  ratesToUsd: Record<CurrencyCode, number>,
+) {
+  return usdMinor / 100 / ratesToUsd[currency];
 }
 
 function categoryLabel(category: string, language: Language) {
@@ -347,6 +426,14 @@ function categoryGlyph(category: string) {
 export function ExpenseTracker({ firstName }: { firstName: string | null }) {
   const [language, setLanguage] = useState<Language>("en");
   const [baseCurrency, setBaseCurrency] = useState<CurrencyCode>("USD");
+  const [ratesToUsd, setRatesToUsd] =
+    useState<Record<CurrencyCode, number>>(FALLBACK_RATES_TO_USD);
+  const [rateMeta, setRateMeta] = useState<RateMeta>({
+    status: "updating",
+    asOf: null,
+    fetchedAt: null,
+    rateDates: {},
+  });
   const [transactions, setTransactions] =
     useState<LedgerTransaction[]>(FALLBACK_TRANSACTIONS);
   const [isSyncing, setIsSyncing] = useState(true);
@@ -365,14 +452,20 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
   const copy = COPY[language];
 
   useEffect(() => {
-    const storedLanguage = window.localStorage.getItem("globeledger-language");
-    const storedCurrency = window.localStorage.getItem("globeledger-base-currency");
-    if (storedLanguage === "en" || storedLanguage === "ko") {
-      setLanguage(storedLanguage);
-    }
-    if (storedCurrency && storedCurrency in CURRENCIES) {
-      setBaseCurrency(storedCurrency as CurrencyCode);
-    }
+    const frame = window.requestAnimationFrame(() => {
+      const storedLanguage = window.localStorage.getItem("globeledger-language");
+      const storedCurrency = window.localStorage.getItem(
+        "globeledger-base-currency",
+      );
+      if (storedLanguage === "en" || storedLanguage === "ko") {
+        setLanguage(storedLanguage);
+      }
+      if (storedCurrency && storedCurrency in CURRENCIES) {
+        setBaseCurrency(storedCurrency as CurrencyCode);
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {
@@ -383,6 +476,78 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
   useEffect(() => {
     window.localStorage.setItem("globeledger-base-currency", baseCurrency);
   }, [baseCurrency]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadRates() {
+      try {
+        const response = await fetch("/api/rates", {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("RATES_LOAD_FAILED");
+
+        const responseBody = (await response.json()) as RatesApiResponse;
+        const payload = responseBody.data ?? responseBody;
+        const responseBase = payload.baseCurrency ?? payload.base;
+        if (
+          responseBase !== "USD" ||
+          payload.source !== "frankfurter" ||
+          payload.direction !== "USD_PER_ORIGINAL" ||
+          typeof payload.stale !== "boolean" ||
+          !payload.rates ||
+          typeof payload.rates !== "object" ||
+          !payload.rateDates ||
+          typeof payload.rateDates !== "object" ||
+          !isIsoDate(payload.asOf) ||
+          !isIsoInstant(payload.fetchedAt)
+        ) {
+          throw new Error("INVALID_RATES_RESPONSE");
+        }
+
+        const nextRates = { ...FALLBACK_RATES_TO_USD };
+        const rateDates: Partial<Record<CurrencyCode, string>> = {};
+        for (const code of Object.keys(CURRENCIES) as CurrencyCode[]) {
+          const rawRate = payload.rates[code];
+          const parsedRate = Number(rawRate);
+          const rateDate = payload.rateDates[code];
+          if (
+            typeof rawRate !== "string" ||
+            !Number.isFinite(parsedRate) ||
+            parsedRate <= 0 ||
+            !isIsoDate(rateDate)
+          ) {
+            throw new Error("INCOMPLETE_RATES_RESPONSE");
+          }
+          nextRates[code] = parsedRate;
+          rateDates[code] = rateDate;
+        }
+        if (nextRates.USD !== 1) throw new Error("INVALID_USD_RATE");
+        nextRates.USD = 1;
+
+        setRatesToUsd(nextRates);
+        setRateMeta({
+          status: payload.stale ? "stale" : "updated",
+          asOf: payload.asOf,
+          fetchedAt: payload.fetchedAt,
+          rateDates,
+        });
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setRatesToUsd(FALLBACK_RATES_TO_USD);
+        setRateMeta({
+          status: "error",
+          asOf: null,
+          fetchedAt: null,
+          rateDates: {},
+        });
+      }
+    }
+
+    void loadRates();
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -486,9 +651,19 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
     return `conic-gradient(${stops.join(", ")})`;
   }, [totals.currencyTotals]);
 
-  const convertedPreview = Number(amount)
-    ? Number(amount) * CURRENCIES[currency].rateToUsd / CURRENCIES[baseCurrency].rateToUsd
-    : 0;
+  const conversionRate = ratesToUsd[currency] / ratesToUsd[baseCurrency];
+  const convertedPreview = Number(amount) ? Number(amount) * conversionRate : 0;
+  const hasFrankfurterRate =
+    rateMeta.status === "updated" || rateMeta.status === "stale";
+  const selectedRateSource =
+    currency === "USD"
+      ? "identity"
+      : hasFrankfurterRate
+        ? "frankfurter"
+        : "manual";
+  const selectedRateDate = currency !== "USD" && hasFrankfurterRate
+    ? rateMeta.rateDates[currency] ?? rateMeta.asOf
+    : null;
 
   function closeDrawer() {
     setIsDrawerOpen(false);
@@ -525,7 +700,9 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
           occurredOn,
           amount,
           currency,
-          rate: String(CURRENCIES[currency].rateToUsd),
+          rate: String(ratesToUsd[currency]),
+          rateSource: selectedRateSource,
+          rateDate: selectedRateDate,
           category: kind === "income" ? "income" : category,
           description: description.trim(),
           clientRequestId: crypto.randomUUID(),
@@ -582,6 +759,31 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
     month: "long",
     year: "numeric",
   }).format(new Date(`${occurredOn.slice(0, 7)}-01T12:00:00`));
+  const rateDateLabel = rateMeta.asOf
+    ? new Intl.DateTimeFormat(locale, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        timeZone: "UTC",
+      }).format(new Date(`${rateMeta.asOf}T00:00:00Z`))
+    : null;
+  const fetchedAtLabel = rateMeta.fetchedAt
+    ? new Intl.DateTimeFormat(locale, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date(rateMeta.fetchedAt))
+    : null;
+  const rateStatusMessage =
+    rateMeta.status === "updating"
+      ? copy.rateUpdating
+      : rateMeta.status === "stale"
+        ? template(copy.rateStale, { date: rateDateLabel ?? rateMeta.asOf ?? "" })
+        : rateMeta.status === "error"
+          ? copy.rateError
+          : copy.rateLatest;
 
   return (
     <div className="app-shell">
@@ -676,13 +878,30 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
             <span className="eyebrow">{copy.overview}</span>
             <h2 id="month-overview-title">{monthLabel}</h2>
           </div>
-          <span className="rate-note"><span aria-hidden="true">↻</span> {copy.sync}</span>
+          <div
+            className={`rate-note rate-note-${rateMeta.status}`}
+            role="status"
+            aria-live="polite"
+          >
+            <span className="rate-indicator" aria-hidden="true">↻</span>
+            <span className="rate-note-copy">
+              <strong>{copy.rateProvider}</strong>
+              <span>{rateStatusMessage}</span>
+              {(rateDateLabel || fetchedAtLabel) && (
+                <small>
+                  {rateDateLabel ? `${copy.rateDate}: ${rateDateLabel}` : ""}
+                  {rateDateLabel && fetchedAtLabel ? " · " : ""}
+                  {fetchedAtLabel ? `${copy.fetchedAt}: ${fetchedAtLabel}` : ""}
+                </small>
+              )}
+            </span>
+          </div>
         </section>
 
         <section className="metric-grid" aria-label={`${monthLabel} overview`}>
           <article className="metric-card metric-featured">
             <div className="metric-label"><span>{copy.spent}</span><span className="metric-icon">↗</span></div>
-            <strong>{formatCurrency(inBaseCurrency(totals.expenseUsdMinor, baseCurrency), baseCurrency, language)}</strong>
+            <strong>{formatCurrency(inBaseCurrency(totals.expenseUsdMinor, baseCurrency, ratesToUsd), baseCurrency, language)}</strong>
             <p>{template(copy.across, { count: totals.currencies.size })}</p>
             <div className="micro-bars" aria-hidden="true">
               {[34, 58, 46, 72, 64, 88, 78, 100, 84, 94, 76, 90].map((height, index) => (
@@ -692,7 +911,7 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
           </article>
           <article className="metric-card">
             <div className="metric-label"><span>{copy.budgetLeft}</span><span className="metric-icon pale">◔</span></div>
-            <strong>{formatCurrency(inBaseCurrency(remainingUsdMinor, baseCurrency), baseCurrency, language)}</strong>
+            <strong>{formatCurrency(inBaseCurrency(remainingUsdMinor, baseCurrency, ratesToUsd), baseCurrency, language)}</strong>
             <p>{budgetProgress}% {copy.ofBudget}</p>
             <div
               className="budget-track"
@@ -709,13 +928,13 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
             <div className="metric-label"><span>{copy.netFlow}</span><span className="metric-icon green">↕</span></div>
             <strong className="positive-amount">
               {formatCurrency(
-                inBaseCurrency(totals.incomeUsdMinor - totals.expenseUsdMinor, baseCurrency),
+                inBaseCurrency(totals.incomeUsdMinor - totals.expenseUsdMinor, baseCurrency, ratesToUsd),
                 baseCurrency,
                 language,
               )}
             </strong>
             <p>{copy.incomeMinusSpend}</p>
-            <span className="income-pill">+ {formatCurrency(inBaseCurrency(totals.incomeUsdMinor, baseCurrency), baseCurrency, language)}</span>
+            <span className="income-pill">+ {formatCurrency(inBaseCurrency(totals.incomeUsdMinor, baseCurrency, ratesToUsd), baseCurrency, language)}</span>
           </article>
           <article className="metric-card">
             <div className="metric-label"><span>{copy.activeCurrencies}</span><span className="metric-icon blue">◎</span></div>
@@ -748,7 +967,7 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
                       } as CSSProperties}
                     />
                   </div>
-                  <strong>{formatCurrency(inBaseCurrency(value, baseCurrency), baseCurrency, language)}</strong>
+                  <strong>{formatCurrency(inBaseCurrency(value, baseCurrency, ratesToUsd), baseCurrency, language)}</strong>
                 </div>
               ))}
             </div>
@@ -809,7 +1028,7 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
                     <span>{transaction.originalCurrency}</span>
                   </div>
                   <div className={transaction.kind === "income" ? "base-value income" : "base-value"}>
-                    <strong>{transaction.kind === "income" ? "+" : "−"}{formatCurrency(inBaseCurrency(transaction.baseAmountMinor, baseCurrency), baseCurrency, language)}</strong>
+                    <strong>{transaction.kind === "income" ? "+" : "−"}{formatCurrency(inBaseCurrency(transaction.baseAmountMinor, baseCurrency, ratesToUsd), baseCurrency, language)}</strong>
                     <span>{template(copy.convertedTo, { currency: baseCurrency })}</span>
                   </div>
                   <button
@@ -865,7 +1084,12 @@ export function ExpenseTracker({ firstName }: { firstName: string | null }) {
               </div>
               <div className="conversion-preview" id="conversion-preview" aria-live="polite">
                 <div><span>{copy.converted}</span><strong>{formatCurrency(convertedPreview, baseCurrency, language)} <small>{baseCurrency}</small></strong></div>
-                <p>1 {currency} = {CURRENCIES[currency].rateToUsd / CURRENCIES[baseCurrency].rateToUsd < 0.01 ? (CURRENCIES[currency].rateToUsd / CURRENCIES[baseCurrency].rateToUsd).toFixed(6) : (CURRENCIES[currency].rateToUsd / CURRENCIES[baseCurrency].rateToUsd).toFixed(4)} {baseCurrency} · {copy.savedRate}</p>
+                <p>
+                  1 {currency} = {conversionRate < 0.01 ? conversionRate.toFixed(6) : conversionRate.toFixed(4)} {baseCurrency}
+                  {" · "}{currency === "USD" ? copy.identityRate : hasFrankfurterRate ? copy.rateProvider : copy.fallbackRate}
+                  {selectedRateDate ? ` · ${copy.rateDate}: ${selectedRateDate}` : ""}
+                  {" · "}{copy.savedRate}
+                </p>
               </div>
               {kind === "expense" && (
                 <label className="field">

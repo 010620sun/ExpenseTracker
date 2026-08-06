@@ -33,6 +33,8 @@ test("server-renders the GlobeLedger dashboard", async () => {
   const html = await response.text();
   assert.match(html, /<title>GlobeLedger — Every currency, one clear picture<\/title>/i);
   assert.match(html, /Every currency, one clear picture\./);
+  assert.match(html, /Frankfurter reference rates/);
+  assert.match(html, /Updating reference rates/);
   assert.match(html, /Spent this month/);
   assert.match(html, /Recent transactions/);
   assert.match(html, /한국어/);

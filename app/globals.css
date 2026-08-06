@@ -471,17 +471,55 @@ select:focus-visible {
 }
 
 .rate-note {
-  align-items: center;
+  align-items: flex-start;
   color: var(--muted);
   display: inline-flex;
-  font-size: 10px;
-  gap: 6px;
+  gap: 8px;
+  max-width: 390px;
   padding-bottom: 3px;
+  text-align: right;
 }
 
-.rate-note span {
+.rate-indicator {
   color: var(--green);
-  font-size: 14px;
+  flex: 0 0 auto;
+  font-size: 15px;
+  line-height: 1.1;
+  margin-top: 1px;
+}
+
+.rate-note-updating .rate-indicator {
+  animation: pulse 1.4s infinite;
+}
+
+.rate-note-stale .rate-indicator {
+  color: #a66d22;
+}
+
+.rate-note-error .rate-indicator {
+  color: var(--accent-dark);
+}
+
+.rate-note-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.rate-note-copy strong {
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 760;
+}
+
+.rate-note-copy > span {
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.rate-note-copy small {
+  color: #89948f;
+  font-size: 9px;
+  line-height: 1.35;
 }
 
 .metric-grid {
@@ -1228,8 +1266,8 @@ select:focus-visible {
     z-index: 40;
   }
   .mobile-add:hover { transform: translate(-50%, -1px); }
-  .month-heading { padding-top: 25px; }
-  .rate-note { display: none; }
+  .month-heading { align-items: flex-start; gap: 18px; padding-top: 25px; }
+  .rate-note { padding-bottom: 0; }
   .transaction-row { grid-template-columns: 34px minmax(130px, 1fr) minmax(100px, auto) 25px; }
   .transaction-row time, .original-value { display: none; }
   .delete-transaction { opacity: 1; }
@@ -1240,7 +1278,9 @@ select:focus-visible {
   .language-switch button { padding: 0 7px; }
   .language-switch button:last-child { font-size: 0; }
   .language-switch button:last-child::after { content: "KO"; font-size: 10px; }
+  .month-heading { flex-direction: column; gap: 12px; }
   .month-heading h2 { font-size: 27px; }
+  .rate-note { max-width: 100%; text-align: left; }
   .metric-grid { grid-template-columns: 1fr; }
   .metric-card { min-height: 138px; }
   .metric-featured { min-height: 164px; }

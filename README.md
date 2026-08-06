@@ -48,8 +48,16 @@ npm test
 
 ## Exchange-rate model
 
-The direction is always `1 original currency = rate USD`. The server accepts
-decimal strings, calculates with integers, and stores the rate and converted
-USD amount with each transaction. This keeps historical totals stable when
-reference rates change. A live rate-provider integration can replace the
-current UI reference-rate table without changing stored transaction semantics.
+Frankfurter v2 is the default reference-rate source. The server uses a
+one-hour freshness window, refreshes rates on demand, and stores the last
+successful result in D1. If an upstream refresh fails, the last-known-good
+result remains available with a stale status until a refresh succeeds.
+
+The application direction is always `1 original currency = rate USD`, even
+though Frankfurter returns quote units per USD. The server normalizes that
+direction before sending rates to the browser. Transaction inputs are decimal
+strings, monetary calculations use integers, and the applied rate, source,
+rate date, transaction capture time, and converted USD amount are stored with
+each transaction. Frankfurter-labelled snapshots must exactly match the D1
+snapshot history. This keeps historical totals stable when later reference
+rates change, including when a form was opened before the latest refresh.

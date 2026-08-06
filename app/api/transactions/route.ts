@@ -12,6 +12,7 @@ import {
 import { getChatGPTUser } from "@/app/chatgpt-auth";
 import { getDb, type AppDatabase } from "@/db";
 import {
+  exchangeRateSnapshots,
   transactions,
   userStates,
   type NewTransaction,
@@ -404,6 +405,9 @@ function serializeTransaction(transaction: Transaction) {
     fxRate: transaction.fxRate,
     exchangeRateDirection: "USD_PER_ORIGINAL" as const,
     exchangeRateSource: transaction.fxSource,
+    exchangeRateDate: transaction.fxRateDate,
+    fxRateDate: transaction.fxRateDate,
+    rateDate: transaction.fxRateDate,
     exchangeRateCapturedAt: new Date(
       transaction.fxCapturedAtMs,
     ).toISOString(),
@@ -468,6 +472,7 @@ function sampleTransaction(
     originalCurrencyExponent: exponent,
     fxRate: rate.canonical,
     fxSource: input.currency === BASE_CURRENCY ? "identity" : "sample",
+    fxRateDate: null,
     fxCapturedAtMs: timestamp,
     baseAmountMinor: Number(baseMinor),
     baseCurrency: BASE_CURRENCY,
@@ -593,10 +598,11 @@ async function seedSamplesOnce(
   ]);
 }
 
-function buildNewTransaction(
+async function buildNewTransaction(
   ownerId: string,
   body: JsonRecord,
-): NewTransaction {
+  db: AppDatabase,
+): Promise<NewTransaction> {
   const rawKind = firstDefined(body, ["kind", "type"]);
   const kind =
     typeof rawKind === "string" ? rawKind.trim().toLowerCase() : "";
@@ -620,8 +626,54 @@ function buildNewTransaction(
   }
 
   const originalMinor = parseAmount(body.amount, exponent);
+  const rawSource = firstDefined(body, [
+    "exchangeRateSource",
+    "fxSource",
+    "rateSource",
+  ]);
+  const requestedSource =
+    typeof rawSource === "string" ? rawSource.trim().toLowerCase() : rawSource;
+  let fxSource: "identity" | "manual" | "frankfurter";
+  if (currency === BASE_CURRENCY) {
+    if (requestedSource !== undefined && requestedSource !== "identity") {
+      throw new ApiValidationError(
+        "INVALID_EXCHANGE_RATE_SOURCE",
+        400,
+        "fxSource",
+      );
+    }
+    fxSource = "identity";
+  } else {
+    if (requestedSource === undefined || requestedSource === "manual") {
+      fxSource = "manual";
+    } else if (requestedSource === "frankfurter") {
+      fxSource = "frankfurter";
+    } else {
+      throw new ApiValidationError(
+        "INVALID_EXCHANGE_RATE_SOURCE",
+        400,
+        "fxSource",
+      );
+    }
+  }
+
+  const rawRateDate = firstDefined(body, [
+    "rateDate",
+    "fxRateDate",
+    "exchangeRateDate",
+  ]);
+  let fxRateDate: string | null = null;
+  if (fxSource === "frankfurter") {
+    if (typeof rawRateDate !== "string" || !isValidDate(rawRateDate)) {
+      throw new ApiValidationError("INVALID_RATE_DATE", 400, "rateDate");
+    }
+    fxRateDate = rawRateDate;
+  } else if (rawRateDate !== undefined && rawRateDate !== null) {
+    throw new ApiValidationError("INVALID_RATE_DATE", 400, "rateDate");
+  }
+
   const rawRate = firstDefined(body, ["exchangeRate", "fxRate", "rate"]);
-  const rate = parseRate(
+  let rate = parseRate(
     rawRate === undefined && currency === BASE_CURRENCY ? "1" : rawRate,
   );
   if (currency === BASE_CURRENCY && rate.canonical !== "1") {
@@ -632,10 +684,47 @@ function buildNewTransaction(
     );
   }
 
+  if (fxSource === "frankfurter") {
+    const snapshotId = `${currency}:${fxRateDate}:${rate.canonical}`;
+    const snapshotRows = await db
+      .select({
+        quoteCurrency: exchangeRateSnapshots.quoteCurrency,
+        usdPerUnit: exchangeRateSnapshots.usdPerUnit,
+        rateDate: exchangeRateSnapshots.rateDate,
+      })
+      .from(exchangeRateSnapshots)
+      .where(eq(exchangeRateSnapshots.snapshotId, snapshotId))
+      .limit(1);
+    const snapshot = snapshotRows[0];
+    if (!snapshot) {
+      throw new ApiValidationError(
+        "FRANKFURTER_RATE_UNAVAILABLE",
+        409,
+        "currency",
+      );
+    }
+
+    const authoritativeRate = parseRate(snapshot.usdPerUnit);
+    if (
+      snapshot.quoteCurrency !== currency ||
+      rate.canonical !== authoritativeRate.canonical ||
+      fxRateDate !== snapshot.rateDate
+    ) {
+      throw new ApiValidationError(
+        "RATE_SNAPSHOT_CHANGED",
+        409,
+        "exchangeRate",
+      );
+    }
+    rate = authoritativeRate;
+    fxRateDate = snapshot.rateDate;
+  }
+
   const baseMinor =
     currency === BASE_CURRENCY
       ? originalMinor
       : toBaseMinor(originalMinor, exponent, rate);
+
   const category = normalizeText(body.category, "category", 40, {
     fallback: "other",
   });
@@ -673,7 +762,8 @@ function buildNewTransaction(
     originalCurrency: currency,
     originalCurrencyExponent: exponent,
     fxRate: rate.canonical,
-    fxSource: currency === BASE_CURRENCY ? "identity" : "manual",
+    fxSource,
+    fxRateDate,
     fxCapturedAtMs: now,
     baseAmountMinor: Number(baseMinor),
     baseCurrency: BASE_CURRENCY,
@@ -696,6 +786,7 @@ function sameMutation(existing: Transaction, proposed: NewTransaction) {
     existing.originalCurrencyExponent === proposed.originalCurrencyExponent &&
     existing.fxRate === proposed.fxRate &&
     existing.fxSource === proposed.fxSource &&
+    existing.fxRateDate === proposed.fxRateDate &&
     existing.baseAmountMinor === proposed.baseAmountMinor &&
     existing.baseCurrency === proposed.baseCurrency &&
     existing.baseCurrencyExponent === proposed.baseCurrencyExponent &&
@@ -818,8 +909,8 @@ export async function POST(request: Request) {
     if (!ownerId) return errorResponse("AUTH_REQUIRED", 401);
 
     const body = await readJsonBody(request);
-    const newTransaction = buildNewTransaction(ownerId, body);
     const db = getDb();
+    const newTransaction = await buildNewTransaction(ownerId, body, db);
     await ensureUserState(db, ownerId);
 
     if (newTransaction.clientRequestId) {

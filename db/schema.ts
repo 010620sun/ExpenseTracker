@@ -27,6 +27,96 @@ export const userStates = sqliteTable(
   ],
 );
 
+// Shared by every user. Freshness is derived from fetched_at_ms so a cached
+// row can remain the last-known-good fallback after its normal TTL expires.
+export const exchangeRateCache = sqliteTable(
+  "exchange_rate_cache",
+  {
+    quoteCurrency: text("quote_currency").primaryKey(),
+    baseCurrency: text("base_currency").notNull().default("USD"),
+    usdPerUnit: text("usd_per_unit").notNull(),
+    rateDate: text("rate_date").notNull(),
+    fetchedAtMs: integer("fetched_at_ms").notNull(),
+    source: text("source", { enum: ["frankfurter"] })
+      .notNull()
+      .default("frankfurter"),
+  },
+  (table) => [
+    check(
+      "exchange_rate_cache_supported_quote",
+      sql`${table.quoteCurrency} IN ('KRW', 'EUR', 'JPY', 'GBP', 'SGD', 'CAD', 'AUD')`,
+    ),
+    check(
+      "exchange_rate_cache_base_usd",
+      sql`${table.baseCurrency} = 'USD'`,
+    ),
+    check(
+      "exchange_rate_cache_rate_length",
+      sql`length(${table.usdPerUnit}) BETWEEN 1 AND 32`,
+    ),
+    check(
+      "exchange_rate_cache_rate_date_shape",
+      sql`length(${table.rateDate}) = 10 AND ${table.rateDate} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`,
+    ),
+    check(
+      "exchange_rate_cache_fetched_at_positive",
+      sql`${table.fetchedAtMs} > 0`,
+    ),
+    check(
+      "exchange_rate_cache_source",
+      sql`${table.source} = 'frankfurter'`,
+    ),
+  ],
+);
+
+// Immutable rate/date combinations that have been served to clients. Keeping
+// these snapshots lets a transaction remain verifiable after the current cache
+// advances to a newer reference date.
+export const exchangeRateSnapshots = sqliteTable(
+  "exchange_rate_snapshots",
+  {
+    snapshotId: text("snapshot_id").primaryKey(),
+    quoteCurrency: text("quote_currency").notNull(),
+    baseCurrency: text("base_currency").notNull().default("USD"),
+    usdPerUnit: text("usd_per_unit").notNull(),
+    rateDate: text("rate_date").notNull(),
+    fetchedAtMs: integer("fetched_at_ms").notNull(),
+    source: text("source", { enum: ["frankfurter"] })
+      .notNull()
+      .default("frankfurter"),
+  },
+  (table) => [
+    check(
+      "exchange_rate_snapshots_id",
+      sql`length(${table.snapshotId}) BETWEEN 1 AND 64 AND ${table.snapshotId} = ${table.quoteCurrency} || ':' || ${table.rateDate} || ':' || ${table.usdPerUnit}`,
+    ),
+    check(
+      "exchange_rate_snapshots_supported_quote",
+      sql`${table.quoteCurrency} IN ('KRW', 'EUR', 'JPY', 'GBP', 'SGD', 'CAD', 'AUD')`,
+    ),
+    check(
+      "exchange_rate_snapshots_base_usd",
+      sql`${table.baseCurrency} = 'USD'`,
+    ),
+    check(
+      "exchange_rate_snapshots_rate_length",
+      sql`length(${table.usdPerUnit}) BETWEEN 1 AND 32`,
+    ),
+    check(
+      "exchange_rate_snapshots_rate_date_shape",
+      sql`length(${table.rateDate}) = 10 AND ${table.rateDate} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`,
+    ),
+    check(
+      "exchange_rate_snapshots_fetched_at_positive",
+      sql`${table.fetchedAtMs} > 0`,
+    ),
+    check(
+      "exchange_rate_snapshots_source",
+      sql`${table.source} = 'frankfurter'`,
+    ),
+  ],
+);
+
 export const transactions = sqliteTable(
   "transactions",
   {
@@ -49,8 +139,9 @@ export const transactions = sqliteTable(
     // "1 original currency major unit = fx_rate USD major units".
     fxRate: text("fx_rate").notNull(),
     fxSource: text("fx_source", {
-      enum: ["identity", "manual", "sample"],
+      enum: ["identity", "manual", "sample", "frankfurter"],
     }).notNull(),
+    fxRateDate: text("fx_rate_date"),
     fxCapturedAtMs: integer("fx_captured_at_ms").notNull(),
 
     baseAmountMinor: integer("base_amount_minor").notNull(),
@@ -101,7 +192,15 @@ export const transactions = sqliteTable(
     ),
     check(
       "transactions_fx_source",
-      sql`${table.fxSource} IN ('identity', 'manual', 'sample')`,
+      sql`${table.fxSource} IN ('identity', 'manual', 'sample', 'frankfurter')`,
+    ),
+    check(
+      "transactions_fx_rate_date_shape",
+      sql`${table.fxRateDate} IS NULL OR (length(${table.fxRateDate}) = 10 AND ${table.fxRateDate} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')`,
+    ),
+    check(
+      "transactions_fx_provenance",
+      sql`(${table.fxSource} = 'frankfurter' AND ${table.fxRateDate} IS NOT NULL) OR (${table.fxSource} <> 'frankfurter' AND ${table.fxRateDate} IS NULL)`,
     ),
     check(
       "transactions_timestamps_positive",
@@ -113,7 +212,7 @@ export const transactions = sqliteTable(
     ),
     check(
       "transactions_identity_conversion",
-      sql`${table.originalCurrency} <> 'USD' OR (${table.fxRate} = '1' AND ${table.originalAmountMinor} = ${table.baseAmountMinor})`,
+      sql`(${table.originalCurrency} = 'USD' AND ${table.fxSource} = 'identity' AND ${table.fxRate} = '1' AND ${table.originalAmountMinor} = ${table.baseAmountMinor}) OR (${table.originalCurrency} <> 'USD' AND ${table.fxSource} <> 'identity')`,
     ),
     check(
       "transactions_category_length",
@@ -145,3 +244,5 @@ export const transactions = sqliteTable(
 
 export type Transaction = typeof transactions.$inferSelect;
 export type NewTransaction = typeof transactions.$inferInsert;
+export type ExchangeRateCache = typeof exchangeRateCache.$inferSelect;
+export type ExchangeRateSnapshot = typeof exchangeRateSnapshots.$inferSelect;
