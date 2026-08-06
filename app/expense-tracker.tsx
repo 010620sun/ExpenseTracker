@@ -890,6 +890,20 @@ export function ExpenseTracker({
     function handlePointerDown(event: PointerEvent) {
       const target = event.target;
       if (!(target instanceof Node)) return;
+      const drawer = drawerRef.current;
+      if (drawer) {
+        const drawerBounds = drawer.getBoundingClientRect();
+        const scrollbarWidth = drawer.offsetWidth - drawer.clientWidth;
+        if (
+          scrollbarWidth > 0 &&
+          event.clientX >= drawerBounds.right - scrollbarWidth &&
+          event.clientX <= drawerBounds.right &&
+          event.clientY >= drawerBounds.top &&
+          event.clientY <= drawerBounds.bottom
+        ) {
+          return;
+        }
+      }
       if (
         categoryPickerRef.current?.contains(target) ||
         categoryTriggerRef.current?.contains(target)

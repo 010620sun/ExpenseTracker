@@ -98,6 +98,11 @@ test("provides an expanded visual expense category picker", async () => {
   assert.match(source, /role="listbox"/u);
   assert.match(source, /className="category-option-art"/u);
   assert.doesNotMatch(source, /<select value=\{category\}/u);
+  assert.match(source, /drawer\.offsetWidth - drawer\.clientWidth/u);
+  assert.match(
+    source,
+    /event\.clientX >= drawerBounds\.right - scrollbarWidth/u,
+  );
   assert.match(styles, /\.category-option-grid/u);
   const categoryPopoverStyles = styles.match(
     /\.category-popover\s*\{([\s\S]*?)\}/u,
