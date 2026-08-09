@@ -8,9 +8,10 @@ currency.
 ## Product scope
 
 - English by default with a persistent Korean language switch
-- USD, KRW, EUR, JPY, GBP, SGD, CAD, and AUD entry flows
+- Every currency currently exposed by Frankfurter, discovered dynamically
 - Base-currency dashboard conversion without changing the UI language
 - Monthly spending, budget, net-flow, category, and currency-mix summaries
+- Weekly, monthly, and yearly recurring expenses and regular income
 - User-isolated D1 storage with exact minor-unit monetary calculations
 - Idempotent transaction creation and owner-scoped deletion
 - Responsive desktop, tablet, and mobile layouts
@@ -63,3 +64,16 @@ rate date, transaction capture time, and converted USD amount are stored with
 each transaction. Frankfurter-labelled snapshots must exactly match the D1
 snapshot history. This keeps historical totals stable when later reference
 rates change, including when a form was opened before the latest refresh.
+
+## Recurring transactions
+
+A recurring transaction stores its schedule and original-currency template as
+a separate series. Opening a month materializes only the occurrences required
+for that month, protected by a unique series/date key so repeated requests do
+not duplicate entries. Each generated occurrence captures the latest cached
+exchange rate available at that time, with the series' original rate snapshot
+as an offline fallback.
+
+Editing affects only the selected occurrence. Deleting an occurrence records
+an exception so it is not recreated, while stopping a series keeps the selected
+and past entries and removes any already-materialized future entries.

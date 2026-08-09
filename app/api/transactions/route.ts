@@ -13,9 +13,14 @@ import { getChatGPTUser } from "@/app/chatgpt-auth";
 import { getDb, type AppDatabase } from "@/db";
 import {
   exchangeRateSnapshots,
+  exchangeRateCache,
+  recurringExceptions,
+  recurringSeries,
   transactions,
   userStates,
+  type NewRecurringSeries,
   type NewTransaction,
+  type RecurringSeries,
   type Transaction,
 } from "@/db/schema";
 import { currencyExponent } from "@/lib/currency";
@@ -60,6 +65,13 @@ type Cursor = {
   occurredOn: string;
   createdAtMs: number;
   id: string;
+};
+
+type RecurrenceFrequency = "weekly" | "monthly" | "yearly";
+
+type RecurrenceConfig = {
+  frequency: RecurrenceFrequency;
+  endsOn: string | null;
 };
 
 function errorResponse(code: string, status: number, field?: string) {
@@ -295,6 +307,107 @@ function parseMonth(value: string | null) {
   };
 }
 
+function parseRecurrence(body: JsonRecord, startOn: string): RecurrenceConfig | null {
+  const raw = body.recurrence;
+  if (raw === undefined || raw === null || raw === false) return null;
+  if (!isPlainRecord(raw)) {
+    throw new ApiValidationError("INVALID_RECURRENCE", 400, "recurrence");
+  }
+
+  const frequency = raw.frequency;
+  if (
+    frequency !== "weekly" &&
+    frequency !== "monthly" &&
+    frequency !== "yearly"
+  ) {
+    throw new ApiValidationError(
+      "INVALID_RECURRENCE_FREQUENCY",
+      400,
+      "recurrence.frequency",
+    );
+  }
+
+  const rawEndsOn = raw.endsOn;
+  let endsOn: string | null = null;
+  if (rawEndsOn !== undefined && rawEndsOn !== null && rawEndsOn !== "") {
+    if (
+      typeof rawEndsOn !== "string" ||
+      !isValidDate(rawEndsOn) ||
+      rawEndsOn < startOn
+    ) {
+      throw new ApiValidationError(
+        "INVALID_RECURRENCE_END_DATE",
+        400,
+        "recurrence.endsOn",
+      );
+    }
+    endsOn = rawEndsOn;
+  }
+
+  return { frequency, endsOn };
+}
+
+function shiftIsoDate(date: string, days: number) {
+  const shifted = new Date(`${date}T00:00:00Z`);
+  shifted.setUTCDate(shifted.getUTCDate() + days);
+  return shifted.toISOString().slice(0, 10);
+}
+
+function daysInIsoMonth(month: string) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  return new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+}
+
+function dateInIsoMonth(month: string, preferredDay: number) {
+  const day = Math.min(preferredDay, daysInIsoMonth(month));
+  return `${month}-${String(day).padStart(2, "0")}`;
+}
+
+function recurringDatesForMonth(
+  series: RecurringSeries,
+  monthStart: string,
+  monthEnd: string,
+) {
+  const dates: string[] = [];
+  const withinSeries = (date: string) =>
+    date >= series.startOn &&
+    date < monthEnd &&
+    (series.endsOn === null || date <= series.endsOn);
+
+  if (series.frequency === "weekly") {
+    const startMs = Date.parse(`${series.startOn}T00:00:00Z`);
+    const monthMs = Date.parse(`${monthStart}T00:00:00Z`);
+    const weeksToMonth = Math.max(
+      0,
+      Math.ceil((monthMs - startMs) / (7 * 86_400_000)),
+    );
+    for (
+      let date = shiftIsoDate(series.startOn, weeksToMonth * 7);
+      date < monthEnd;
+      date = shiftIsoDate(date, 7)
+    ) {
+      if (date >= monthStart && withinSeries(date)) dates.push(date);
+    }
+    return dates;
+  }
+
+  const targetMonth = monthStart.slice(0, 7);
+  const startMonth = series.startOn.slice(0, 7);
+  if (targetMonth < startMonth) return dates;
+
+  if (series.frequency === "monthly") {
+    const date = dateInIsoMonth(targetMonth, Number(series.startOn.slice(8)));
+    if (withinSeries(date)) dates.push(date);
+    return dates;
+  }
+
+  if (targetMonth.slice(5) === startMonth.slice(5)) {
+    const date = dateInIsoMonth(targetMonth, Number(series.startOn.slice(8)));
+    if (withinSeries(date)) dates.push(date);
+  }
+  return dates;
+}
+
 function parseLimit(value: string | null) {
   if (value === null) return DEFAULT_LIMIT;
   if (!/^\d{1,3}$/u.test(value)) {
@@ -399,6 +512,9 @@ function serializeTransaction(transaction: Transaction) {
     category: transaction.category,
     description: transaction.description,
     note: transaction.note,
+    recurringSeriesId: transaction.recurringSeriesId,
+    recurrenceDate: transaction.recurrenceDate,
+    isRecurring: transaction.recurringSeriesId !== null,
     createdAt: new Date(transaction.createdAtMs).toISOString(),
     updatedAt: new Date(transaction.updatedAtMs).toISOString(),
   };
@@ -409,6 +525,148 @@ async function ensureUserState(db: AppDatabase, ownerId: string) {
     .insert(userStates)
     .values({ ownerId, createdAtMs: Date.now() })
     .onConflictDoNothing();
+}
+
+function recurringSeriesFromTransaction(
+  transaction: NewTransaction,
+  recurrence: RecurrenceConfig,
+): NewRecurringSeries {
+  return {
+    id: transaction.id,
+    ownerId: transaction.ownerId,
+    kind: transaction.kind,
+    startOn: transaction.occurredOn,
+    frequency: recurrence.frequency,
+    endsOn: recurrence.endsOn,
+    originalAmountMinor: transaction.originalAmountMinor,
+    originalCurrency: transaction.originalCurrency,
+    originalCurrencyExponent: transaction.originalCurrencyExponent,
+    fallbackFxRate: transaction.fxRate,
+    fallbackFxSource:
+      transaction.fxSource === "sample" ? "manual" : transaction.fxSource,
+    fallbackFxRateDate:
+      transaction.fxSource === "frankfurter" ? transaction.fxRateDate : null,
+    category: transaction.category,
+    description: transaction.description,
+    note: transaction.note,
+    createdAtMs: transaction.createdAtMs,
+    updatedAtMs: transaction.updatedAtMs,
+  };
+}
+
+async function materializeRecurringTransactions(
+  db: AppDatabase,
+  ownerId: string,
+  monthStart: string,
+  monthEnd: string,
+) {
+  const seriesRows = await db
+    .select()
+    .from(recurringSeries)
+    .where(
+      and(
+        eq(recurringSeries.ownerId, ownerId),
+        lt(recurringSeries.startOn, monthEnd),
+        or(
+          isNull(recurringSeries.endsOn),
+          gte(recurringSeries.endsOn, monthStart),
+        ),
+      ),
+    );
+  if (seriesRows.length === 0) return;
+
+  const [exceptionRows, cacheRows] = await db.batch([
+    db
+      .select({
+        seriesId: recurringExceptions.seriesId,
+        occurrenceOn: recurringExceptions.occurrenceOn,
+      })
+      .from(recurringExceptions)
+      .where(
+        and(
+          eq(recurringExceptions.ownerId, ownerId),
+          gte(recurringExceptions.occurrenceOn, monthStart),
+          lt(recurringExceptions.occurrenceOn, monthEnd),
+        ),
+      ),
+    db.select().from(exchangeRateCache),
+  ]);
+  const exceptions = new Set(
+    exceptionRows.map((row) => `${row.seriesId}:${row.occurrenceOn}`),
+  );
+  const ratesByCurrency = new Map(
+    cacheRows.map((row) => [row.quoteCurrency, row]),
+  );
+  const generated: NewTransaction[] = [];
+  const generatedAtMs = Date.now();
+
+  for (const series of seriesRows) {
+    for (const occurrenceOn of recurringDatesForMonth(
+      series,
+      monthStart,
+      monthEnd,
+    )) {
+      if (exceptions.has(`${series.id}:${occurrenceOn}`)) continue;
+
+      const currentRate = ratesByCurrency.get(series.originalCurrency);
+      const fxRate =
+        series.originalCurrency === BASE_CURRENCY
+          ? "1"
+          : currentRate?.usdPerUnit ?? series.fallbackFxRate;
+      const fxSource =
+        series.originalCurrency === BASE_CURRENCY
+          ? "identity"
+          : currentRate
+            ? "frankfurter"
+            : series.fallbackFxSource;
+      const fxRateDate =
+        fxSource === "frankfurter"
+          ? currentRate?.rateDate ?? series.fallbackFxRateDate
+          : null;
+      const parsedRate = parseRate(fxRate);
+      const originalMinor = BigInt(series.originalAmountMinor);
+      const baseMinor =
+        series.originalCurrency === BASE_CURRENCY
+          ? originalMinor
+          : toBaseMinor(
+              originalMinor,
+              series.originalCurrencyExponent,
+              parsedRate,
+            );
+      const timestamp = generatedAtMs + generated.length;
+      generated.push({
+        id: crypto.randomUUID(),
+        ownerId,
+        kind: series.kind,
+        occurredOn: occurrenceOn,
+        originalAmountMinor: series.originalAmountMinor,
+        originalCurrency: series.originalCurrency,
+        originalCurrencyExponent: series.originalCurrencyExponent,
+        fxRate: parsedRate.canonical,
+        fxSource,
+        fxRateDate,
+        fxCapturedAtMs: currentRate?.fetchedAtMs ?? series.createdAtMs,
+        baseAmountMinor: Number(baseMinor),
+        baseCurrency: BASE_CURRENCY,
+        baseCurrencyExponent: BASE_CURRENCY_EXPONENT,
+        category: series.category,
+        description: series.description,
+        note: series.note,
+        recurringSeriesId: series.id,
+        recurrenceDate: occurrenceOn,
+        clientRequestId: `rec:${series.id}:${occurrenceOn}`,
+        createdAtMs: timestamp,
+        updatedAtMs: timestamp,
+      });
+    }
+  }
+
+  for (let index = 0; index < generated.length; index += 4) {
+    await db
+      .insert(transactions)
+      .values(generated.slice(index, index + 4))
+      .onConflictDoNothing();
+  }
 }
 
 function dateWithinMonth(month: string, daysAgo: number) {
@@ -785,6 +1043,12 @@ export async function GET(request: Request) {
     const db = getDb();
 
     await seedSamplesOnce(db, ownerId, monthRange.month);
+    await materializeRecurringTransactions(
+      db,
+      ownerId,
+      monthRange.start,
+      monthRange.end,
+    );
 
     const predicates = [
       eq(transactions.ownerId, ownerId),
@@ -888,7 +1152,66 @@ export async function POST(request: Request) {
     const body = await readJsonBody(request);
     const db = getDb();
     const newTransaction = await buildNewTransaction(ownerId, body, db);
+    const recurrence = parseRecurrence(body, newTransaction.occurredOn);
     await ensureUserState(db, ownerId);
+
+    if (recurrence) {
+      if (newTransaction.clientRequestId) {
+        const existing = await db
+          .select()
+          .from(transactions)
+          .where(
+            and(
+              eq(transactions.ownerId, ownerId),
+              eq(
+                transactions.clientRequestId,
+                newTransaction.clientRequestId,
+              ),
+            ),
+          )
+          .limit(1);
+        if (existing[0]) {
+          const existingSeries = existing[0].recurringSeriesId
+            ? await db
+                .select({
+                  frequency: recurringSeries.frequency,
+                  endsOn: recurringSeries.endsOn,
+                })
+                .from(recurringSeries)
+                .where(
+                  and(
+                    eq(recurringSeries.id, existing[0].recurringSeriesId),
+                    eq(recurringSeries.ownerId, ownerId),
+                  ),
+                )
+                .limit(1)
+            : [];
+          if (
+            sameMutation(existing[0], newTransaction) &&
+            existingSeries[0]?.frequency === recurrence.frequency &&
+            existingSeries[0]?.endsOn === recurrence.endsOn
+          ) {
+            return Response.json(
+              { data: serializeTransaction(existing[0]), idempotent: true },
+              { status: 200, headers: NO_STORE_HEADERS },
+            );
+          }
+          return errorResponse("IDEMPOTENCY_CONFLICT", 409, "clientRequestId");
+        }
+      }
+
+      const series = recurringSeriesFromTransaction(newTransaction, recurrence);
+      newTransaction.recurringSeriesId = series.id;
+      newTransaction.recurrenceDate = newTransaction.occurredOn;
+      const [, insertedRows] = await db.batch([
+        db.insert(recurringSeries).values(series),
+        db.insert(transactions).values(newTransaction).returning(),
+      ]);
+      return Response.json(
+        { data: serializeTransaction(insertedRows[0]) },
+        { status: 201, headers: NO_STORE_HEADERS },
+      );
+    }
 
     if (newTransaction.clientRequestId) {
       const inserted = await db
@@ -916,7 +1239,11 @@ export async function POST(request: Request) {
           ),
         )
         .limit(1);
-      if (existing[0] && sameMutation(existing[0], newTransaction)) {
+      if (
+        existing[0] &&
+        existing[0].recurringSeriesId === null &&
+        sameMutation(existing[0], newTransaction)
+      ) {
         return Response.json(
           { data: serializeTransaction(existing[0]), idempotent: true },
           { status: 200, headers: NO_STORE_HEADERS },
@@ -1058,12 +1385,47 @@ export async function DELETE(request: Request) {
       return errorResponse("INVALID_TRANSACTION_ID", 400, "id");
     }
 
-    const deleted = await getDb()
-      .delete(transactions)
-      .where(
-        and(eq(transactions.id, id), eq(transactions.ownerId, ownerId)),
-      )
-      .returning({ id: transactions.id });
+    const db = getDb();
+    const existingRows = await db
+      .select({
+        id: transactions.id,
+        recurringSeriesId: transactions.recurringSeriesId,
+        recurrenceDate: transactions.recurrenceDate,
+      })
+      .from(transactions)
+      .where(and(eq(transactions.id, id), eq(transactions.ownerId, ownerId)))
+      .limit(1);
+    const existing = existingRows[0];
+    if (!existing) return errorResponse("TRANSACTION_NOT_FOUND", 404);
+
+    let deleted: Array<{ id: string }>;
+    if (existing.recurringSeriesId && existing.recurrenceDate) {
+      const [, deletedRows] = await db.batch([
+        db
+          .insert(recurringExceptions)
+          .values({
+            seriesId: existing.recurringSeriesId,
+            occurrenceOn: existing.recurrenceDate,
+            ownerId,
+            createdAtMs: Date.now(),
+          })
+          .onConflictDoNothing(),
+        db
+          .delete(transactions)
+          .where(
+            and(eq(transactions.id, id), eq(transactions.ownerId, ownerId)),
+          )
+          .returning({ id: transactions.id }),
+      ]);
+      deleted = deletedRows;
+    } else {
+      deleted = await db
+        .delete(transactions)
+        .where(
+          and(eq(transactions.id, id), eq(transactions.ownerId, ownerId)),
+        )
+        .returning({ id: transactions.id });
+    }
     if (!deleted[0]) return errorResponse("TRANSACTION_NOT_FOUND", 404);
 
     return new Response(null, { status: 204, headers: NO_STORE_HEADERS });

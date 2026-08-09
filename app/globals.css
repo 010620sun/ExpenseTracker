@@ -754,6 +754,12 @@ textarea:focus-visible {
   white-space: nowrap;
 }
 
+.calendar-entry-preview em {
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+
 .calendar-entry-previews small {
   color: var(--muted);
   font-size: 9px;
@@ -1620,6 +1626,87 @@ textarea:focus-visible {
   box-shadow: 0 0 0 3px rgba(59, 111, 96, 0.1);
 }
 
+.recurrence-card {
+  background: #f7f9f6;
+  border: 1px solid #dfe4df;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.recurrence-card.active {
+  background: #edf5f1;
+  border-color: #b9d0c5;
+}
+
+.recurrence-toggle {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.recurrence-toggle > span {
+  display: grid;
+  gap: 4px;
+}
+
+.recurrence-toggle strong,
+.recurring-edit-card strong {
+  font-size: 12px;
+}
+
+.recurrence-toggle small,
+.recurring-edit-card small {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.recurrence-toggle input {
+  accent-color: var(--green);
+  flex: 0 0 auto;
+  height: 20px;
+  width: 20px;
+}
+
+.recurrence-options {
+  border-top: 1px solid #d6e3dc;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 13px;
+  padding-top: 13px;
+}
+
+.recurring-edit-card {
+  align-items: center;
+  background: #edf5f1;
+  border: 1px solid #c7dcd2;
+  border-radius: 14px;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 13px 14px;
+}
+
+.recurring-edit-card > div {
+  display: grid;
+  gap: 4px;
+}
+
+.recurring-edit-card button {
+  background: #fff;
+  border: 1px solid #c8d8d0;
+  border-radius: 9px;
+  color: var(--green);
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 750;
+  min-height: 34px;
+  padding: 0 10px;
+}
+
 .category-picker {
   position: relative;
 }
@@ -1970,6 +2057,8 @@ textarea:focus-visible {
   @keyframes slide-in { from { transform: translateY(100%); } }
   .drawer-header h2 { font-size: 25px; }
   .amount-row, .field-row { grid-template-columns: 1fr; }
+  .recurrence-options { grid-template-columns: 1fr; }
+  .recurring-edit-card { align-items: stretch; flex-direction: column; }
   .category-popover { padding: 12px; }
   .category-option-grid { gap: 6px; }
   .category-option { min-height: 72px; }

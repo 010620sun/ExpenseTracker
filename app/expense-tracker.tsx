@@ -16,6 +16,7 @@ import { currencyExponent } from "@/lib/currency";
 type Language = "en" | "ko";
 type CurrencyCode = string;
 type TransactionKind = "expense" | "income";
+type RecurrenceFrequency = "weekly" | "monthly" | "yearly";
 
 type CurrencyMetadata = {
   code: CurrencyCode;
@@ -40,6 +41,9 @@ type LedgerTransaction = {
   category: string;
   description: string;
   note?: string | null;
+  recurringSeriesId?: string | null;
+  recurrenceDate?: string | null;
+  isRecurring?: boolean;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -285,6 +289,20 @@ const COPY = {
     menu: "Open navigation",
     deleteLabel: "Delete {merchant}",
     convertedTo: "in {currency}",
+    repeatTransaction: "Repeat this transaction",
+    repeatHint: "Create future entries automatically on the calendar.",
+    repeatFrequency: "Repeats",
+    weekly: "Every week",
+    monthly: "Every month",
+    yearly: "Every year",
+    repeatEnds: "Ends on (optional)",
+    recurringEntry: "Recurring entry",
+    recurringEditHint: "Changes apply only to this occurrence.",
+    stopRecurring: "Stop future repeats",
+    stopRecurringConfirm: "Stop repeats after this occurrence? Past entries will remain.",
+    recurringStopped: "Future repeats stopped.",
+    recurringStopFailed: "We couldn’t stop the recurring transaction.",
+    recurrenceDateError: "The repeat end date must be on or after the first transaction.",
   },
   ko: {
     overview: "대시보드",
@@ -372,6 +390,20 @@ const COPY = {
     menu: "내비게이션 열기",
     deleteLabel: "{merchant} 삭제",
     convertedTo: "{currency} 기준",
+    repeatTransaction: "이 거래 반복",
+    repeatHint: "앞으로의 거래를 달력에 자동으로 생성합니다.",
+    repeatFrequency: "반복 주기",
+    weekly: "매주",
+    monthly: "매월",
+    yearly: "매년",
+    repeatEnds: "종료일 (선택)",
+    recurringEntry: "반복 거래",
+    recurringEditHint: "변경 내용은 이번 거래에만 적용됩니다.",
+    stopRecurring: "향후 반복 중단",
+    stopRecurringConfirm: "이번 거래 이후의 반복을 중단할까요? 지난 거래는 유지됩니다.",
+    recurringStopped: "향후 반복을 중단했습니다.",
+    recurringStopFailed: "반복 거래를 중단하지 못했습니다.",
+    recurrenceDateError: "반복 종료일은 첫 거래일과 같거나 이후여야 합니다.",
   },
 } as const;
 
@@ -686,6 +718,10 @@ export function ExpenseTracker({
   const [isCategoryPickerOpen, setIsCategoryPickerOpen] = useState(false);
   const [note, setNote] = useState("");
   const [occurredOn, setOccurredOn] = useState(today);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceFrequency, setRecurrenceFrequency] =
+    useState<RecurrenceFrequency>("monthly");
+  const [recurrenceEndsOn, setRecurrenceEndsOn] = useState("");
   const [formError, setFormError] = useState("");
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const descriptionRef = useRef<HTMLInputElement>(null);
@@ -1149,6 +1185,9 @@ export function ExpenseTracker({
     setCategory("dining");
     setNote("");
     setOccurredOn(date);
+    setIsRecurring(false);
+    setRecurrenceFrequency("monthly");
+    setRecurrenceEndsOn("");
     setIsDrawerOpen(true);
     setFormError("");
   }
@@ -1171,6 +1210,9 @@ export function ExpenseTracker({
     );
     setNote(transaction.note ?? "");
     setOccurredOn(transaction.occurredOn);
+    setIsRecurring(false);
+    setRecurrenceFrequency("monthly");
+    setRecurrenceEndsOn("");
     setIsDrawerOpen(true);
     setFormError("");
   }
@@ -1299,6 +1341,15 @@ export function ExpenseTracker({
       setFormError(copy.dateError);
       return;
     }
+    if (
+      !editingTransaction &&
+      isRecurring &&
+      recurrenceEndsOn &&
+      (!isIsoDate(recurrenceEndsOn) || recurrenceEndsOn < occurredOn)
+    ) {
+      setFormError(copy.recurrenceDateError);
+      return;
+    }
 
     isSavingRef.current = true;
     setIsSaving(true);
@@ -1321,6 +1372,14 @@ export function ExpenseTracker({
           category: kind === "income" ? "income" : category,
           description: description.trim(),
           note: note.trim(),
+          ...(!editingTransaction && isRecurring
+            ? {
+                recurrence: {
+                  frequency: recurrenceFrequency,
+                  endsOn: recurrenceEndsOn || null,
+                },
+              }
+            : {}),
           ...(editingTransaction
             ? { expectedUpdatedAt: editingTransaction.updatedAt }
             : { clientRequestId: crypto.randomUUID() }),
@@ -1409,6 +1468,40 @@ export function ExpenseTracker({
     } catch {
       setTransactions(previous);
       setToast(copy.deleteFailed);
+    }
+  }
+
+  async function stopRecurringTransaction(transaction: LedgerTransaction) {
+    if (!transaction.recurringSeriesId) return;
+    if (!window.confirm(copy.stopRecurringConfirm)) return;
+
+    setIsSaving(true);
+    try {
+      const response = await fetch(
+        `/api/recurring?id=${encodeURIComponent(transaction.recurringSeriesId)}`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            endsOn: transaction.recurrenceDate ?? transaction.occurredOn,
+          }),
+        },
+      );
+      if (!response.ok) throw new Error("STOP_RECURRING_FAILED");
+      const endsOn = transaction.recurrenceDate ?? transaction.occurredOn;
+      setTransactions((current) =>
+        current.filter(
+          (item) =>
+            item.recurringSeriesId !== transaction.recurringSeriesId ||
+            (item.recurrenceDate ?? item.occurredOn) <= endsOn,
+        ),
+      );
+      setToast(copy.recurringStopped);
+      closeDrawer();
+    } catch {
+      setFormError(copy.recurringStopFailed);
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -1663,6 +1756,7 @@ export function ExpenseTracker({
                                   {dayEntries.slice(0, 2).map((transaction) => (
                                     <span className={transaction.kind === "income" ? "calendar-entry-preview income" : "calendar-entry-preview"} key={transaction.id}>
                                       <i style={{ backgroundColor: CATEGORY_COLORS[transaction.category] ?? CATEGORY_COLORS.other }} />
+                                      {transaction.isRecurring && <em>↻</em>}
                                       <b>{transaction.description}</b>
                                     </span>
                                   ))}
@@ -1729,7 +1823,7 @@ export function ExpenseTracker({
                       </span>
                       <span className="day-entry-copy">
                         <strong>{transaction.description}</strong>
-                        <small>{categoryLabel(transaction.category, language)} · {formatCurrency(originalMajor(transaction), transaction.originalCurrency, language)} {transaction.originalCurrency}</small>
+                        <small>{transaction.isRecurring ? "↻ · " : ""}{categoryLabel(transaction.category, language)} · {formatCurrency(originalMajor(transaction), transaction.originalCurrency, language)} {transaction.originalCurrency}</small>
                       </span>
                       <span className={transaction.kind === "income" ? "day-entry-value income" : "day-entry-value"}>
                         {transaction.kind === "income" ? "+" : "−"}{formatCurrency(inBaseCurrency(transaction.baseAmountMinor, baseCurrency, ratesToUsd), baseCurrency, language)}
@@ -1872,7 +1966,7 @@ export function ExpenseTracker({
                   </span>
                   <div className="transaction-name">
                     <strong>{transaction.description}</strong>
-                    <span>{categoryLabel(transaction.category, language)}</span>
+                    <span>{transaction.isRecurring ? "↻ · " : ""}{categoryLabel(transaction.category, language)}</span>
                   </div>
                   <time dateTime={transaction.occurredOn}>
                     {new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(
@@ -2040,6 +2134,66 @@ export function ExpenseTracker({
                 <span>{copy.date}</span>
                 <input type="date" value={occurredOn} onChange={(event) => setOccurredOn(event.target.value)} required />
               </label>
+              {!editingTransaction && (
+                <div className={isRecurring ? "recurrence-card active" : "recurrence-card"}>
+                  <label className="recurrence-toggle" htmlFor="recurrence-enabled">
+                    <span>
+                      <strong>{copy.repeatTransaction}</strong>
+                      <small>{copy.repeatHint}</small>
+                    </span>
+                    <input
+                      id="recurrence-enabled"
+                      type="checkbox"
+                      aria-label={copy.repeatTransaction}
+                      checked={isRecurring}
+                      onChange={(event) => setIsRecurring(event.target.checked)}
+                    />
+                  </label>
+                  {isRecurring && (
+                    <div className="recurrence-options">
+                      <label className="field">
+                        <span>{copy.repeatFrequency}</span>
+                        <select
+                          value={recurrenceFrequency}
+                          onChange={(event) =>
+                            setRecurrenceFrequency(
+                              event.target.value as RecurrenceFrequency,
+                            )
+                          }
+                        >
+                          <option value="weekly">{copy.weekly}</option>
+                          <option value="monthly">{copy.monthly}</option>
+                          <option value="yearly">{copy.yearly}</option>
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span>{copy.repeatEnds}</span>
+                        <input
+                          type="date"
+                          min={occurredOn}
+                          value={recurrenceEndsOn}
+                          onChange={(event) => setRecurrenceEndsOn(event.target.value)}
+                        />
+                      </label>
+                    </div>
+                  )}
+                </div>
+              )}
+              {editingTransaction?.recurringSeriesId && (
+                <div className="recurring-edit-card">
+                  <div>
+                    <strong>↻ {copy.recurringEntry}</strong>
+                    <small>{copy.recurringEditHint}</small>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void stopRecurringTransaction(editingTransaction)}
+                    disabled={isSaving}
+                  >
+                    {copy.stopRecurring}
+                  </button>
+                </div>
+              )}
               <label className="field">
                 <span>{calendarCopy.note}</span>
                 <textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder={calendarCopy.notePlaceholder} />

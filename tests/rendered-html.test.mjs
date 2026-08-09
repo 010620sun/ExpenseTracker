@@ -133,3 +133,34 @@ test("discovers every current Frankfurter currency dynamically", async () => {
   assert.match(currencyHelpers, /Intl\.NumberFormat/u);
   assert.match(currencyHelpers, /Intl\.DisplayNames/u);
 });
+
+test("supports durable recurring expenses and regular income", async () => {
+  const [transactionsRoute, recurringRoute, tracker, schema, migration] =
+    await Promise.all([
+      readFile(new URL("../app/api/transactions/route.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/api/recurring/route.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+      readFile(new URL("../drizzle/0003_chilly_unus.sql", import.meta.url), "utf8"),
+    ]);
+
+  assert.match(transactionsRoute, /function recurringDatesForMonth/u);
+  assert.match(transactionsRoute, /materializeRecurringTransactions/u);
+  assert.match(transactionsRoute, /onConflictDoNothing\(\)/u);
+  assert.match(transactionsRoute, /insert\(recurringExceptions\)/u);
+  assert.match(recurringRoute, /gt\(transactions\.recurrenceDate, endsOn\)/u);
+  assert.match(tracker, /recurrenceFrequency/u);
+  assert.match(tracker, /weekly/u);
+  assert.match(tracker, /monthly/u);
+  assert.match(tracker, /yearly/u);
+  assert.match(schema, /uq_transactions_recurring_occurrence/u);
+  assert.match(schema, /uq_recurring_exceptions_series_occurrence/u);
+  assert.match(
+    migration,
+    /"note", NULL, NULL, "client_request_id"/u,
+  );
+  assert.doesNotMatch(
+    migration,
+    /SELECT[\s\S]*?"note", "recurring_series_id", "recurrence_date", "client_request_id" FROM `transactions`/u,
+  );
+});

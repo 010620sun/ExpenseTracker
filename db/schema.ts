@@ -117,6 +117,106 @@ export const exchangeRateSnapshots = sqliteTable(
   ],
 );
 
+export const recurringSeries = sqliteTable(
+  "recurring_series",
+  {
+    id: text("id").primaryKey(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => userStates.ownerId, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["expense", "income"] }).notNull(),
+    startOn: text("start_on").notNull(),
+    frequency: text("frequency", {
+      enum: ["weekly", "monthly", "yearly"],
+    }).notNull(),
+    endsOn: text("ends_on"),
+    originalAmountMinor: integer("original_amount_minor").notNull(),
+    originalCurrency: text("original_currency").notNull(),
+    originalCurrencyExponent: integer(
+      "original_currency_exponent",
+    ).notNull(),
+    fallbackFxRate: text("fallback_fx_rate").notNull(),
+    fallbackFxSource: text("fallback_fx_source", {
+      enum: ["identity", "manual", "frankfurter"],
+    }).notNull(),
+    fallbackFxRateDate: text("fallback_fx_rate_date"),
+    category: text("category").notNull().default("other"),
+    description: text("description").notNull(),
+    note: text("note").notNull().default(""),
+    createdAtMs: integer("created_at_ms").notNull(),
+    updatedAtMs: integer("updated_at_ms").notNull(),
+  },
+  (table) => [
+    check("recurring_series_id_length", sql`length(${table.id}) BETWEEN 1 AND 64`),
+    check("recurring_series_kind", sql`${table.kind} IN ('expense', 'income')`),
+    check(
+      "recurring_series_dates",
+      sql`length(${table.startOn}) = 10 AND ${table.startOn} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' AND (${table.endsOn} IS NULL OR (${table.endsOn} >= ${table.startOn} AND length(${table.endsOn}) = 10 AND ${table.endsOn} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'))`,
+    ),
+    check(
+      "recurring_series_frequency",
+      sql`${table.frequency} IN ('weekly', 'monthly', 'yearly')`,
+    ),
+    check(
+      "recurring_series_amount_range",
+      sql`${table.originalAmountMinor} > 0 AND ${table.originalAmountMinor} <= 9000000000000`,
+    ),
+    check(
+      "recurring_series_currency",
+      sql`length(${table.originalCurrency}) = 3 AND ${table.originalCurrency} = upper(${table.originalCurrency}) AND ${table.originalCurrencyExponent} BETWEEN 0 AND 4`,
+    ),
+    check(
+      "recurring_series_fx",
+      sql`length(${table.fallbackFxRate}) BETWEEN 1 AND 32 AND ((${table.fallbackFxSource} = 'frankfurter' AND ${table.fallbackFxRateDate} IS NOT NULL) OR (${table.fallbackFxSource} <> 'frankfurter' AND ${table.fallbackFxRateDate} IS NULL))`,
+    ),
+    check(
+      "recurring_series_text",
+      sql`length(${table.category}) BETWEEN 1 AND 40 AND length(${table.description}) BETWEEN 1 AND 120 AND length(${table.note}) <= 500`,
+    ),
+    check(
+      "recurring_series_timestamps",
+      sql`${table.createdAtMs} > 0 AND ${table.updatedAtMs} >= ${table.createdAtMs}`,
+    ),
+    index("idx_recurring_series_owner_dates").on(
+      table.ownerId,
+      table.startOn,
+      table.endsOn,
+    ),
+  ],
+);
+
+export const recurringExceptions = sqliteTable(
+  "recurring_exceptions",
+  {
+    seriesId: text("series_id")
+      .notNull()
+      .references(() => recurringSeries.id, { onDelete: "cascade" }),
+    occurrenceOn: text("occurrence_on").notNull(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => userStates.ownerId, { onDelete: "cascade" }),
+    createdAtMs: integer("created_at_ms").notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_recurring_exceptions_series_occurrence").on(
+      table.seriesId,
+      table.occurrenceOn,
+    ),
+    check(
+      "recurring_exceptions_date",
+      sql`length(${table.occurrenceOn}) = 10 AND ${table.occurrenceOn} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`,
+    ),
+    check(
+      "recurring_exceptions_created_at",
+      sql`${table.createdAtMs} > 0`,
+    ),
+    index("idx_recurring_exceptions_owner_occurrence").on(
+      table.ownerId,
+      table.occurrenceOn,
+    ),
+  ],
+);
+
 export const transactions = sqliteTable(
   "transactions",
   {
@@ -153,6 +253,11 @@ export const transactions = sqliteTable(
     category: text("category").notNull().default("other"),
     description: text("description").notNull(),
     note: text("note").notNull().default(""),
+    recurringSeriesId: text("recurring_series_id").references(
+      () => recurringSeries.id,
+      { onDelete: "cascade" },
+    ),
+    recurrenceDate: text("recurrence_date"),
     clientRequestId: text("client_request_id"),
     createdAtMs: integer("created_at_ms").notNull(),
     updatedAtMs: integer("updated_at_ms").notNull(),
@@ -227,6 +332,10 @@ export const transactions = sqliteTable(
       sql`length(${table.note}) <= 500`,
     ),
     check(
+      "transactions_recurrence",
+      sql`(${table.recurringSeriesId} IS NULL AND ${table.recurrenceDate} IS NULL) OR (${table.recurringSeriesId} IS NOT NULL AND length(${table.recurrenceDate}) = 10 AND ${table.recurrenceDate} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')`,
+    ),
+    check(
       "transactions_client_request_id_length",
       sql`${table.clientRequestId} IS NULL OR length(${table.clientRequestId}) BETWEEN 1 AND 64`,
     ),
@@ -239,6 +348,9 @@ export const transactions = sqliteTable(
     uniqueIndex("uq_transactions_owner_client_request")
       .on(table.ownerId, table.clientRequestId)
       .where(sql`${table.clientRequestId} IS NOT NULL`),
+    uniqueIndex("uq_transactions_recurring_occurrence")
+      .on(table.ownerId, table.recurringSeriesId, table.recurrenceDate)
+      .where(sql`${table.recurringSeriesId} IS NOT NULL`),
   ],
 );
 
@@ -246,3 +358,5 @@ export type Transaction = typeof transactions.$inferSelect;
 export type NewTransaction = typeof transactions.$inferInsert;
 export type ExchangeRateCache = typeof exchangeRateCache.$inferSelect;
 export type ExchangeRateSnapshot = typeof exchangeRateSnapshots.$inferSelect;
+export type RecurringSeries = typeof recurringSeries.$inferSelect;
+export type NewRecurringSeries = typeof recurringSeries.$inferInsert;
