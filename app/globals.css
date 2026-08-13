@@ -535,6 +535,32 @@ textarea:focus-visible {
   min-width: auto;
 }
 
+.recurring-add-button {
+  align-items: center;
+  background: #edf5f1;
+  border: 1px solid #bfd5ca;
+  border-radius: 11px;
+  color: var(--green);
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 760;
+  gap: 7px;
+  min-height: 42px;
+  padding: 0 13px;
+  white-space: nowrap;
+}
+
+.recurring-add-button > span {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.recurring-add-button:hover {
+  background: #e3f0ea;
+  border-color: #9fc2b2;
+  transform: translateY(-1px);
+}
+
 .rate-note {
   align-items: flex-start;
   color: var(--muted);
@@ -1638,36 +1664,28 @@ textarea:focus-visible {
   border-color: #b9d0c5;
 }
 
-.recurrence-toggle {
+.recurrence-heading {
   align-items: center;
-  cursor: pointer;
   display: flex;
   gap: 16px;
   justify-content: space-between;
 }
 
-.recurrence-toggle > span {
+.recurrence-heading > span {
   display: grid;
   gap: 4px;
 }
 
-.recurrence-toggle strong,
+.recurrence-heading strong,
 .recurring-edit-card strong {
   font-size: 12px;
 }
 
-.recurrence-toggle small,
+.recurrence-heading small,
 .recurring-edit-card small {
   color: var(--muted);
   font-size: 10px;
   line-height: 1.4;
-}
-
-.recurrence-toggle input {
-  accent-color: var(--green);
-  flex: 0 0 auto;
-  height: 20px;
-  width: 20px;
 }
 
 .recurrence-options {
@@ -1971,6 +1989,9 @@ textarea:focus-visible {
 @media (max-width: 1180px) {
   .main-content { padding-left: 27px; padding-right: 27px; }
   .sync-state { display: none; }
+  .month-heading { align-items: flex-start; gap: 24px; }
+  .month-title-row { flex-wrap: wrap; }
+  .rate-note { max-width: 340px; }
   .calendar-workspace { grid-template-columns: 1fr; }
   .day-agenda-list { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: none; }
   .metric-grid { grid-template-columns: repeat(2, 1fr); }
@@ -2020,6 +2041,7 @@ textarea:focus-visible {
   .month-heading { flex-direction: column; gap: 12px; }
   .month-heading h2 { font-size: 27px; }
   .month-title-row { align-items: flex-start; flex-direction: column; gap: 9px; }
+  .recurring-add-button { justify-content: center; width: 100%; }
   .rate-note { max-width: 100%; text-align: left; }
   .calendar-panel { padding: 13px; }
   .calendar-panel-heading { align-items: center; }

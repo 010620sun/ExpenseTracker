@@ -407,6 +407,29 @@ const COPY = {
   },
 } as const;
 
+const RECURRING_FLOW_COPY = {
+  en: {
+    add: "Add recurring",
+    buttonHint: "Schedule an expense or regular income",
+    drawerTitle: "Add a recurring transaction",
+    drawerSubtitle:
+      "Set the first entry and schedule. Future entries will appear automatically.",
+    scheduleTitle: "Recurring schedule",
+    save: "Save recurring transaction",
+    saved: "Recurring transaction added.",
+  },
+  ko: {
+    add: "반복 거래 추가",
+    buttonHint: "반복 지출 또는 정기 수입 설정",
+    drawerTitle: "반복 거래 추가",
+    drawerSubtitle:
+      "첫 거래와 반복 주기를 설정하면 이후 거래가 자동으로 생성됩니다.",
+    scheduleTitle: "반복 일정",
+    save: "반복 거래 저장",
+    saved: "반복 거래가 추가되었습니다.",
+  },
+} as const;
+
 const CALENDAR_COPY = {
   en: {
     calendar: "Monthly calendar",
@@ -739,6 +762,7 @@ export function ExpenseTracker({
   );
   const copy = COPY[language];
   const calendarCopy = CALENDAR_COPY[language];
+  const recurringFlowCopy = RECURRING_FLOW_COPY[language];
   const transactionCurrencyCatalog = useMemo(() => {
     if (currencyCatalog.some((item) => item.code === currency)) {
       return currencyCatalog;
@@ -961,6 +985,7 @@ export function ExpenseTracker({
       )?.focus();
     }, 0);
     setEditingTransaction(null);
+    setIsRecurring(false);
   }, []);
 
   useEffect(() => {
@@ -1192,6 +1217,11 @@ export function ExpenseTracker({
     setFormError("");
   }
 
+  function openRecurringDrawer(date = selectedDate) {
+    openAddDrawer(date);
+    setIsRecurring(true);
+  }
+
   function openEditDrawer(transaction: LedgerTransaction) {
     if (!isPersistedTransaction(transaction)) {
       setToast(copy.previewMode);
@@ -1413,7 +1443,13 @@ export function ExpenseTracker({
       setDescription("");
       setAmount("");
       setNote("");
-      setToast(editingTransaction ? calendarCopy.updated : copy.saved);
+      setToast(
+        editingTransaction
+          ? calendarCopy.updated
+          : isRecurring
+            ? recurringFlowCopy.saved
+            : copy.saved,
+      );
       isSavingRef.current = false;
       setIsSaving(false);
       closeDrawer();
@@ -1648,6 +1684,15 @@ export function ExpenseTracker({
                 <button type="button" className="month-today" onClick={goToToday}>{calendarCopy.thisMonth}</button>
                 <button type="button" onClick={() => navigateMonth(1)} aria-label={calendarCopy.nextMonth}>›</button>
               </div>
+              <button
+                type="button"
+                className="recurring-add-button"
+                onClick={() => openRecurringDrawer()}
+                aria-label={`${recurringFlowCopy.add}: ${recurringFlowCopy.buttonHint}`}
+              >
+                <span aria-hidden="true">↻</span>
+                <strong>{recurringFlowCopy.add}</strong>
+              </button>
             </div>
           </div>
           <div
@@ -2023,8 +2068,20 @@ export function ExpenseTracker({
             <div className="drawer-header">
               <div>
                 <span className="eyebrow">GlobeLedger</span>
-                <h2 id="drawer-title">{editingTransaction ? calendarCopy.editTransaction : copy.drawerTitle}</h2>
-                <p id="drawer-description">{editingTransaction ? calendarCopy.editSubtitle : copy.drawerSubtitle}</p>
+                <h2 id="drawer-title">
+                  {editingTransaction
+                    ? calendarCopy.editTransaction
+                    : isRecurring
+                      ? recurringFlowCopy.drawerTitle
+                      : copy.drawerTitle}
+                </h2>
+                <p id="drawer-description">
+                  {editingTransaction
+                    ? calendarCopy.editSubtitle
+                    : isRecurring
+                      ? recurringFlowCopy.drawerSubtitle
+                      : copy.drawerSubtitle}
+                </p>
               </div>
               <button type="button" className="drawer-close" onClick={closeDrawer} aria-label={copy.close} disabled={isSaving}>×</button>
             </div>
@@ -2134,49 +2191,40 @@ export function ExpenseTracker({
                 <span>{copy.date}</span>
                 <input type="date" value={occurredOn} onChange={(event) => setOccurredOn(event.target.value)} required />
               </label>
-              {!editingTransaction && (
-                <div className={isRecurring ? "recurrence-card active" : "recurrence-card"}>
-                  <label className="recurrence-toggle" htmlFor="recurrence-enabled">
+              {!editingTransaction && isRecurring && (
+                <div className="recurrence-card active">
+                  <div className="recurrence-heading">
                     <span>
-                      <strong>{copy.repeatTransaction}</strong>
+                      <strong>{recurringFlowCopy.scheduleTitle}</strong>
                       <small>{copy.repeatHint}</small>
                     </span>
-                    <input
-                      id="recurrence-enabled"
-                      type="checkbox"
-                      aria-label={copy.repeatTransaction}
-                      checked={isRecurring}
-                      onChange={(event) => setIsRecurring(event.target.checked)}
-                    />
-                  </label>
-                  {isRecurring && (
-                    <div className="recurrence-options">
-                      <label className="field">
-                        <span>{copy.repeatFrequency}</span>
-                        <select
-                          value={recurrenceFrequency}
-                          onChange={(event) =>
-                            setRecurrenceFrequency(
-                              event.target.value as RecurrenceFrequency,
-                            )
-                          }
-                        >
-                          <option value="weekly">{copy.weekly}</option>
-                          <option value="monthly">{copy.monthly}</option>
-                          <option value="yearly">{copy.yearly}</option>
-                        </select>
-                      </label>
-                      <label className="field">
-                        <span>{copy.repeatEnds}</span>
-                        <input
-                          type="date"
-                          min={occurredOn}
-                          value={recurrenceEndsOn}
-                          onChange={(event) => setRecurrenceEndsOn(event.target.value)}
-                        />
-                      </label>
-                    </div>
-                  )}
+                  </div>
+                  <div className="recurrence-options">
+                    <label className="field">
+                      <span>{copy.repeatFrequency}</span>
+                      <select
+                        value={recurrenceFrequency}
+                        onChange={(event) =>
+                          setRecurrenceFrequency(
+                            event.target.value as RecurrenceFrequency,
+                          )
+                        }
+                      >
+                        <option value="weekly">{copy.weekly}</option>
+                        <option value="monthly">{copy.monthly}</option>
+                        <option value="yearly">{copy.yearly}</option>
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>{copy.repeatEnds}</span>
+                      <input
+                        type="date"
+                        min={occurredOn}
+                        value={recurrenceEndsOn}
+                        onChange={(event) => setRecurrenceEndsOn(event.target.value)}
+                      />
+                    </label>
+                  </div>
                 </div>
               )}
               {editingTransaction?.recurringSeriesId && (
@@ -2208,7 +2256,9 @@ export function ExpenseTracker({
                       : copy.saving
                     : editingTransaction
                       ? calendarCopy.update
-                      : copy.save}
+                      : isRecurring
+                        ? recurringFlowCopy.save
+                        : copy.save}
                 </button>
               </div>
             </form>

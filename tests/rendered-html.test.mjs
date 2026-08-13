@@ -36,6 +36,7 @@ test("server-renders the GlobeLedger dashboard", async () => {
   assert.match(html, /Frankfurter reference rates/);
   assert.match(html, /Updating reference rates/);
   assert.match(html, /Monthly calendar/);
+  assert.match(html, /Add recurring/);
   assert.match(html, /Previous month/);
   assert.match(html, /Next month/);
   assert.match(html, /Spent this month/);
@@ -135,11 +136,12 @@ test("discovers every current Frankfurter currency dynamically", async () => {
 });
 
 test("supports durable recurring expenses and regular income", async () => {
-  const [transactionsRoute, recurringRoute, tracker, schema, migration] =
+  const [transactionsRoute, recurringRoute, tracker, styles, schema, migration] =
     await Promise.all([
       readFile(new URL("../app/api/transactions/route.ts", import.meta.url), "utf8"),
       readFile(new URL("../app/api/recurring/route.ts", import.meta.url), "utf8"),
       readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
       readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
       readFile(new URL("../drizzle/0003_chilly_unus.sql", import.meta.url), "utf8"),
     ]);
@@ -153,6 +155,15 @@ test("supports durable recurring expenses and regular income", async () => {
   assert.match(tracker, /weekly/u);
   assert.match(tracker, /monthly/u);
   assert.match(tracker, /yearly/u);
+  assert.match(tracker, /function openRecurringDrawer/u);
+  assert.match(tracker, /className="recurring-add-button"/u);
+  assert.match(tracker, /!editingTransaction && isRecurring/u);
+  assert.match(
+    tracker,
+    /function openAddDrawer[\s\S]*?setIsRecurring\(false\)[\s\S]*?function openRecurringDrawer[\s\S]*?setIsRecurring\(true\)/u,
+  );
+  assert.doesNotMatch(tracker, /id="recurrence-enabled"/u);
+  assert.match(styles, /\.recurring-add-button/u);
   assert.match(schema, /uq_transactions_recurring_occurrence/u);
   assert.match(schema, /uq_recurring_exceptions_series_occurrence/u);
   assert.match(
