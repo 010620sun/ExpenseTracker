@@ -8,7 +8,7 @@
     {
       "binding": "DB",
       "database_name": "globeledger-db",
-      "database_id": "00000000-0000-4000-8000-000000000000",
+      "database_id": "dd8f8cc2-974c-475a-a2ee-acee0cd1f2fe",
       "migrations_dir": "drizzle"
     }
   ],
