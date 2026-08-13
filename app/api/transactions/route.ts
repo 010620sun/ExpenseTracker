@@ -9,7 +9,6 @@ import {
   sql,
 } from "drizzle-orm";
 
-import { getChatGPTUser } from "@/app/chatgpt-auth";
 import { getDb, type AppDatabase } from "@/db";
 import {
   exchangeRateSnapshots,
@@ -24,6 +23,7 @@ import {
   type Transaction,
 } from "@/db/schema";
 import { currencyExponent } from "@/lib/currency";
+import { memberFromRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +36,6 @@ const BIGINT_ZERO = BigInt(0);
 const BIGINT_TWO = BigInt(2);
 const BIGINT_TEN = BigInt(10);
 const MAX_AMOUNT_MINOR = BigInt("9000000000000");
-const LOCAL_DEMO_OWNER_ID = "local-demo";
 const TRANSACTION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const NO_STORE_HEADERS = {
@@ -153,21 +152,8 @@ async function readJsonBody(request: Request): Promise<JsonRecord> {
   return parsed;
 }
 
-function isLocalHostname(hostname: string) {
-  return (
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "[::1]" ||
-    hostname === "::1"
-  );
-}
-
 async function ownerIdForRequest(request: Request) {
-  const user = await getChatGPTUser();
-  if (user?.userId && user.userId.length <= 255) return user.userId;
-
-  const hostname = new URL(request.url).hostname.toLowerCase();
-  return isLocalHostname(hostname) ? LOCAL_DEMO_OWNER_ID : null;
+  return (await memberFromRequest(request))?.id ?? null;
 }
 
 function isSameOrigin(request: Request) {
@@ -671,170 +657,6 @@ async function materializeRecurringTransactions(
   }
 }
 
-function dateWithinMonth(month: string, daysAgo: number) {
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  const currentDay =
-    month === currentMonth ? new Date().getUTCDate() : 15;
-  const day = Math.max(1, currentDay - daysAgo);
-  return `${month}-${String(day).padStart(2, "0")}`;
-}
-
-function sampleTransaction(
-  ownerId: string,
-  input: {
-    kind: "expense" | "income";
-    occurredOn: string;
-    amount: string;
-    currency: string;
-    exchangeRate: string;
-    category: string;
-    description: string;
-    clientRequestId: string;
-  },
-  timestamp: number,
-): NewTransaction {
-  const exponent = currencyExponent(input.currency);
-  if (exponent === null) throw new Error("Invalid sample currency");
-
-  const originalMinor = parseAmount(input.amount, exponent);
-  const rate = parseRate(input.exchangeRate);
-  const baseMinor = toBaseMinor(originalMinor, exponent, rate);
-  return {
-    id: crypto.randomUUID(),
-    ownerId,
-    kind: input.kind,
-    occurredOn: input.occurredOn,
-    originalAmountMinor: Number(originalMinor),
-    originalCurrency: input.currency,
-    originalCurrencyExponent: exponent,
-    fxRate: rate.canonical,
-    fxSource: input.currency === BASE_CURRENCY ? "identity" : "sample",
-    fxRateDate: null,
-    fxCapturedAtMs: timestamp,
-    baseAmountMinor: Number(baseMinor),
-    baseCurrency: BASE_CURRENCY,
-    baseCurrencyExponent: BASE_CURRENCY_EXPONENT,
-    category: input.category,
-    description: input.description,
-    note: "Sample transaction",
-    clientRequestId: input.clientRequestId,
-    createdAtMs: timestamp,
-    updatedAtMs: timestamp,
-  };
-}
-
-async function seedSamplesOnce(
-  db: AppDatabase,
-  ownerId: string,
-  month: string,
-) {
-  await ensureUserState(db, ownerId);
-
-  const [states, existingTransactions] = await db.batch([
-    db
-      .select({ samplesSeededAtMs: userStates.samplesSeededAtMs })
-      .from(userStates)
-      .where(eq(userStates.ownerId, ownerId))
-      .limit(1),
-    db
-      .select({ id: transactions.id })
-      .from(transactions)
-      .where(eq(transactions.ownerId, ownerId))
-      .limit(1),
-  ]);
-
-  if (states[0]?.samplesSeededAtMs != null) return;
-
-  const now = Date.now();
-  if (existingTransactions.length > 0) {
-    await db
-      .update(userStates)
-      .set({ samplesSeededAtMs: now })
-      .where(
-        and(
-          eq(userStates.ownerId, ownerId),
-          isNull(userStates.samplesSeededAtMs),
-        ),
-      );
-    return;
-  }
-
-  const samples = [
-    sampleTransaction(
-      ownerId,
-      {
-        kind: "expense",
-        occurredOn: dateWithinMonth(month, 0),
-        amount: "1450",
-        currency: "KRW",
-        exchangeRate: "0.00072",
-        category: "transport",
-        description: "Seoul subway",
-        clientRequestId: "sample-v1-subway",
-      },
-      now - 60_000,
-    ),
-    sampleTransaction(
-      ownerId,
-      {
-        kind: "expense",
-        occurredOn: dateWithinMonth(month, 2),
-        amount: "4.80",
-        currency: "EUR",
-        exchangeRate: "1.085",
-        category: "dining",
-        description: "Coffee with a friend",
-        clientRequestId: "sample-v1-coffee",
-      },
-      now - 120_000,
-    ),
-    sampleTransaction(
-      ownerId,
-      {
-        kind: "expense",
-        occurredOn: dateWithinMonth(month, 5),
-        amount: "86.42",
-        currency: "USD",
-        exchangeRate: "1",
-        category: "groceries",
-        description: "Neighborhood market",
-        clientRequestId: "sample-v1-market",
-      },
-      now - 180_000,
-    ),
-    sampleTransaction(
-      ownerId,
-      {
-        kind: "income",
-        occurredOn: dateWithinMonth(month, 9),
-        amount: "1250.00",
-        currency: "EUR",
-        exchangeRate: "1.085",
-        category: "income",
-        description: "Freelance payout",
-        clientRequestId: "sample-v1-income",
-      },
-      now - 240_000,
-    ),
-  ] as const;
-
-  await db.batch([
-    db.insert(transactions).values(samples[0]).onConflictDoNothing(),
-    db.insert(transactions).values(samples[1]).onConflictDoNothing(),
-    db.insert(transactions).values(samples[2]).onConflictDoNothing(),
-    db.insert(transactions).values(samples[3]).onConflictDoNothing(),
-    db
-      .update(userStates)
-      .set({ samplesSeededAtMs: now })
-      .where(
-        and(
-          eq(userStates.ownerId, ownerId),
-          isNull(userStates.samplesSeededAtMs),
-        ),
-      ),
-  ]);
-}
-
 async function buildNewTransaction(
   ownerId: string,
   body: JsonRecord,
@@ -1044,7 +866,6 @@ export async function GET(request: Request) {
     const cursor = decodeCursor(url.searchParams.get("cursor"));
     const db = getDb();
 
-    await seedSamplesOnce(db, ownerId, monthRange.month);
     await materializeRecurringTransactions(
       db,
       ownerId,

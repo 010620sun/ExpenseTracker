@@ -1,6 +1,5 @@
 import { and, asc, eq, gt, gte } from "drizzle-orm";
 
-import { getChatGPTUser } from "@/app/chatgpt-auth";
 import { getDb } from "@/db";
 import {
   recurringExceptions,
@@ -8,10 +7,10 @@ import {
   transactions,
   type RecurringSeries,
 } from "@/db/schema";
+import { memberFromRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-const LOCAL_DEMO_OWNER_ID = "local-demo";
 const ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
@@ -20,21 +19,8 @@ const MAX_AMOUNT_MINOR = 9_000_000_000_000;
 type JsonRecord = Record<string, unknown>;
 type Frequency = "weekly" | "monthly" | "yearly";
 
-function isLocalHostname(hostname: string) {
-  return (
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "[::1]" ||
-    hostname === "::1"
-  );
-}
-
 async function ownerIdForRequest(request: Request) {
-  const user = await getChatGPTUser();
-  if (user?.userId && user.userId.length <= 255) return user.userId;
-  return isLocalHostname(new URL(request.url).hostname.toLowerCase())
-    ? LOCAL_DEMO_OWNER_ID
-    : null;
+  return (await memberFromRequest(request))?.id ?? null;
 }
 
 function isSameOrigin(request: Request) {

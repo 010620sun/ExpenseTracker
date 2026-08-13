@@ -88,6 +88,7 @@ const COPY = {
     pausedStatus: "Paused",
     endedStatus: "Ended",
     privateLedger: "Your private global ledger",
+    logout: "Log out",
   },
   ko: {
     back: "대시보드",
@@ -138,6 +139,7 @@ const COPY = {
     pausedStatus: "일시정지",
     endedStatus: "종료",
     privateLedger: "나만의 글로벌 가계부",
+    logout: "로그아웃",
   },
 } as const;
 
@@ -328,6 +330,11 @@ export function RecurringManager({
         ? copy.pausedStatus
         : copy.endedStatus;
 
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.assign("/auth");
+  }
+
   return (
     <div className="recurring-page-shell">
       <aside className="recurring-sidebar">
@@ -343,6 +350,7 @@ export function RecurringManager({
         <div className="account-chip">
           <span className="avatar">{firstName?.[0]?.toUpperCase() ?? "G"}</span>
           <span><strong>{firstName ?? "Global citizen"}</strong><small>{copy.privateLedger}</small></span>
+          <button type="button" className="account-logout" onClick={() => void logout()}>{copy.logout}</button>
         </div>
       </aside>
 

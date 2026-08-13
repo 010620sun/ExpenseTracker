@@ -284,6 +284,7 @@ const COPY = {
     incomeCategory: "Income",
     language: "Language",
     privateLedger: "Your private global ledger",
+    logout: "Log out",
     helpTitle: "Built for borderless lives",
     helpBody: "Original amounts stay intact, while one base view keeps your budget honest.",
     learnMore: "How conversions work",
@@ -385,6 +386,7 @@ const COPY = {
     incomeCategory: "수입",
     language: "언어",
     privateLedger: "나만의 글로벌 가계부",
+    logout: "로그아웃",
     helpTitle: "국경 없는 일상을 위해",
     helpBody: "원 결제 금액은 그대로, 기준 통화로는 예산을 분명하게 관리하세요.",
     learnMore: "환산 방식 보기",
@@ -1556,6 +1558,11 @@ export function ExpenseTracker({
     }
   }
 
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.assign("/auth");
+  }
+
   const locale = language === "ko" ? "ko-KR" : "en-US";
   const monthLabel = new Intl.DateTimeFormat(locale, {
     month: "long",
@@ -1633,7 +1640,7 @@ export function ExpenseTracker({
             <strong>{firstName ?? "Global citizen"}</strong>
             <small>{copy.privateLedger}</small>
           </span>
-          <span aria-hidden="true">•••</span>
+          <button type="button" className="account-logout" onClick={() => void logout()}>{copy.logout}</button>
         </div>
       </aside>
 

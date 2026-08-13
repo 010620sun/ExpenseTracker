@@ -8,6 +8,95 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+export const members = sqliteTable(
+  "members",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(),
+    displayName: text("display_name").notNull(),
+    passwordHash: text("password_hash").notNull(),
+    passwordSalt: text("password_salt").notNull(),
+    passwordIterations: integer("password_iterations").notNull(),
+    createdAtMs: integer("created_at_ms").notNull(),
+    updatedAtMs: integer("updated_at_ms").notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_members_email").on(table.email),
+    check("members_id_length", sql`length(${table.id}) BETWEEN 1 AND 64`),
+    check(
+      "members_email_shape",
+      sql`length(${table.email}) BETWEEN 3 AND 254 AND ${table.email} = lower(${table.email}) AND instr(${table.email}, '@') > 1`,
+    ),
+    check(
+      "members_display_name_length",
+      sql`length(${table.displayName}) BETWEEN 1 AND 80`,
+    ),
+    check(
+      "members_password_material",
+      sql`length(${table.passwordHash}) BETWEEN 32 AND 128 AND length(${table.passwordSalt}) BETWEEN 16 AND 64 AND ${table.passwordIterations} BETWEEN 100000 AND 1000000`,
+    ),
+    check(
+      "members_timestamps",
+      sql`${table.createdAtMs} > 0 AND ${table.updatedAtMs} >= ${table.createdAtMs}`,
+    ),
+  ],
+);
+
+export const authSessions = sqliteTable(
+  "auth_sessions",
+  {
+    id: text("id").primaryKey(),
+    memberId: text("member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAtMs: integer("expires_at_ms").notNull(),
+    createdAtMs: integer("created_at_ms").notNull(),
+    lastSeenAtMs: integer("last_seen_at_ms").notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_auth_sessions_token_hash").on(table.tokenHash),
+    index("idx_auth_sessions_member_expires").on(
+      table.memberId,
+      table.expiresAtMs,
+    ),
+    check("auth_sessions_id_length", sql`length(${table.id}) BETWEEN 1 AND 64`),
+    check(
+      "auth_sessions_token_hash_length",
+      sql`length(${table.tokenHash}) BETWEEN 32 AND 128`,
+    ),
+    check(
+      "auth_sessions_timestamps",
+      sql`${table.createdAtMs} > 0 AND ${table.lastSeenAtMs} >= ${table.createdAtMs} AND ${table.expiresAtMs} > ${table.createdAtMs}`,
+    ),
+  ],
+);
+
+export const authRateLimits = sqliteTable(
+  "auth_rate_limits",
+  {
+    keyHash: text("key_hash").primaryKey(),
+    attempts: integer("attempts").notNull(),
+    windowStartedAtMs: integer("window_started_at_ms").notNull(),
+    blockedUntilMs: integer("blocked_until_ms"),
+    updatedAtMs: integer("updated_at_ms").notNull(),
+  },
+  (table) => [
+    check(
+      "auth_rate_limits_key_hash_length",
+      sql`length(${table.keyHash}) BETWEEN 32 AND 128`,
+    ),
+    check(
+      "auth_rate_limits_attempts",
+      sql`${table.attempts} BETWEEN 0 AND 100`,
+    ),
+    check(
+      "auth_rate_limits_timestamps",
+      sql`${table.windowStartedAtMs} > 0 AND ${table.updatedAtMs} >= ${table.windowStartedAtMs} AND (${table.blockedUntilMs} IS NULL OR ${table.blockedUntilMs} > ${table.windowStartedAtMs})`,
+    ),
+  ],
+);
+
 export const userStates = sqliteTable(
   "user_states",
   {

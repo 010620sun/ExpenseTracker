@@ -11,7 +11,11 @@
     "start": "vinext start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "db:create": "wrangler d1 create globeledger-db",
+    "db:migrate:local": "wrangler d1 migrations apply globeledger-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply globeledger-db --remote",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

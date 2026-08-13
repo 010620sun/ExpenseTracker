@@ -1,0 +1,31 @@
+import { redirect } from "next/navigation";
+
+import { getCurrentMember } from "../member-auth";
+import { AuthScreen } from "./auth-screen";
+
+export const dynamic = "force-dynamic";
+
+export default async function AuthPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ return_to?: string }>;
+}) {
+  const params = await searchParams;
+  const returnTo = safeReturnTo(params.return_to);
+  if (await getCurrentMember()) redirect(returnTo);
+  return <AuthScreen returnTo={returnTo} />;
+}
+
+function safeReturnTo(value: string | undefined) {
+  if (!value?.startsWith("/") || value.startsWith("//")) return "/";
+  try {
+    const parsed = new URL(value, "https://globeledger.local");
+    if (parsed.origin !== "https://globeledger.local") return "/";
+    if (parsed.pathname === "/auth" || parsed.pathname.startsWith("/api/")) {
+      return "/";
+    }
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return "/";
+  }
+}
