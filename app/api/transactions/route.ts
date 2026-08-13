@@ -538,6 +538,7 @@ function recurringSeriesFromTransaction(
     startOn: transaction.occurredOn,
     frequency: recurrence.frequency,
     endsOn: recurrence.endsOn,
+    pausedAtMs: null,
     originalAmountMinor: transaction.originalAmountMinor,
     originalCurrency: transaction.originalCurrency,
     originalCurrencyExponent: transaction.originalCurrencyExponent,
@@ -566,6 +567,7 @@ async function materializeRecurringTransactions(
     .where(
       and(
         eq(recurringSeries.ownerId, ownerId),
+        isNull(recurringSeries.pausedAtMs),
         lt(recurringSeries.startOn, monthEnd),
         or(
           isNull(recurringSeries.endsOn),

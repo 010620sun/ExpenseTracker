@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   type CSSProperties,
   type FormEvent,
@@ -410,6 +411,7 @@ const COPY = {
 const RECURRING_FLOW_COPY = {
   en: {
     add: "Add recurring",
+    manage: "Recurring transactions",
     buttonHint: "Schedule an expense or regular income",
     drawerTitle: "Add a recurring transaction",
     drawerSubtitle:
@@ -420,6 +422,7 @@ const RECURRING_FLOW_COPY = {
   },
   ko: {
     add: "반복 거래 추가",
+    manage: "반복 거래 관리",
     buttonHint: "반복 지출 또는 정기 수입 설정",
     drawerTitle: "반복 거래 추가",
     drawerSubtitle:
@@ -1222,6 +1225,18 @@ export function ExpenseTracker({
     setIsRecurring(true);
   }
 
+  useEffect(() => {
+    const search = new URLSearchParams(window.location.search);
+    if (search.get("new") !== "recurring") return;
+    const frame = window.requestAnimationFrame(() => {
+      openRecurringDrawer(currentDate);
+      window.history.replaceState(null, "", window.location.pathname);
+    });
+    return () => window.cancelAnimationFrame(frame);
+    // This deep link is consumed once on arrival from the management page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function openEditDrawer(transaction: LedgerTransaction) {
     if (!isPersistedTransaction(transaction)) {
       setToast(copy.previewMode);
@@ -1595,15 +1610,11 @@ export function ExpenseTracker({
         </div>
 
         <nav className="primary-nav">
-          {[
-            ["overview", "●"],
-            ["transactions", "↕"],
-            ["budgets", "◒"],
-            ["reports", "▥"],
-            ["settings", "⚙"],
-          ].map(([item, icon], index) => (
-            <button className={index === 0 ? "nav-item active" : "nav-item"} key={item}>
-              <span aria-hidden="true">{icon}</span>
+          <span className="nav-item active"><span aria-hidden="true">●</span>{copy.overview}</span>
+          <Link className="nav-item" href="/recurring"><span aria-hidden="true">↻</span>{recurringFlowCopy.manage}</Link>
+          {["transactions", "budgets", "reports", "settings"].map((item) => (
+            <button className="nav-item" key={item}>
+              <span aria-hidden="true">·</span>
               {copy[item as keyof typeof copy]}
             </button>
           ))}

@@ -130,6 +130,7 @@ export const recurringSeries = sqliteTable(
       enum: ["weekly", "monthly", "yearly"],
     }).notNull(),
     endsOn: text("ends_on"),
+    pausedAtMs: integer("paused_at_ms"),
     originalAmountMinor: integer("original_amount_minor").notNull(),
     originalCurrency: text("original_currency").notNull(),
     originalCurrencyExponent: integer(
@@ -175,7 +176,7 @@ export const recurringSeries = sqliteTable(
     ),
     check(
       "recurring_series_timestamps",
-      sql`${table.createdAtMs} > 0 AND ${table.updatedAtMs} >= ${table.createdAtMs}`,
+      sql`${table.createdAtMs} > 0 AND ${table.updatedAtMs} >= ${table.createdAtMs} AND (${table.pausedAtMs} IS NULL OR ${table.pausedAtMs} > 0)`,
     ),
     index("idx_recurring_series_owner_dates").on(
       table.ownerId,

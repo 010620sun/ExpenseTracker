@@ -25,6 +25,16 @@ async function render(pathname = "/") {
   );
 }
 
+test("server-renders the recurring transaction management page", async () => {
+  const response = await render("/recurring");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Recurring transactions/);
+  assert.match(html, /Expected expenses/);
+  assert.match(html, /Expected income/);
+  assert.match(html, /Add recurring/);
+});
+
 test("server-renders the GlobeLedger dashboard", async () => {
   const response = await render();
   assert.equal(response.status, 200);
@@ -136,14 +146,16 @@ test("discovers every current Frankfurter currency dynamically", async () => {
 });
 
 test("supports durable recurring expenses and regular income", async () => {
-  const [transactionsRoute, recurringRoute, tracker, styles, schema, migration] =
+  const [transactionsRoute, recurringRoute, tracker, manager, styles, schema, migration, pauseMigration] =
     await Promise.all([
       readFile(new URL("../app/api/transactions/route.ts", import.meta.url), "utf8"),
       readFile(new URL("../app/api/recurring/route.ts", import.meta.url), "utf8"),
       readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/recurring/recurring-manager.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
       readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
       readFile(new URL("../drizzle/0003_chilly_unus.sql", import.meta.url), "utf8"),
+      readFile(new URL("../drizzle/0004_omniscient_korg.sql", import.meta.url), "utf8"),
     ]);
 
   assert.match(transactionsRoute, /function recurringDatesForMonth/u);
@@ -164,7 +176,16 @@ test("supports durable recurring expenses and regular income", async () => {
   );
   assert.doesNotMatch(tracker, /id="recurrence-enabled"/u);
   assert.match(styles, /\.recurring-add-button/u);
+  assert.match(recurringRoute, /export async function GET/u);
+  assert.match(recurringRoute, /action === "pause"/u);
+  assert.match(recurringRoute, /action === "resume"/u);
+  assert.match(recurringRoute, /action === "update"/u);
+  assert.match(recurringRoute, /export async function DELETE/u);
+  assert.match(manager, /className="recurring-summary-grid"/u);
+  assert.match(manager, /className="recurring-series-card"/u);
+  assert.match(manager, /href="\/\?new=recurring"/u);
   assert.match(schema, /uq_transactions_recurring_occurrence/u);
+  assert.match(schema, /pausedAtMs/u);
   assert.match(schema, /uq_recurring_exceptions_series_occurrence/u);
   assert.match(
     migration,
@@ -173,5 +194,10 @@ test("supports durable recurring expenses and regular income", async () => {
   assert.doesNotMatch(
     migration,
     /SELECT[\s\S]*?"note", "recurring_series_id", "recurrence_date", "client_request_id" FROM `transactions`/u,
+  );
+  assert.match(pauseMigration, /"ends_on", NULL, "original_amount_minor"/u);
+  assert.doesNotMatch(
+    pauseMigration,
+    /SELECT[\s\S]*?"ends_on", "paused_at_ms", "original_amount_minor" FROM `recurring_series`/u,
   );
 });

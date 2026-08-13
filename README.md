@@ -12,6 +12,8 @@ currency.
 - Base-currency dashboard conversion without changing the UI language
 - Monthly spending, budget, net-flow, category, and currency-mix summaries
 - Weekly, monthly, and yearly recurring expenses and regular income
+- Recurring schedule management with monthly forecasts, pause/resume, editing,
+  status filters, and full-series deletion
 - User-isolated D1 storage with exact minor-unit monetary calculations
 - Idempotent transaction creation and owner-scoped deletion
 - Responsive desktop, tablet, and mobile layouts
@@ -77,3 +79,8 @@ as an offline fallback.
 Editing affects only the selected occurrence. Deleting an occurrence records
 an exception so it is not recreated, while stopping a series keeps the selected
 and past entries and removes any already-materialized future entries.
+
+The recurring-transactions page provides an owner-scoped view of every active,
+paused, and ended schedule. Schedule edits affect future materialized entries;
+pausing preserves recorded history, resuming continues generation, and deleting
+a schedule removes the series and all of its linked occurrences.
