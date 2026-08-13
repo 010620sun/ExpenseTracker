@@ -5,7 +5,9 @@ import { authRateLimits, authSessions, members } from "@/db/schema";
 
 const SESSION_DAYS = 30;
 const SESSION_MAX_AGE_SECONDS = SESSION_DAYS * 24 * 60 * 60;
-const PBKDF2_ITERATIONS = 210_000;
+// Keep password derivation within the CPU budget of Cloudflare Workers Free.
+// Every password still receives a unique 128-bit salt and a 256-bit digest.
+const PBKDF2_ITERATIONS = 100_000;
 const SESSION_COOKIE = "globeledger_session";
 const SECURE_SESSION_COOKIE = "__Host-globeledger_session";
 
