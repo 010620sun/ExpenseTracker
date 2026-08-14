@@ -73,6 +73,11 @@ test("discovers every current Frankfurter currency dynamically", async () => {
   assert.doesNotMatch(ratesRoute, /searchParams\.set\("quotes"/u);
   assert.match(ratesRoute, /payload\.length < MIN_REMOTE_CURRENCY_COUNT/u);
   assert.match(tracker, /payload\.currencies\.length < 100/u);
+  assert.match(tracker, /function CurrencyPicker/u);
+  assert.match(tracker, /currencySearchPlaceholder/u);
+  assert.match(tracker, /POPULAR_CURRENCY_CODES/u);
+  assert.match(tracker, /type="search"/u);
+  assert.match(tracker, /role="listbox"/u);
   assert.match(schema, /exchange_rate_cache_quote_shape/u);
   assert.match(currencyHelpers, /Intl\.DisplayNames/u);
 });

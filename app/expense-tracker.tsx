@@ -7,6 +7,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -105,6 +106,287 @@ const FALLBACK_CURRENCY_CATALOG: CurrencyMetadata[] = Object.entries(
   symbol: code,
   exponent: details.exponent,
 }));
+
+const POPULAR_CURRENCY_CODES = [
+  "USD",
+  "KRW",
+  "EUR",
+  "JPY",
+  "GBP",
+  "CNY",
+  "CAD",
+  "AUD",
+  "SGD",
+  "CHF",
+  "HKD",
+  "THB",
+] as const;
+
+const CURRENCY_SEARCH_ALIASES: Record<string, string> = {
+  USD: "united states america usa 미국 달러",
+  KRW: "south korea korean 대한민국 한국 원화 원",
+  EUR: "europe eurozone 유럽 유로",
+  JPY: "japan japanese 일본 엔화 엔",
+  GBP: "united kingdom britain british 영국 파운드",
+  CNY: "china chinese 중국 위안화 위안",
+  CAD: "canada canadian 캐나다 달러",
+  AUD: "australia australian 호주 달러",
+  SGD: "singapore 싱가포르 달러",
+  CHF: "switzerland swiss 스위스 프랑",
+  HKD: "hong kong 홍콩 달러",
+  THB: "thailand thai 태국 바트",
+};
+
+type CurrencyPickerCopy = {
+  search: string;
+  searchPlaceholder: string;
+  popular: string;
+  all: string;
+  results: string;
+  empty: string;
+};
+
+function normalizeCurrencySearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/gu, "")
+    .toLocaleLowerCase()
+    .trim();
+}
+
+function CurrencyPicker({
+  value,
+  catalog,
+  onChange,
+  language,
+  label,
+  pickerCopy,
+  className = "",
+}: {
+  value: CurrencyCode;
+  catalog: CurrencyMetadata[];
+  onChange: (currency: CurrencyCode) => void;
+  language: Language;
+  label: string;
+  pickerCopy: CurrencyPickerCopy;
+  className?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const optionRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const listboxId = useId();
+  const triggerId = useId();
+
+  const displayNames = useMemo(
+    () =>
+      typeof Intl.DisplayNames === "function"
+        ? new Intl.DisplayNames([language === "ko" ? "ko-KR" : "en-US"], {
+            type: "currency",
+          })
+        : null,
+    [language],
+  );
+
+  const currencies = useMemo(
+    () =>
+      catalog.map((metadata) => {
+        const localizedName = displayNames?.of(metadata.code) ?? metadata.name;
+        return {
+          metadata,
+          localizedName,
+          searchable: normalizeCurrencySearch(
+            `${metadata.code} ${metadata.name} ${localizedName} ${metadata.symbol} ${CURRENCY_SEARCH_ALIASES[metadata.code] ?? ""}`,
+          ),
+        };
+      }),
+    [catalog, displayNames],
+  );
+
+  const normalizedQuery = normalizeCurrencySearch(query);
+  const filtered = useMemo(
+    () =>
+      currencies.filter((currency) =>
+        currency.searchable.includes(normalizedQuery),
+      ),
+    [currencies, normalizedQuery],
+  );
+  const popular = POPULAR_CURRENCY_CODES.flatMap((code) => {
+    const match = currencies.find((currency) => currency.metadata.code === code);
+    return match ? [match] : [];
+  });
+  const popularCodes = new Set(popular.map((currency) => currency.metadata.code));
+  const remaining = currencies
+    .filter((currency) => !popularCodes.has(currency.metadata.code))
+    .sort((left, right) =>
+      left.localizedName.localeCompare(right.localizedName, language),
+    );
+  const visibleCurrencies = normalizedQuery
+    ? filtered
+    : [...popular, ...remaining];
+  const selected =
+    currencies.find((currency) => currency.metadata.code === value) ??
+    currencies[0];
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const frame = window.requestAnimationFrame(() => {
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    });
+    function closeOnOutsideClick(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false);
+    }
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+    };
+  }, [isOpen]);
+
+  function closePicker() {
+    setIsOpen(false);
+    setQuery("");
+  }
+
+  function chooseCurrency(code: CurrencyCode) {
+    onChange(code);
+    closePicker();
+  }
+
+  function renderOptions(
+    items: typeof currencies,
+    heading: string,
+  ) {
+    if (items.length === 0) return null;
+    return (
+      <section className="currency-option-section">
+        <strong>{heading}</strong>
+        {items.map((currency) => {
+          const index = visibleCurrencies.findIndex(
+            (item) => item.metadata.code === currency.metadata.code,
+          );
+          const isSelected = currency.metadata.code === value;
+          return (
+            <button
+              key={currency.metadata.code}
+              ref={(node) => {
+                optionRefs.current[currency.metadata.code] = node;
+              }}
+              type="button"
+              role="option"
+              aria-selected={isSelected}
+              className={isSelected ? "currency-option selected" : "currency-option"}
+              onClick={() => chooseCurrency(currency.metadata.code)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  closePicker();
+                  document.getElementById(triggerId)?.focus();
+                } else if (event.key === "ArrowDown") {
+                  event.preventDefault();
+                  const next = visibleCurrencies[(index + 1) % visibleCurrencies.length];
+                  if (next) optionRefs.current[next.metadata.code]?.focus();
+                } else if (event.key === "ArrowUp") {
+                  event.preventDefault();
+                  const previous =
+                    visibleCurrencies[
+                      (index - 1 + visibleCurrencies.length) %
+                        visibleCurrencies.length
+                    ];
+                  if (previous) optionRefs.current[previous.metadata.code]?.focus();
+                }
+              }}
+            >
+              <span className="currency-code">{currency.metadata.code}</span>
+              <span className="currency-option-name">
+                <strong>{currency.localizedName}</strong>
+                {currency.localizedName !== currency.metadata.name && (
+                  <small>{currency.metadata.name}</small>
+                )}
+              </span>
+              <span className="currency-symbol" aria-hidden="true">
+                {currency.metadata.symbol}
+              </span>
+              {isSelected && <i aria-hidden="true">✓</i>}
+            </button>
+          );
+        })}
+      </section>
+    );
+  }
+
+  return (
+    <div
+      ref={rootRef}
+      className={`currency-picker ${className}`.trim()}
+    >
+      <span className="currency-picker-label">{label}</span>
+      <button
+        id={triggerId}
+        type="button"
+        className="currency-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? listboxId : undefined}
+        onClick={() => setIsOpen((open) => !open)}
+      >
+        <span className="currency-code">{selected?.metadata.code ?? value}</span>
+        <span className="currency-trigger-name">
+          {selected?.localizedName ?? value}
+        </span>
+        <span className="currency-chevron" aria-hidden="true">⌄</span>
+      </button>
+      {isOpen && (
+        <div className="currency-popover">
+          <label className="currency-search">
+            <span aria-hidden="true">⌕</span>
+            <span className="sr-only">{pickerCopy.search}</span>
+            <input
+              ref={searchRef}
+              type="search"
+              value={query}
+              placeholder={pickerCopy.searchPlaceholder}
+              autoComplete="off"
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  closePicker();
+                  document.getElementById(triggerId)?.focus();
+                } else if (event.key === "ArrowDown" && visibleCurrencies.length > 0) {
+                  event.preventDefault();
+                  const first = visibleCurrencies[0];
+                  if (first) optionRefs.current[first.metadata.code]?.focus();
+                }
+              }}
+            />
+            {query && (
+              <button type="button" onClick={() => setQuery("")} aria-label={pickerCopy.search}>
+                ×
+              </button>
+            )}
+          </label>
+          <div id={listboxId} className="currency-listbox" role="listbox" aria-label={label}>
+            {normalizedQuery ? (
+              filtered.length > 0 ? (
+                renderOptions(filtered, `${pickerCopy.results} · ${filtered.length}`)
+              ) : (
+                <p className="currency-empty">{pickerCopy.empty}</p>
+              )
+            ) : (
+              <>
+                {renderOptions(popular, pickerCopy.popular)}
+                {renderOptions(remaining, pickerCopy.all)}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const CATEGORY_COLORS: Record<string, string> = {
   housing: "#ee6c4d",
@@ -214,6 +496,12 @@ const COPY = {
     greetingFallback: "Good morning",
     subtitle: "Every currency, one clear picture.",
     baseCurrency: "Base currency",
+    currencySearch: "Search currencies",
+    currencySearchPlaceholder: "Search code, currency, or country",
+    popularCurrencies: "Popular currencies",
+    allCurrencies: "All currencies",
+    currencyResults: "Search results",
+    noCurrencies: "No matching currencies found.",
     sync: "Rates saved per transaction",
     rateProvider: "Frankfurter reference rates",
     rateLatest: "Latest available reference rates",
@@ -316,6 +604,12 @@ const COPY = {
     greetingFallback: "좋은 아침이에요",
     subtitle: "모든 통화를 한눈에 명확하게.",
     baseCurrency: "기준 통화",
+    currencySearch: "통화 검색",
+    currencySearchPlaceholder: "통화 코드, 이름 또는 국가 검색",
+    popularCurrencies: "자주 쓰는 통화",
+    allCurrencies: "전체 통화",
+    currencyResults: "검색 결과",
+    noCurrencies: "일치하는 통화를 찾지 못했습니다.",
     sync: "거래별 환율 저장",
     rateProvider: "Frankfurter 기준 환율",
     rateLatest: "최신 가용 기준 환율",
@@ -766,6 +1060,14 @@ export function ExpenseTracker({
     {},
   );
   const copy = COPY[language];
+  const currencyPickerCopy: CurrencyPickerCopy = {
+    search: copy.currencySearch,
+    searchPlaceholder: copy.currencySearchPlaceholder,
+    popular: copy.popularCurrencies,
+    all: copy.allCurrencies,
+    results: copy.currencyResults,
+    empty: copy.noCurrencies,
+  };
   const calendarCopy = CALENDAR_COPY[language];
   const recurringFlowCopy = RECURRING_FLOW_COPY[language];
   const transactionCurrencyCatalog = useMemo(() => {
@@ -1675,17 +1977,15 @@ export function ExpenseTracker({
                 한국어
               </button>
             </div>
-            <label className="base-select">
-              <span>{copy.baseCurrency}</span>
-              <select
-                value={baseCurrency}
-                onChange={(event) => setBaseCurrency(event.target.value as CurrencyCode)}
-              >
-                {currencyCatalog.map((details) => (
-                  <option key={details.code} value={details.code}>{details.code} · {details.name}</option>
-                ))}
-              </select>
-            </label>
+            <CurrencyPicker
+              className="base-select"
+              value={baseCurrency}
+              catalog={currencyCatalog}
+              onChange={setBaseCurrency}
+              language={language}
+              label={copy.baseCurrency}
+              pickerCopy={currencyPickerCopy}
+            />
             <button className="primary-button desktop-add" onClick={() => openAddDrawer()} ref={addButtonRef}>
               <span aria-hidden="true">＋</span> {copy.addExpense}
             </button>
@@ -2117,12 +2417,15 @@ export function ExpenseTracker({
                   <span>{copy.amount}</span>
                   <input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" aria-describedby="conversion-preview" />
                 </label>
-                <label className="field currency-field">
-                  <span>{copy.currency}</span>
-                  <select value={currency} onChange={(event) => setCurrency(event.target.value as CurrencyCode)}>
-                    {transactionCurrencyCatalog.map((details) => <option key={details.code} value={details.code}>{details.code} · {details.name}</option>)}
-                  </select>
-                </label>
+                <CurrencyPicker
+                  className="field currency-field"
+                  value={currency}
+                  catalog={transactionCurrencyCatalog}
+                  onChange={setCurrency}
+                  language={language}
+                  label={copy.currency}
+                  pickerCopy={currencyPickerCopy}
+                />
               </div>
               <div className="conversion-preview" id="conversion-preview" aria-live="polite">
                 <div><span>{copy.converted}</span><strong>{formatCurrency(convertedPreview, baseCurrency, language)} <small>{baseCurrency}</small></strong></div>
