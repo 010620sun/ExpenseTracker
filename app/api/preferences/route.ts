@@ -4,6 +4,7 @@ import { getDb } from "@/db";
 import { userStates } from "@/db/schema";
 import { memberFromRequest } from "@/lib/auth";
 import { isCurrencyCode } from "@/lib/currency";
+import { isLanguage } from "@/lib/language";
 
 import {
   authError,
@@ -33,6 +34,7 @@ export async function GET(request: Request) {
       .select({
         baseCurrency: userStates.baseCurrency,
         lastTransactionCurrency: userStates.lastTransactionCurrency,
+        language: userStates.language,
       })
       .from(userStates)
       .where(eq(userStates.ownerId, state.ownerId))
@@ -55,6 +57,7 @@ export async function PATCH(request: Request) {
     const updates: {
       baseCurrency?: string;
       lastTransactionCurrency?: string;
+      language?: "en" | "ko" | "ja" | "ru";
     } = {};
     if (body.baseCurrency !== undefined) {
       if (!isCurrencyCode(body.baseCurrency)) {
@@ -72,6 +75,12 @@ export async function PATCH(request: Request) {
       }
       updates.lastTransactionCurrency = body.lastTransactionCurrency;
     }
+    if (body.language !== undefined) {
+      if (!isLanguage(body.language)) {
+        return authError("INVALID_LANGUAGE", 400, "language");
+      }
+      updates.language = body.language;
+    }
     if (Object.keys(updates).length === 0) {
       return authError("INVALID_BODY", 400);
     }
@@ -83,6 +92,7 @@ export async function PATCH(request: Request) {
       .returning({
         baseCurrency: userStates.baseCurrency,
         lastTransactionCurrency: userStates.lastTransactionCurrency,
+        language: userStates.language,
       });
     return Response.json({ data: rows[0] }, { headers: NO_STORE_HEADERS });
   } catch (error) {

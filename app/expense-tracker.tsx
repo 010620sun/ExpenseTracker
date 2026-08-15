@@ -14,8 +14,12 @@ import {
 } from "react";
 
 import { currencyExponent } from "@/lib/currency";
+import {
+  isLanguage,
+  LANGUAGE_LOCALES,
+  type Language,
+} from "@/lib/language";
 
-type Language = "en" | "ko";
 type CurrencyCode = string;
 type TransactionKind = "expense" | "income";
 type RecurrenceFrequency = "weekly" | "monthly" | "yearly";
@@ -78,6 +82,7 @@ type PreferencesApiResponse = {
   data?: {
     baseCurrency?: string;
     lastTransactionCurrency?: string;
+    language?: Language;
   };
 };
 
@@ -189,7 +194,7 @@ function CurrencyPicker({
   const displayNames = useMemo(
     () =>
       typeof Intl.DisplayNames === "function"
-        ? new Intl.DisplayNames([language === "ko" ? "ko-KR" : "en-US"], {
+        ? new Intl.DisplayNames([LANGUAGE_LOCALES[language]], {
             type: "currency",
           })
         : null,
@@ -709,6 +714,222 @@ const COPY = {
     recurringStopFailed: "반복 거래를 중단하지 못했습니다.",
     recurrenceDateError: "반복 종료일은 첫 거래일과 같거나 이후여야 합니다.",
   },
+  ja: {
+    overview: "概要",
+    transactions: "取引履歴",
+    budgets: "予算",
+    reports: "レポート",
+    settings: "設定",
+    greeting: "おはようございます",
+    greetingFallback: "おはようございます",
+    subtitle: "すべての通貨を、ひと目で明確に。",
+    baseCurrency: "基準通貨",
+    currencySearch: "通貨を検索",
+    currencySearchPlaceholder: "通貨コード、名称、国名で検索",
+    popularCurrencies: "よく使われる通貨",
+    allCurrencies: "すべての通貨",
+    currencyResults: "検索結果",
+    noCurrencies: "該当する通貨が見つかりません。",
+    sync: "取引ごとに為替レートを保存",
+    rateProvider: "Frankfurter参照レート",
+    rateLatest: "利用可能な最新の参照レート",
+    rateUpdating: "参照レートを更新中…",
+    rateStale: "{date}時点の最新レートを使用中",
+    rateError: "接続に失敗しました · 予備レートを使用中",
+    rateDate: "レート基準日",
+    fetchedAt: "取得日時",
+    fallbackRate: "予備レート",
+    identityRate: "USD固定レート",
+    syncing: "家計簿を同期中",
+    synced: "家計簿を同期しました",
+    addExpense: "取引を追加",
+    spent: "今月の支出",
+    across: "{count}通貨の合計",
+    budgetLeft: "残り予算",
+    ofBudget: "月間予算に対して",
+    netFlow: "純収支",
+    incomeMinusSpend: "収入から支出を差し引いた額",
+    activeCurrencies: "使用中の通貨",
+    originalAmounts: "元の金額をそのまま保存",
+    spendingBreakdown: "支出の内訳",
+    byCategory: "カテゴリー別 · {currency}換算",
+    currencyMix: "通貨の構成",
+    originalSpend: "元通貨取引の割合",
+    recent: "最近の取引",
+    recentHint: "元の金額と{currency}換算額",
+    allActivity: "すべての履歴",
+    merchant: "店舗名または説明",
+    category: "カテゴリー",
+    chooseCategory: "カテゴリーを選択",
+    categoryHint: "この支出に最も合う項目を選んでください。",
+    date: "日付",
+    amount: "金額",
+    currency: "通貨",
+    converted: "換算額",
+    savedRate: "このレートは取引と一緒に保存されます。",
+    save: "取引を保存",
+    saving: "保存中…",
+    cancel: "キャンセル",
+    close: "閉じる",
+    expense: "支出",
+    income: "収入",
+    drawerTitle: "取引を追加",
+    drawerSubtitle: "元の金額と当時のUSDレートを保存し、履歴を安定して維持します。",
+    amountError: "0より大きい金額を入力してください。",
+    dateError: "有効な取引日を選択してください。",
+    requiredError: "店舗名または説明を入力してください。",
+    saved: "取引を追加しました。",
+    deleted: "取引を削除しました。",
+    saveFailed: "取引を保存できませんでした。もう一度お試しください。",
+    deleteFailed: "取引を削除できませんでした。",
+    signInNeeded: "ログインすると自分の家計簿に保存できます。",
+    previewMode: "家計簿に再接続するまでサンプルデータを表示しています。",
+    empty: "取引はまだありません。最初の取引を追加しましょう。",
+    housing: "住居",
+    groceries: "食料品",
+    transport: "交通",
+    dining: "飲食",
+    utilities: "光熱費",
+    health: "健康・医療",
+    education: "教育",
+    entertainment: "娯楽",
+    travel: "旅行",
+    shopping: "買い物",
+    subscriptions: "サブスクリプション",
+    other: "その他",
+    incomeCategory: "収入",
+    language: "言語",
+    privateLedger: "自分だけのグローバル家計簿",
+    logout: "ログアウト",
+    helpTitle: "国境を越える暮らしのために",
+    helpBody: "元の金額はそのままに、基準通貨で予算を明確に管理できます。",
+    learnMore: "換算方法を見る",
+    menu: "ナビゲーションを開く",
+    deleteLabel: "{merchant}を削除",
+    convertedTo: "{currency}換算",
+    repeatTransaction: "この取引を繰り返す",
+    repeatHint: "今後の取引をカレンダーに自動作成します。",
+    repeatFrequency: "繰り返し",
+    weekly: "毎週",
+    monthly: "毎月",
+    yearly: "毎年",
+    repeatEnds: "終了日（任意）",
+    recurringEntry: "繰り返し取引",
+    recurringEditHint: "変更は今回の取引にのみ適用されます。",
+    stopRecurring: "今後の繰り返しを停止",
+    stopRecurringConfirm: "この取引以降の繰り返しを停止しますか？過去の取引は残ります。",
+    recurringStopped: "今後の繰り返しを停止しました。",
+    recurringStopFailed: "繰り返し取引を停止できませんでした。",
+    recurrenceDateError: "終了日は最初の取引日以降にしてください。",
+  },
+  ru: {
+    overview: "Обзор",
+    transactions: "Операции",
+    budgets: "Бюджеты",
+    reports: "Отчёты",
+    settings: "Настройки",
+    greeting: "Доброе утро",
+    greetingFallback: "Доброе утро",
+    subtitle: "Все валюты в одной ясной картине.",
+    baseCurrency: "Основная валюта",
+    currencySearch: "Поиск валют",
+    currencySearchPlaceholder: "Код, название валюты или страна",
+    popularCurrencies: "Популярные валюты",
+    allCurrencies: "Все валюты",
+    currencyResults: "Результаты поиска",
+    noCurrencies: "Подходящие валюты не найдены.",
+    sync: "Курс сохраняется для каждой операции",
+    rateProvider: "Справочные курсы Frankfurter",
+    rateLatest: "Последние доступные справочные курсы",
+    rateUpdating: "Обновляем справочные курсы…",
+    rateStale: "Используется последний курс на {date}",
+    rateError: "Нет соединения · используется резервный курс",
+    rateDate: "Дата курса",
+    fetchedAt: "Получено",
+    fallbackRate: "Резервный курс",
+    identityRate: "Фиксированный курс USD",
+    syncing: "Синхронизация бюджета",
+    synced: "Бюджет синхронизирован",
+    addExpense: "Добавить операцию",
+    spent: "Расходы за месяц",
+    across: "Всего в {count} валютах",
+    budgetLeft: "Остаток бюджета",
+    ofBudget: "от месячного бюджета",
+    netFlow: "Чистый денежный поток",
+    incomeMinusSpend: "Доходы за вычетом расходов",
+    activeCurrencies: "Используемые валюты",
+    originalAmounts: "Исходные суммы сохранены",
+    spendingBreakdown: "Структура расходов",
+    byCategory: "По категориям · в {currency}",
+    currencyMix: "Состав валют",
+    originalSpend: "Доля операций в исходной валюте",
+    recent: "Недавние операции",
+    recentHint: "Исходная сумма и значение в {currency}",
+    allActivity: "Вся активность",
+    merchant: "Продавец или описание",
+    category: "Категория",
+    chooseCategory: "Выберите категорию",
+    categoryHint: "Выберите наиболее подходящую категорию расхода.",
+    date: "Дата",
+    amount: "Сумма",
+    currency: "Валюта",
+    converted: "Сумма после пересчёта",
+    savedRate: "Этот курс сохранится вместе с операцией.",
+    save: "Сохранить операцию",
+    saving: "Сохранение…",
+    cancel: "Отмена",
+    close: "Закрыть",
+    expense: "Расход",
+    income: "Доход",
+    drawerTitle: "Добавить операцию",
+    drawerSubtitle: "Сохраняем исходную сумму и курс к USD, чтобы история оставалась точной.",
+    amountError: "Введите сумму больше 0.",
+    dateError: "Выберите корректную дату операции.",
+    requiredError: "Укажите продавца или описание.",
+    saved: "Операция добавлена.",
+    deleted: "Операция удалена.",
+    saveFailed: "Не удалось сохранить операцию. Попробуйте ещё раз.",
+    deleteFailed: "Не удалось удалить операцию.",
+    signInNeeded: "Войдите, чтобы сохранить личный бюджет.",
+    previewMode: "Показываем пример данных, пока восстанавливается соединение.",
+    empty: "Операций пока нет. Добавьте первую.",
+    housing: "Жильё",
+    groceries: "Продукты",
+    transport: "Транспорт",
+    dining: "Еда и напитки",
+    utilities: "Коммунальные услуги",
+    health: "Здоровье",
+    education: "Образование",
+    entertainment: "Развлечения",
+    travel: "Путешествия",
+    shopping: "Покупки",
+    subscriptions: "Подписки",
+    other: "Другое",
+    incomeCategory: "Доход",
+    language: "Язык",
+    privateLedger: "Ваш личный глобальный бюджет",
+    logout: "Выйти",
+    helpTitle: "Для жизни без границ",
+    helpBody: "Исходные суммы сохраняются, а основная валюта помогает честно вести бюджет.",
+    learnMore: "Как работает пересчёт",
+    menu: "Открыть навигацию",
+    deleteLabel: "Удалить {merchant}",
+    convertedTo: "в {currency}",
+    repeatTransaction: "Повторять эту операцию",
+    repeatHint: "Автоматически создавать будущие операции в календаре.",
+    repeatFrequency: "Повтор",
+    weekly: "Каждую неделю",
+    monthly: "Каждый месяц",
+    yearly: "Каждый год",
+    repeatEnds: "Дата окончания (необязательно)",
+    recurringEntry: "Регулярная операция",
+    recurringEditHint: "Изменения применятся только к этой операции.",
+    stopRecurring: "Остановить будущие повторы",
+    stopRecurringConfirm: "Остановить повторы после этой операции? Прошлые записи сохранятся.",
+    recurringStopped: "Будущие повторы остановлены.",
+    recurringStopFailed: "Не удалось остановить регулярную операцию.",
+    recurrenceDateError: "Дата окончания должна быть не раньше первой операции.",
+  },
 } as const;
 
 const RECURRING_FLOW_COPY = {
@@ -733,6 +954,26 @@ const RECURRING_FLOW_COPY = {
     scheduleTitle: "반복 일정",
     save: "반복 거래 저장",
     saved: "반복 거래가 추가되었습니다.",
+  },
+  ja: {
+    add: "繰り返し取引を追加",
+    manage: "繰り返し取引の管理",
+    buttonHint: "定期的な支出または収入を設定",
+    drawerTitle: "繰り返し取引を追加",
+    drawerSubtitle: "最初の取引と周期を設定すると、今後の取引が自動で表示されます。",
+    scheduleTitle: "繰り返しスケジュール",
+    save: "繰り返し取引を保存",
+    saved: "繰り返し取引を追加しました。",
+  },
+  ru: {
+    add: "Добавить регулярную",
+    manage: "Регулярные операции",
+    buttonHint: "Запланировать расход или регулярный доход",
+    drawerTitle: "Добавить регулярную операцию",
+    drawerSubtitle: "Задайте первую операцию и расписание. Будущие записи появятся автоматически.",
+    scheduleTitle: "Расписание повторов",
+    save: "Сохранить регулярную операцию",
+    saved: "Регулярная операция добавлена.",
   },
 } as const;
 
@@ -795,6 +1036,64 @@ const CALENDAR_COPY = {
     openDate: "{date} 열기",
     daySummary: "거래 {count}건, 지출 {expense}, 수입 {income}",
   },
+  ja: {
+    calendar: "月間カレンダー",
+    calendarHint: "日付を選んで取引を確認、追加、編集できます。",
+    previousMonth: "前の月",
+    nextMonth: "次の月",
+    thisMonth: "今月",
+    today: "今日",
+    selectedDay: "選択した日",
+    transactionCount: "{count}件の取引",
+    addOnDate: "{date}に取引を追加",
+    noTransactions: "この日の取引はありません。",
+    moreTransactions: "ほか{count}件",
+    edit: "編集",
+    editLabel: "{merchant}を編集",
+    editTransaction: "取引を編集",
+    editSubtitle: "保存済みの過去レートを維持したまま取引を更新します。",
+    update: "変更を保存",
+    updating: "変更を保存中…",
+    updated: "取引を更新しました。",
+    historicalRate: "保存済みの過去レート",
+    changedConflict: "別の場所で変更された取引です。開き直してもう一度お試しください。",
+    confirmDelete: "{merchant}を削除しますか？この操作は元に戻せません。",
+    expenseTotal: "支出",
+    incomeTotal: "収入",
+    note: "メモ",
+    notePlaceholder: "任意の詳細",
+    openDate: "{date}を開く",
+    daySummary: "{count}件、支出{expense}、収入{income}",
+  },
+  ru: {
+    calendar: "Календарь на месяц",
+    calendarHint: "Выберите дату, чтобы просмотреть, добавить или изменить операции.",
+    previousMonth: "Предыдущий месяц",
+    nextMonth: "Следующий месяц",
+    thisMonth: "Текущий месяц",
+    today: "Сегодня",
+    selectedDay: "Выбранный день",
+    transactionCount: "Операций: {count}",
+    addOnDate: "Добавить на {date}",
+    noTransactions: "В этот день операций нет.",
+    moreTransactions: "Ещё {count}",
+    edit: "Изменить",
+    editLabel: "Изменить {merchant}",
+    editTransaction: "Изменить операцию",
+    editSubtitle: "Обновите запись, сохранив зафиксированный исторический курс.",
+    update: "Сохранить изменения",
+    updating: "Сохранение изменений…",
+    updated: "Операция обновлена.",
+    historicalRate: "Сохранённый исторический курс",
+    changedConflict: "Эта запись была изменена в другом месте. Откройте её заново.",
+    confirmDelete: "Удалить {merchant}? Это действие нельзя отменить.",
+    expenseTotal: "Расход",
+    incomeTotal: "Доход",
+    note: "Заметка",
+    notePlaceholder: "Дополнительные сведения",
+    openDate: "Открыть {date}",
+    daySummary: "Операций: {count}, расходы: {expense}, доходы: {income}",
+  },
 } as const;
 
 const CATEGORY_OPTIONS = [
@@ -825,7 +1124,7 @@ function formatCurrency(
   currency: CurrencyCode,
   language: Language,
 ) {
-  const locale = language === "ko" ? "ko-KR" : "en-US";
+  const locale = LANGUAGE_LOCALES[language];
   const exponent = currencyExponent(currency) ?? 2;
   try {
     return new Intl.NumberFormat(locale, {
@@ -846,7 +1145,7 @@ function formatCompactCurrency(
   language: Language,
 ) {
   try {
-    return new Intl.NumberFormat(language === "ko" ? "ko-KR" : "en-US", {
+    return new Intl.NumberFormat(LANGUAGE_LOCALES[language], {
       style: "currency",
       currency,
       currencyDisplay: "narrowSymbol",
@@ -1099,7 +1398,7 @@ export function ExpenseTracker({
       const localToday = localIsoDate();
       setCurrentDate(localToday);
       const storedLanguage = window.localStorage.getItem("globeledger-language");
-      if (storedLanguage === "en" || storedLanguage === "ko") {
+      if (isLanguage(storedLanguage)) {
         setLanguage(storedLanguage);
       }
       if (localToday !== today) {
@@ -1132,6 +1431,7 @@ export function ExpenseTracker({
         const storedBaseCurrency = payload.data?.baseCurrency;
         const storedTransactionCurrency =
           payload.data?.lastTransactionCurrency;
+        const storedLanguage = payload.data?.language;
         if (storedBaseCurrency && /^[A-Z]{3}$/u.test(storedBaseCurrency)) {
           setBaseCurrency(storedBaseCurrency);
         }
@@ -1141,6 +1441,7 @@ export function ExpenseTracker({
         ) {
           setLastTransactionCurrency(storedTransactionCurrency);
         }
+        if (isLanguage(storedLanguage)) setLanguage(storedLanguage);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
       }
@@ -1528,7 +1829,9 @@ export function ExpenseTracker({
   }
 
   async function saveCurrencyPreference(
-    preference: { baseCurrency: CurrencyCode },
+    preference:
+      | { baseCurrency: CurrencyCode }
+      | { language: Language },
   ) {
     try {
       const response = await fetch("/api/preferences", {
@@ -1546,6 +1849,11 @@ export function ExpenseTracker({
   function chooseBaseCurrency(nextCurrency: CurrencyCode) {
     setBaseCurrency(nextCurrency);
     void saveCurrencyPreference({ baseCurrency: nextCurrency });
+  }
+
+  function chooseLanguage(nextLanguage: Language) {
+    setLanguage(nextLanguage);
+    void saveCurrencyPreference({ language: nextLanguage });
   }
 
   function openAddDrawer(date = selectedDate) {
@@ -1912,7 +2220,7 @@ export function ExpenseTracker({
     window.location.assign("/auth");
   }
 
-  const locale = language === "ko" ? "ko-KR" : "en-US";
+  const locale = LANGUAGE_LOCALES[language];
   const monthLabel = new Intl.DateTimeFormat(locale, {
     month: "long",
     year: "numeric",
@@ -2009,20 +2317,16 @@ export function ExpenseTracker({
               <span>{isSyncing ? copy.syncing : copy.synced}</span>
             </div>
             <div className="language-switch" aria-label={copy.language}>
-              <button
-                aria-pressed={language === "en"}
-                className={language === "en" ? "selected" : ""}
-                onClick={() => setLanguage("en")}
+              <select
+                value={language}
+                onChange={(event) => chooseLanguage(event.target.value as Language)}
+                aria-label={copy.language}
               >
-                EN
-              </button>
-              <button
-                aria-pressed={language === "ko"}
-                className={language === "ko" ? "selected" : ""}
-                onClick={() => setLanguage("ko")}
-              >
-                한국어
-              </button>
+                <option value="en">English</option>
+                <option value="ko">한국어</option>
+                <option value="ja">日本語</option>
+                <option value="ru">Русский</option>
+              </select>
             </div>
             <CurrencyPicker
               className="base-select"

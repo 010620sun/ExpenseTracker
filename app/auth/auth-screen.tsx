@@ -1,6 +1,8 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
+
+import { isLanguage, type Language } from "@/lib/language";
 
 type Mode = "login" | "register";
 
@@ -28,7 +30,7 @@ const COPY = {
     duplicate: "An account already exists for this email.",
     weak: "Use at least 10 characters with a letter and number.",
     limited: "Too many attempts. Please wait 15 minutes.",
-    language: "한국어",
+    language: "Language",
   },
   ko: {
     title: "나만의 가계부를 안전하게.",
@@ -53,12 +55,63 @@ const COPY = {
     duplicate: "이미 가입된 이메일입니다.",
     weak: "영문과 숫자를 포함한 10자 이상의 비밀번호를 사용하세요.",
     limited: "시도 횟수가 너무 많습니다. 15분 후 다시 시도하세요.",
-    language: "EN",
+    language: "언어",
+  },
+  ja: {
+    title: "自分だけの家計簿を安全に。",
+    subtitle: "あらゆる通貨を一つの安全な家計簿で管理できます。",
+    login: "ログイン",
+    register: "アカウント作成",
+    name: "名前",
+    email: "メールアドレス",
+    password: "パスワード",
+    passwordHint: "英字と数字を含む10〜128文字で入力してください。",
+    submitLogin: "GlobeLedgerにログイン",
+    submitRegister: "自分の家計簿を作成",
+    working: "処理中…",
+    newHere: "GlobeLedgerは初めてですか？",
+    already: "すでにアカウントをお持ちですか？",
+    privateTitle: "会員ごとに完全分離",
+    privateBody: "すべての取引と繰り返しスケジュールはあなたのアカウントに紐づき、他の会員は閲覧・変更できません。",
+    rateTitle: "過去のレートを安定して保存",
+    rateBody: "元の通貨と取引時の為替レートが各取引に保存されます。",
+    genericError: "リクエストを処理できませんでした。もう一度お試しください。",
+    invalid: "メールアドレスとパスワードをご確認ください。",
+    duplicate: "このメールアドレスはすでに登録されています。",
+    weak: "英字と数字を含む10文字以上のパスワードを使用してください。",
+    limited: "試行回数が多すぎます。15分後にもう一度お試しください。",
+    language: "言語",
+  },
+  ru: {
+    title: "Ваши финансы под надёжной защитой.",
+    subtitle: "Единый безопасный бюджет для всех используемых валют.",
+    login: "Войти",
+    register: "Создать аккаунт",
+    name: "Имя",
+    email: "Электронная почта",
+    password: "Пароль",
+    passwordHint: "От 10 до 128 символов, включая букву и цифру.",
+    submitLogin: "Войти в GlobeLedger",
+    submitRegister: "Создать личный бюджет",
+    working: "Подождите…",
+    newHere: "Впервые в GlobeLedger?",
+    already: "Уже есть аккаунт?",
+    privateTitle: "Данные участников полностью разделены",
+    privateBody: "Каждая операция и регулярное расписание принадлежат только вашему аккаунту. Другие участники не могут их просматривать или изменять.",
+    rateTitle: "Исторические курсы сохраняются",
+    rateBody: "Исходная валюта и снимок обменного курса остаются привязаны к каждой записи.",
+    genericError: "Не удалось выполнить запрос. Попробуйте ещё раз.",
+    invalid: "Проверьте электронную почту и пароль.",
+    duplicate: "Аккаунт с этой почтой уже существует.",
+    weak: "Используйте не менее 10 символов, включая букву и цифру.",
+    limited: "Слишком много попыток. Повторите через 15 минут.",
+    language: "Язык",
   },
 } as const;
 
 export function AuthScreen({ returnTo }: { returnTo: string }) {
-  const [language, setLanguage] = useState<"en" | "ko">("en");
+  const [language, setLanguage] = useState<Language>("en");
+  const [languageTouched, setLanguageTouched] = useState(false);
   const [mode, setMode] = useState<Mode>("login");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -66,6 +119,19 @@ export function AuthScreen({ returnTo }: { returnTo: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const copy = COPY[language];
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const stored = window.localStorage.getItem("globeledger-language");
+      if (isLanguage(stored)) setLanguage(stored);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+    window.localStorage.setItem("globeledger-language", language);
+  }, [language]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -93,6 +159,17 @@ export function AuthScreen({ returnTo }: { returnTo: string }) {
         );
         return;
       }
+      if (languageTouched) {
+        try {
+          await fetch("/api/preferences", {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ language }),
+          });
+        } catch {
+          // Authentication succeeded; the dashboard can retry the preference.
+        }
+      }
       window.location.assign(returnTo);
     } catch {
       setError(copy.genericError);
@@ -104,6 +181,11 @@ export function AuthScreen({ returnTo }: { returnTo: string }) {
   function switchMode(next: Mode) {
     setMode(next);
     setError("");
+  }
+
+  function chooseLanguage(nextLanguage: Language) {
+    setLanguage(nextLanguage);
+    setLanguageTouched(true);
   }
 
   return (
@@ -118,7 +200,7 @@ export function AuthScreen({ returnTo }: { returnTo: string }) {
       </section>
       <section className="auth-form-panel">
         <div className="auth-card">
-          <div className="auth-card-top"><div className="auth-tabs" role="tablist"><button role="tab" aria-selected={mode === "login"} className={mode === "login" ? "selected" : ""} onClick={() => switchMode("login")}>{copy.login}</button><button role="tab" aria-selected={mode === "register"} className={mode === "register" ? "selected" : ""} onClick={() => switchMode("register")}>{copy.register}</button></div><button className="auth-language" onClick={() => setLanguage(language === "en" ? "ko" : "en")}>{copy.language}</button></div>
+          <div className="auth-card-top"><div className="auth-tabs" role="tablist"><button role="tab" aria-selected={mode === "login"} className={mode === "login" ? "selected" : ""} onClick={() => switchMode("login")}>{copy.login}</button><button role="tab" aria-selected={mode === "register"} className={mode === "register" ? "selected" : ""} onClick={() => switchMode("register")}>{copy.register}</button></div><select className="auth-language" value={language} onChange={(event) => chooseLanguage(event.target.value as Language)} aria-label={copy.language}><option value="en">English</option><option value="ko">한국어</option><option value="ja">日本語</option><option value="ru">Русский</option></select></div>
           <h2>{mode === "login" ? copy.login : copy.register}</h2>
           <p>{mode === "login" ? copy.already : copy.newHere}</p>
           <form onSubmit={submit}>

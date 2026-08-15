@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
-type Language = "en" | "ko";
+import {
+  isLanguage,
+  LANGUAGE_LOCALES,
+  type Language,
+} from "@/lib/language";
+
 type Frequency = "weekly" | "monthly" | "yearly";
 type SeriesStatus = "active" | "paused" | "ended";
 
@@ -36,6 +41,10 @@ type RecurringResponse = {
     expectedIncomeMinor: number;
     expectedExpenseMinor: number;
   };
+};
+
+type PreferencesResponse = {
+  data?: { language?: Language };
 };
 
 const COPY = {
@@ -141,26 +150,128 @@ const COPY = {
     privateLedger: "나만의 글로벌 가계부",
     logout: "로그아웃",
   },
+  ja: {
+    back: "概要",
+    title: "繰り返し取引",
+    subtitle: "通貨をまたぐ定期支出と収入を見通しよく管理します。",
+    add: "繰り返し取引を追加",
+    active: "有効なスケジュール",
+    paused: "一時停止",
+    expense: "予想支出",
+    income: "予想収入",
+    monthEstimate: "今月のUSD換算予想額",
+    all: "すべて",
+    activeFilter: "有効",
+    pausedFilter: "一時停止",
+    endedFilter: "終了",
+    empty: "該当する繰り返しスケジュールはありません。",
+    next: "次回",
+    noNext: "今後の予定なし",
+    started: "開始日",
+    ends: "終了日",
+    never: "終了日なし",
+    weekly: "毎週",
+    monthly: "毎月",
+    yearly: "毎年",
+    edit: "編集",
+    pause: "一時停止",
+    resume: "再開",
+    delete: "削除",
+    deleteConfirm: "この繰り返しスケジュールと関連するすべての取引を削除しますか？",
+    editTitle: "繰り返しスケジュールを編集",
+    description: "説明",
+    amount: "金額",
+    frequency: "周期",
+    category: "カテゴリー",
+    endDate: "終了日（任意）",
+    note: "メモ",
+    save: "変更を保存",
+    cancel: "キャンセル",
+    loading: "繰り返しスケジュールを読み込み中…",
+    loadFailed: "繰り返しスケジュールを読み込めませんでした。",
+    actionFailed: "スケジュールを更新できませんでした。",
+    saved: "繰り返しスケジュールを更新しました。",
+    deleted: "繰り返しスケジュールを削除しました。",
+    pausedToast: "繰り返しスケジュールを一時停止しました。",
+    resumedToast: "繰り返しスケジュールを再開しました。",
+    language: "言語",
+    activeStatus: "有効",
+    pausedStatus: "一時停止",
+    endedStatus: "終了",
+    privateLedger: "自分だけのグローバル家計簿",
+    logout: "ログアウト",
+  },
+  ru: {
+    back: "Обзор",
+    title: "Регулярные операции",
+    subtitle: "Планируйте регулярные расходы и доходы в разных валютах.",
+    add: "Добавить регулярную",
+    active: "Активные расписания",
+    paused: "Приостановлено",
+    expense: "Ожидаемые расходы",
+    income: "Ожидаемые доходы",
+    monthEstimate: "Оценка на этот месяц в USD",
+    all: "Все",
+    activeFilter: "Активные",
+    pausedFilter: "На паузе",
+    endedFilter: "Завершённые",
+    empty: "В этом разделе нет регулярных расписаний.",
+    next: "Следующая",
+    noNext: "Нет предстоящих записей",
+    started: "Начало",
+    ends: "Окончание",
+    never: "Без даты окончания",
+    weekly: "Еженедельно",
+    monthly: "Ежемесячно",
+    yearly: "Ежегодно",
+    edit: "Изменить",
+    pause: "Приостановить",
+    resume: "Возобновить",
+    delete: "Удалить",
+    deleteConfirm: "Удалить это расписание и все связанные операции?",
+    editTitle: "Изменить регулярное расписание",
+    description: "Описание",
+    amount: "Сумма",
+    frequency: "Периодичность",
+    category: "Категория",
+    endDate: "Дата окончания (необязательно)",
+    note: "Заметка",
+    save: "Сохранить изменения",
+    cancel: "Отмена",
+    loading: "Загрузка регулярных расписаний…",
+    loadFailed: "Не удалось загрузить регулярные расписания.",
+    actionFailed: "Не удалось обновить расписание.",
+    saved: "Регулярное расписание обновлено.",
+    deleted: "Регулярное расписание удалено.",
+    pausedToast: "Регулярное расписание приостановлено.",
+    resumedToast: "Регулярное расписание возобновлено.",
+    language: "Язык",
+    activeStatus: "Активно",
+    pausedStatus: "Приостановлено",
+    endedStatus: "Завершено",
+    privateLedger: "Ваш личный глобальный бюджет",
+    logout: "Выйти",
+  },
 } as const;
 
-const CATEGORY_LABELS: Record<string, { en: string; ko: string }> = {
-  housing: { en: "Housing", ko: "주거" },
-  groceries: { en: "Groceries", ko: "식료품" },
-  dining: { en: "Food & drink", ko: "식음료" },
-  transport: { en: "Transport", ko: "교통" },
-  utilities: { en: "Utilities", ko: "공과금" },
-  health: { en: "Health", ko: "건강·의료" },
-  education: { en: "Education", ko: "교육" },
-  entertainment: { en: "Entertainment", ko: "문화·여가" },
-  travel: { en: "Travel", ko: "여행" },
-  shopping: { en: "Shopping", ko: "쇼핑" },
-  subscriptions: { en: "Subscriptions", ko: "구독" },
-  other: { en: "Other", ko: "기타" },
-  income: { en: "Income", ko: "수입" },
+const CATEGORY_LABELS: Record<string, Record<Language, string>> = {
+  housing: { en: "Housing", ko: "주거", ja: "住居", ru: "Жильё" },
+  groceries: { en: "Groceries", ko: "식료품", ja: "食料品", ru: "Продукты" },
+  dining: { en: "Food & drink", ko: "식음료", ja: "飲食", ru: "Еда и напитки" },
+  transport: { en: "Transport", ko: "교통", ja: "交通", ru: "Транспорт" },
+  utilities: { en: "Utilities", ko: "공과금", ja: "光熱費", ru: "Коммунальные услуги" },
+  health: { en: "Health", ko: "건강·의료", ja: "健康・医療", ru: "Здоровье" },
+  education: { en: "Education", ko: "교육", ja: "教育", ru: "Образование" },
+  entertainment: { en: "Entertainment", ko: "문화·여가", ja: "娯楽", ru: "Развлечения" },
+  travel: { en: "Travel", ko: "여행", ja: "旅行", ru: "Путешествия" },
+  shopping: { en: "Shopping", ko: "쇼핑", ja: "買い物", ru: "Покупки" },
+  subscriptions: { en: "Subscriptions", ko: "구독", ja: "サブスクリプション", ru: "Подписки" },
+  other: { en: "Other", ko: "기타", ja: "その他", ru: "Другое" },
+  income: { en: "Income", ko: "수입", ja: "収入", ru: "Доход" },
 };
 
 function money(minor: number, currency: string, language: Language) {
-  return new Intl.NumberFormat(language === "ko" ? "ko-KR" : "en-US", {
+  return new Intl.NumberFormat(LANGUAGE_LOCALES[language], {
     style: "currency",
     currency,
     currencyDisplay: "narrowSymbol",
@@ -168,7 +279,7 @@ function money(minor: number, currency: string, language: Language) {
 }
 
 function dateLabel(value: string, language: Language) {
-  return new Intl.DateTimeFormat(language === "ko" ? "ko-KR" : "en-US", {
+  return new Intl.DateTimeFormat(LANGUAGE_LOCALES[language], {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -219,17 +330,38 @@ export function RecurringManager({
   }
 
   useEffect(() => {
+    const controller = new AbortController();
     const frame = window.requestAnimationFrame(() => {
       const stored = window.localStorage.getItem("globeledger-language");
-      if (stored === "ko" || stored === "en") setLanguage(stored);
+      if (isLanguage(stored)) setLanguage(stored);
       void loadItems();
     });
-    return () => window.cancelAnimationFrame(frame);
+    async function loadLanguage() {
+      try {
+        const response = await fetch("/api/preferences", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const payload = (await response.json()) as PreferencesResponse;
+        if (isLanguage(payload.data?.language)) {
+          setLanguage(payload.data.language);
+        }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+    void loadLanguage();
+    return () => {
+      controller.abort();
+      window.cancelAnimationFrame(frame);
+    };
     // Load only once; language changes translate existing data locally.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
+    document.documentElement.lang = language;
     window.localStorage.setItem("globeledger-language", language);
   }, [language]);
 
@@ -335,6 +467,15 @@ export function RecurringManager({
     window.location.assign("/auth");
   }
 
+  function chooseLanguage(nextLanguage: Language) {
+    setLanguage(nextLanguage);
+    void fetch("/api/preferences", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ language: nextLanguage }),
+    }).catch(() => undefined);
+  }
+
   return (
     <div className="recurring-page-shell">
       <aside className="recurring-sidebar">
@@ -363,8 +504,12 @@ export function RecurringManager({
           </div>
           <div className="recurring-top-actions">
             <div className="language-switch" aria-label={copy.language}>
-              <button className={language === "en" ? "selected" : ""} aria-pressed={language === "en"} onClick={() => setLanguage("en")}>EN</button>
-              <button className={language === "ko" ? "selected" : ""} aria-pressed={language === "ko"} onClick={() => setLanguage("ko")}>한국어</button>
+              <select value={language} onChange={(event) => chooseLanguage(event.target.value as Language)} aria-label={copy.language}>
+                <option value="en">English</option>
+                <option value="ko">한국어</option>
+                <option value="ja">日本語</option>
+                <option value="ru">Русский</option>
+              </select>
             </div>
             <Link className="primary-button recurring-create" href="/?new=recurring">↻ {copy.add}</Link>
           </div>

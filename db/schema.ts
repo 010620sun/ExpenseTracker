@@ -106,6 +106,9 @@ export const userStates = sqliteTable(
     lastTransactionCurrency: text("last_transaction_currency")
       .notNull()
       .default("KRW"),
+    language: text("language", { enum: ["en", "ko", "ja", "ru"] })
+      .notNull()
+      .default("en"),
     createdAtMs: integer("created_at_ms").notNull(),
   },
   (table) => [
@@ -124,6 +127,10 @@ export const userStates = sqliteTable(
     check(
       "user_states_transaction_currency_shape",
       sql`length(${table.lastTransactionCurrency}) = 3 AND ${table.lastTransactionCurrency} = upper(${table.lastTransactionCurrency})`,
+    ),
+    check(
+      "user_states_language_supported",
+      sql`${table.language} IN ('en', 'ko', 'ja', 'ru')`,
     ),
   ],
 );

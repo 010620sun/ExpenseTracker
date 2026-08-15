@@ -15,6 +15,8 @@ test("provides login and registration", async () => {
   assert.match(screen, /Create account/u);
   assert.match(screen, /Member-isolated by design/u);
   assert.match(screen, /나만의 가계부를 안전하게/u);
+  assert.match(screen, /自分だけの家計簿を安全に/u);
+  assert.match(screen, /Ваши финансы под надёжной защитой/u);
 });
 
 test("protects member ledger pages", async () => {
@@ -107,14 +109,17 @@ test("uses Workers Web Crypto sessions and member-owned ledger APIs", async () =
   assert.doesNotMatch(recurringRoute, /LOCAL_DEMO_OWNER_ID|getChatGPTUser/u);
 });
 
-test("keeps base and latest transaction currencies as independent member settings", async () => {
-  const [tracker, preferencesRoute, transactionsRoute, schema, migration] =
+test("keeps currency and language choices as independent member settings", async () => {
+  const [tracker, recurring, preferencesRoute, transactionsRoute, schema, currencyMigration, languageMigration, languageHelpers] =
     await Promise.all([
       readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/recurring/recurring-manager.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/api/preferences/route.ts", import.meta.url), "utf8"),
       readFile(new URL("../app/api/transactions/route.ts", import.meta.url), "utf8"),
       readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
       readFile(new URL("../drizzle/0006_modern_cyclops.sql", import.meta.url), "utf8"),
+      readFile(new URL("../drizzle/0007_mighty_lockjaw.sql", import.meta.url), "utf8"),
+      readFile(new URL("../lib/language.ts", import.meta.url), "utf8"),
     ]);
 
   assert.match(schema, /baseCurrency: text\("base_currency"\)/u);
@@ -124,20 +129,30 @@ test("keeps base and latest transaction currencies as independent member setting
   );
   assert.match(preferencesRoute, /memberFromRequest/u);
   assert.match(preferencesRoute, /export async function PATCH/u);
+  assert.match(preferencesRoute, /isLanguage\(body\.language\)/u);
   assert.match(tracker, /fetch\("\/api\/preferences"/u);
   assert.match(tracker, /setCurrency\(lastTransactionCurrency\)/u);
   assert.match(tracker, /onChange=\{chooseBaseCurrency\}/u);
+  assert.match(tracker, /<option value="ja">日本語<\/option>/u);
+  assert.match(tracker, /<option value="ru">Русский<\/option>/u);
+  assert.match(recurring, /<option value="ja">日本語<\/option>/u);
+  assert.match(recurring, /<option value="ru">Русский<\/option>/u);
   assert.doesNotMatch(tracker, /globeledger-base-currency/u);
   assert.match(transactionsRoute, /rememberLastTransactionCurrency/u);
   assert.match(
     transactionsRoute,
     /\.set\(\{ lastTransactionCurrency: currency \}\)/u,
   );
-  assert.match(migration, /ALTER TABLE `user_states` ADD `base_currency`/u);
+  assert.match(currencyMigration, /ALTER TABLE `user_states` ADD `base_currency`/u);
   assert.match(
-    migration,
+    currencyMigration,
     /ALTER TABLE `user_states` ADD `last_transaction_currency`/u,
   );
+  assert.match(schema, /language: text\("language"/u);
+  assert.match(languageMigration, /ALTER TABLE `user_states` ADD `language`/u);
+  assert.match(languageHelpers, /\["en", "ko", "ja", "ru"\]/u);
+  assert.match(languageHelpers, /ja: "ja-JP"/u);
+  assert.match(languageHelpers, /ru: "ru-RU"/u);
 });
 
 test("supports durable recurring transaction management", async () => {

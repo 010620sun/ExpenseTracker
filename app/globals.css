@@ -384,6 +384,20 @@ a.nav-item {
   padding: 3px;
 }
 
+.language-switch select {
+  appearance: none;
+  background: var(--ink);
+  border: 0;
+  border-radius: 7px;
+  box-shadow: 0 3px 9px rgba(29, 41, 39, 0.13);
+  color: #fff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  min-height: 30px;
+  padding: 0 25px 0 10px;
+}
+
 .language-switch button {
   background: transparent;
   border: 0;
@@ -2342,7 +2356,7 @@ a.nav-item {
 .auth-tabs { background: #e9ece8; border-radius: 11px; display: inline-flex; padding: 4px; }
 .auth-tabs button { background: transparent; border: 0; border-radius: 8px; color: var(--muted); font-size: 10px; font-weight: 740; min-height: 34px; padding: 0 13px; }
 .auth-tabs button.selected { background: #fff; box-shadow: 0 2px 10px rgba(35, 47, 43, 0.09); color: var(--ink); }
-.auth-language { background: transparent; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); font-size: 9px; font-weight: 750; min-height: 34px; padding: 0 10px; }
+.auth-language { background: transparent; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); cursor: pointer; font-size: 10px; font-weight: 750; min-height: 34px; padding: 0 9px; }
 .auth-card > h2 { font-size: 30px; letter-spacing: -0.04em; margin: 42px 0 6px; }
 .auth-card > p { color: var(--muted); font-size: 11px; margin: 0 0 24px; }
 .auth-card form { display: grid; gap: 16px; }
