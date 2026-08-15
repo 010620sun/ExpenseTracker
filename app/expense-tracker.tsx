@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   type CSSProperties,
   type FormEvent,
@@ -2276,7 +2275,7 @@ export function ExpenseTracker({
 
         <nav className="primary-nav">
           <span className="nav-item active"><span aria-hidden="true">●</span>{copy.overview}</span>
-          <Link className="nav-item" href="/recurring"><span aria-hidden="true">↻</span>{recurringFlowCopy.manage}</Link>
+          <a className="nav-item" href="/recurring"><span aria-hidden="true">↻</span>{recurringFlowCopy.manage}</a>
           {["transactions", "budgets", "reports", "settings"].map((item) => (
             <button className="nav-item" key={item}>
               <span aria-hidden="true">·</span>

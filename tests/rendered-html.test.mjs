@@ -135,6 +135,7 @@ test("keeps currency and language choices as independent member settings", async
   assert.match(tracker, /setCurrency\(lastTransactionCurrency\)/u);
   assert.match(tracker, /onChange=\{chooseBaseCurrency\}/u);
   assert.match(tracker, /<LanguagePicker/u);
+  assert.match(tracker, /<a className="nav-item" href="\/recurring">/u);
   assert.match(recurring, /<LanguagePicker/u);
   assert.match(languagePicker, /code: "ja"[^\n]+name: "日本語"/u);
   assert.match(languagePicker, /code: "ru"[^\n]+name: "Русский"/u);
@@ -179,6 +180,7 @@ test("supports durable recurring transaction management", async () => {
   assert.match(manager, /className="recurring-category-options" role="listbox"/u);
   assert.match(manager, /aria-expanded=\{isCategoryPickerOpen\}/u);
   assert.doesNotMatch(manager, /<span>\{copy\.category\}<\/span><select/u);
+  assert.match(manager, /<Link href="\/" className="nav-item">/u);
   assert.match(schema, /uq_transactions_recurring_occurrence/u);
   assert.match(schema, /pausedAtMs/u);
   assert.match(migration, /"note", NULL, NULL, "client_request_id"/u);
