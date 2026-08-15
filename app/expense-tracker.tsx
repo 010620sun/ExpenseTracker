@@ -86,6 +86,10 @@ type PreferencesApiResponse = {
   };
 };
 
+type BudgetApiResponse = {
+  data?: { totalBudgetUsdMinor?: number };
+};
+
 type RateStatus = "updating" | "updated" | "stale" | "error";
 
 type RateMeta = {
@@ -531,6 +535,7 @@ const COPY = {
     across: "Across {count} currencies",
     budgetLeft: "Budget left",
     ofBudget: "of monthly budget",
+    setBudget: "Set a monthly budget",
     netFlow: "Net flow",
     incomeMinusSpend: "Income minus spending",
     activeCurrencies: "Active currencies",
@@ -639,6 +644,7 @@ const COPY = {
     across: "{count}개 통화 합산",
     budgetLeft: "남은 예산",
     ofBudget: "월 예산 기준",
+    setBudget: "월 예산 설정하기",
     netFlow: "순 현금 흐름",
     incomeMinusSpend: "수입에서 지출을 제외",
     activeCurrencies: "사용 통화",
@@ -747,6 +753,7 @@ const COPY = {
     across: "{count}通貨の合計",
     budgetLeft: "残り予算",
     ofBudget: "月間予算に対して",
+    setBudget: "月間予算を設定",
     netFlow: "純収支",
     incomeMinusSpend: "収入から支出を差し引いた額",
     activeCurrencies: "使用中の通貨",
@@ -855,6 +862,7 @@ const COPY = {
     across: "Всего в {count} валютах",
     budgetLeft: "Остаток бюджета",
     ofBudget: "от месячного бюджета",
+    setBudget: "Задать месячный бюджет",
     netFlow: "Чистый денежный поток",
     incomeMinusSpend: "Доходы за вычетом расходов",
     activeCurrencies: "Используемые валюты",
@@ -1329,6 +1337,8 @@ export function ExpenseTracker({
   });
   const [transactions, setTransactions] =
     useState<LedgerTransaction[]>(FALLBACK_TRANSACTIONS);
+  const [monthlyBudgetUsdMinor, setMonthlyBudgetUsdMinor] =
+    useState<number | null>(null);
   const [isSyncing, setIsSyncing] = useState(true);
   const [currentDate, setCurrentDate] = useState(today);
   const [viewMonth, setViewMonth] = useState(today.slice(0, 7));
@@ -1597,6 +1607,33 @@ export function ExpenseTracker({
     return () => controller.abort();
   }, [viewMonth, copy.previewMode]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadBudget() {
+      try {
+        const response = await fetch(
+          `/api/budgets?month=${encodeURIComponent(viewMonth)}`,
+          { cache: "no-store", signal: controller.signal },
+        );
+        const payload = (await response.json()) as BudgetApiResponse;
+        const total = payload.data?.totalBudgetUsdMinor;
+        if (
+          !response.ok ||
+          !Number.isSafeInteger(total) ||
+          (total ?? -1) < 0
+        ) {
+          throw new Error("INVALID_BUDGET");
+        }
+        setMonthlyBudgetUsdMinor(total ?? 0);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setMonthlyBudgetUsdMinor(0);
+      }
+    }
+    void loadBudget();
+    return () => controller.abort();
+  }, [viewMonth]);
+
   const closeDrawer = useCallback(() => {
     if (isSavingRef.current) return;
     setIsCategoryPickerOpen(false);
@@ -1771,12 +1808,11 @@ export function ExpenseTracker({
     return { expenseUsdMinor, incomeUsdMinor };
   }, [selectedTransactions]);
 
-  const budgetUsdMinor = 350_000;
-  const remainingUsdMinor = Math.max(0, budgetUsdMinor - totals.expenseUsdMinor);
-  const budgetProgress = Math.min(
-    100,
-    Math.round((totals.expenseUsdMinor / budgetUsdMinor) * 100),
-  );
+  const budgetUsdMinor = monthlyBudgetUsdMinor ?? 0;
+  const remainingUsdMinor = budgetUsdMinor - totals.expenseUsdMinor;
+  const budgetProgress = budgetUsdMinor > 0
+    ? Math.round((totals.expenseUsdMinor / budgetUsdMinor) * 100)
+    : 0;
   const maxCategory = totals.categories[0]?.[1] ?? 1;
   const currencyMixBackground = useMemo(() => {
     const total = totals.currencyTotals.reduce((sum, [, value]) => sum + value, 0);
@@ -2276,10 +2312,12 @@ export function ExpenseTracker({
         <nav className="primary-nav">
           <span className="nav-item active"><span aria-hidden="true">●</span>{copy.overview}</span>
           <a className="nav-item" href="/recurring"><span aria-hidden="true">↻</span>{recurringFlowCopy.manage}</a>
-          {["transactions", "budgets", "reports", "settings"].map((item) => (
+          <button className="nav-item"><span aria-hidden="true">·</span>{copy.transactions}</button>
+          <a className="nav-item" href="/budgets"><span aria-hidden="true">◎</span>{copy.budgets}</a>
+          {(["reports", "settings"] as const).map((item) => (
             <button className="nav-item" key={item}>
               <span aria-hidden="true">·</span>
-              {copy[item as keyof typeof copy]}
+              {copy[item]}
             </button>
           ))}
         </nav>
@@ -2568,8 +2606,8 @@ export function ExpenseTracker({
           </article>
           <article className="metric-card">
             <div className="metric-label"><span>{copy.budgetLeft}</span><span className="metric-icon pale">◔</span></div>
-            <strong>{formatCurrency(inBaseCurrency(remainingUsdMinor, baseCurrency, ratesToUsd), baseCurrency, language)}</strong>
-            <p>{budgetProgress}% {copy.ofBudget}</p>
+            <strong>{budgetUsdMinor > 0 ? formatCurrency(inBaseCurrency(remainingUsdMinor, baseCurrency, ratesToUsd), baseCurrency, language) : "—"}</strong>
+            {budgetUsdMinor > 0 ? <p>{budgetProgress}% {copy.ofBudget}</p> : <p><a className="metric-link" href="/budgets">{copy.setBudget} →</a></p>}
             <div
               className="budget-track"
               role="progressbar"
@@ -2578,7 +2616,7 @@ export function ExpenseTracker({
               aria-valuenow={budgetProgress}
               aria-label={`${budgetProgress}% ${copy.ofBudget}`}
             >
-              <span style={{ width: `${budgetProgress}%` }} />
+              <span style={{ width: `${Math.min(budgetProgress, 100)}%` }} />
             </div>
           </article>
           <article className="metric-card">

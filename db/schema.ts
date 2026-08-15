@@ -3,6 +3,7 @@ import {
   check,
   index,
   integer,
+  primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
@@ -131,6 +132,55 @@ export const userStates = sqliteTable(
     check(
       "user_states_language_supported",
       sql`${table.language} IN ('en', 'ko', 'ja', 'ru')`,
+    ),
+  ],
+);
+
+export const monthlyBudgets = sqliteTable(
+  "monthly_budgets",
+  {
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => userStates.ownerId, { onDelete: "cascade" }),
+    month: text("month").notNull(),
+    category: text("category", {
+      enum: [
+        "housing",
+        "groceries",
+        "dining",
+        "transport",
+        "utilities",
+        "health",
+        "education",
+        "entertainment",
+        "travel",
+        "shopping",
+        "subscriptions",
+        "other",
+      ],
+    }).notNull(),
+    amountUsdMinor: integer("amount_usd_minor").notNull(),
+    createdAtMs: integer("created_at_ms").notNull(),
+    updatedAtMs: integer("updated_at_ms").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.ownerId, table.month, table.category] }),
+    index("idx_monthly_budgets_owner_month").on(table.ownerId, table.month),
+    check(
+      "monthly_budgets_month_shape",
+      sql`length(${table.month}) = 7 AND ${table.month} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]'`,
+    ),
+    check(
+      "monthly_budgets_category_supported",
+      sql`${table.category} IN ('housing', 'groceries', 'dining', 'transport', 'utilities', 'health', 'education', 'entertainment', 'travel', 'shopping', 'subscriptions', 'other')`,
+    ),
+    check(
+      "monthly_budgets_amount_range",
+      sql`${table.amountUsdMinor} > 0 AND ${table.amountUsdMinor} <= 9000000000000`,
+    ),
+    check(
+      "monthly_budgets_timestamps",
+      sql`${table.createdAtMs} > 0 AND ${table.updatedAtMs} >= ${table.createdAtMs}`,
     ),
   ],
 );
@@ -469,3 +519,4 @@ export type ExchangeRateCache = typeof exchangeRateCache.$inferSelect;
 export type ExchangeRateSnapshot = typeof exchangeRateSnapshots.$inferSelect;
 export type RecurringSeries = typeof recurringSeries.$inferSelect;
 export type NewRecurringSeries = typeof recurringSeries.$inferInsert;
+export type MonthlyBudget = typeof monthlyBudgets.$inferSelect;

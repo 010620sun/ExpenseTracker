@@ -51,6 +51,7 @@ type PreferencesResponse = {
 const COPY = {
   en: {
     back: "Overview",
+    budgets: "Budgets",
     title: "Recurring transactions",
     subtitle: "Keep regular expenses and income predictable across currencies.",
     add: "Add recurring",
@@ -102,6 +103,7 @@ const COPY = {
   },
   ko: {
     back: "대시보드",
+    budgets: "예산 관리",
     title: "반복 거래 관리",
     subtitle: "반복 지출과 정기 수입을 통화별로 한곳에서 관리하세요.",
     add: "반복 거래 추가",
@@ -153,6 +155,7 @@ const COPY = {
   },
   ja: {
     back: "概要",
+    budgets: "予算管理",
     title: "繰り返し取引",
     subtitle: "通貨をまたぐ定期支出と収入を見通しよく管理します。",
     add: "繰り返し取引を追加",
@@ -204,6 +207,7 @@ const COPY = {
   },
   ru: {
     back: "Обзор",
+    budgets: "Бюджеты",
     title: "Регулярные операции",
     subtitle: "Планируйте регулярные расходы и доходы в разных валютах.",
     add: "Добавить регулярную",
@@ -512,6 +516,7 @@ export function RecurringManager({
         <nav className="recurring-nav" aria-label="Primary navigation">
           <Link href="/" className="nav-item"><span aria-hidden="true">●</span>{copy.back}</Link>
           <span className="nav-item active"><span aria-hidden="true">↻</span>{copy.title}</span>
+          <Link href="/budgets" className="nav-item"><span aria-hidden="true">◎</span>{copy.budgets}</Link>
         </nav>
         <div className="sidebar-spacer" />
         <div className="account-chip">

@@ -20,12 +20,14 @@ test("provides login and registration", async () => {
 });
 
 test("protects member ledger pages", async () => {
-  const [dashboard, recurring] = await Promise.all([
+  const [dashboard, recurring, budgets] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/recurring/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/budgets/page.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(dashboard, /if \(!member\) redirect\("\/auth\?return_to=\/"\)/u);
   assert.match(recurring, /if \(!member\) redirect\("\/auth\?return_to=\/recurring"\)/u);
+  assert.match(budgets, /if \(!member\) redirect\("\/auth\?return_to=\/budgets"\)/u);
 });
 
 test("pins direct Cloudflare Workers and D1 metadata", async () => {
@@ -185,4 +187,30 @@ test("supports durable recurring transaction management", async () => {
   assert.match(schema, /pausedAtMs/u);
   assert.match(migration, /"note", NULL, NULL, "client_request_id"/u);
   assert.match(pauseMigration, /"ends_on", NULL, "original_amount_minor"/u);
+});
+
+test("supports member-owned monthly category budgets", async () => {
+  const [tracker, manager, route, schema, migration] = await Promise.all([
+    readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/budgets/budget-manager.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/budgets/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../drizzle/0008_conscious_franklin_richards.sql", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(schema, /export const monthlyBudgets/u);
+  assert.match(schema, /primaryKey\(\{ columns: \[table\.ownerId, table\.month, table\.category\] \}\)/u);
+  assert.match(migration, /CREATE TABLE `monthly_budgets`/u);
+  assert.match(route, /memberFromRequest/u);
+  assert.match(route, /eq\(monthlyBudgets\.ownerId, ownerId\)/u);
+  assert.match(route, /eq\(transactions\.ownerId, ownerId\)/u);
+  assert.match(route, /export async function GET/u);
+  assert.match(route, /export async function PUT/u);
+  assert.match(manager, /const CATEGORIES = \[/u);
+  assert.match(manager, /className="budget-category-row"/u);
+  assert.match(manager, /copyPreviousMonth/u);
+  assert.match(manager, /<LanguagePicker/u);
+  assert.match(tracker, /href="\/budgets"/u);
+  assert.match(tracker, /monthlyBudgetUsdMinor/u);
+  assert.doesNotMatch(tracker, /const budgetUsdMinor = 350_000/u);
 });
