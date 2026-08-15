@@ -513,6 +513,17 @@ async function ensureUserState(db: AppDatabase, ownerId: string) {
     .onConflictDoNothing();
 }
 
+async function rememberLastTransactionCurrency(
+  db: AppDatabase,
+  ownerId: string,
+  currency: string,
+) {
+  await db
+    .update(userStates)
+    .set({ lastTransactionCurrency: currency })
+    .where(eq(userStates.ownerId, ownerId));
+}
+
 function recurringSeriesFromTransaction(
   transaction: NewTransaction,
   recurrence: RecurrenceConfig,
@@ -1014,6 +1025,11 @@ export async function POST(request: Request) {
             existingSeries[0]?.frequency === recurrence.frequency &&
             existingSeries[0]?.endsOn === recurrence.endsOn
           ) {
+            await rememberLastTransactionCurrency(
+              db,
+              ownerId,
+              existing[0].originalCurrency,
+            );
             return Response.json(
               { data: serializeTransaction(existing[0]), idempotent: true },
               { status: 200, headers: NO_STORE_HEADERS },
@@ -1030,6 +1046,11 @@ export async function POST(request: Request) {
         db.insert(recurringSeries).values(series),
         db.insert(transactions).values(newTransaction).returning(),
       ]);
+      await rememberLastTransactionCurrency(
+        db,
+        ownerId,
+        insertedRows[0].originalCurrency,
+      );
       return Response.json(
         { data: serializeTransaction(insertedRows[0]) },
         { status: 201, headers: NO_STORE_HEADERS },
@@ -1043,6 +1064,11 @@ export async function POST(request: Request) {
         .onConflictDoNothing()
         .returning();
       if (inserted[0]) {
+        await rememberLastTransactionCurrency(
+          db,
+          ownerId,
+          inserted[0].originalCurrency,
+        );
         return Response.json(
           { data: serializeTransaction(inserted[0]) },
           { status: 201, headers: NO_STORE_HEADERS },
@@ -1067,6 +1093,11 @@ export async function POST(request: Request) {
         existing[0].recurringSeriesId === null &&
         sameMutation(existing[0], newTransaction)
       ) {
+        await rememberLastTransactionCurrency(
+          db,
+          ownerId,
+          existing[0].originalCurrency,
+        );
         return Response.json(
           { data: serializeTransaction(existing[0]), idempotent: true },
           { status: 200, headers: NO_STORE_HEADERS },
@@ -1079,6 +1110,11 @@ export async function POST(request: Request) {
       .insert(transactions)
       .values(newTransaction)
       .returning();
+    await rememberLastTransactionCurrency(
+      db,
+      ownerId,
+      inserted[0].originalCurrency,
+    );
     return Response.json(
       { data: serializeTransaction(inserted[0]) },
       { status: 201, headers: NO_STORE_HEADERS },

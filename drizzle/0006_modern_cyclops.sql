@@ -1,0 +1,2 @@
+ALTER TABLE `user_states` ADD `base_currency` text DEFAULT 'USD' NOT NULL CONSTRAINT "user_states_base_currency_shape" CHECK(length(`base_currency`) = 3 AND `base_currency` = upper(`base_currency`));--> statement-breakpoint
+ALTER TABLE `user_states` ADD `last_transaction_currency` text DEFAULT 'KRW' NOT NULL CONSTRAINT "user_states_transaction_currency_shape" CHECK(length(`last_transaction_currency`) = 3 AND `last_transaction_currency` = upper(`last_transaction_currency`));

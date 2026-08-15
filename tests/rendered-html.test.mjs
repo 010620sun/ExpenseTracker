@@ -107,6 +107,39 @@ test("uses Workers Web Crypto sessions and member-owned ledger APIs", async () =
   assert.doesNotMatch(recurringRoute, /LOCAL_DEMO_OWNER_ID|getChatGPTUser/u);
 });
 
+test("keeps base and latest transaction currencies as independent member settings", async () => {
+  const [tracker, preferencesRoute, transactionsRoute, schema, migration] =
+    await Promise.all([
+      readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/api/preferences/route.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/api/transactions/route.ts", import.meta.url), "utf8"),
+      readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+      readFile(new URL("../drizzle/0006_modern_cyclops.sql", import.meta.url), "utf8"),
+    ]);
+
+  assert.match(schema, /baseCurrency: text\("base_currency"\)/u);
+  assert.match(
+    schema,
+    /lastTransactionCurrency: text\("last_transaction_currency"\)/u,
+  );
+  assert.match(preferencesRoute, /memberFromRequest/u);
+  assert.match(preferencesRoute, /export async function PATCH/u);
+  assert.match(tracker, /fetch\("\/api\/preferences"/u);
+  assert.match(tracker, /setCurrency\(lastTransactionCurrency\)/u);
+  assert.match(tracker, /onChange=\{chooseBaseCurrency\}/u);
+  assert.doesNotMatch(tracker, /globeledger-base-currency/u);
+  assert.match(transactionsRoute, /rememberLastTransactionCurrency/u);
+  assert.match(
+    transactionsRoute,
+    /\.set\(\{ lastTransactionCurrency: currency \}\)/u,
+  );
+  assert.match(migration, /ALTER TABLE `user_states` ADD `base_currency`/u);
+  assert.match(
+    migration,
+    /ALTER TABLE `user_states` ADD `last_transaction_currency`/u,
+  );
+});
+
 test("supports durable recurring transaction management", async () => {
   const [transactionsRoute, recurringRoute, manager, schema, migration, pauseMigration] =
     await Promise.all([

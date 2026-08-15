@@ -74,6 +74,13 @@ type RatesApiResponse = RatesPayload & {
   data?: RatesPayload;
 };
 
+type PreferencesApiResponse = {
+  data?: {
+    baseCurrency?: string;
+    lastTransactionCurrency?: string;
+  };
+};
+
 type RateStatus = "updating" | "updated" | "stale" | "error";
 
 type RateMeta = {
@@ -1036,6 +1043,8 @@ export function ExpenseTracker({
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<CurrencyCode>("KRW");
+  const [lastTransactionCurrency, setLastTransactionCurrency] =
+    useState<CurrencyCode>("KRW");
   const [category, setCategory] = useState("dining");
   const [isCategoryPickerOpen, setIsCategoryPickerOpen] = useState(false);
   const [note, setNote] = useState("");
@@ -1090,14 +1099,8 @@ export function ExpenseTracker({
       const localToday = localIsoDate();
       setCurrentDate(localToday);
       const storedLanguage = window.localStorage.getItem("globeledger-language");
-      const storedCurrency = window.localStorage.getItem(
-        "globeledger-base-currency",
-      );
       if (storedLanguage === "en" || storedLanguage === "ko") {
         setLanguage(storedLanguage);
-      }
-      if (storedCurrency && storedCurrency in FALLBACK_CURRENCIES) {
-        setBaseCurrency(storedCurrency);
       }
       if (localToday !== today) {
         setTransactions([]);
@@ -1117,8 +1120,34 @@ export function ExpenseTracker({
   }, [language]);
 
   useEffect(() => {
-    window.localStorage.setItem("globeledger-base-currency", baseCurrency);
-  }, [baseCurrency]);
+    const controller = new AbortController();
+    async function loadPreferences() {
+      try {
+        const response = await fetch("/api/preferences", {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("PREFERENCES_LOAD_FAILED");
+        const payload = (await response.json()) as PreferencesApiResponse;
+        const storedBaseCurrency = payload.data?.baseCurrency;
+        const storedTransactionCurrency =
+          payload.data?.lastTransactionCurrency;
+        if (storedBaseCurrency && /^[A-Z]{3}$/u.test(storedBaseCurrency)) {
+          setBaseCurrency(storedBaseCurrency);
+        }
+        if (
+          storedTransactionCurrency &&
+          /^[A-Z]{3}$/u.test(storedTransactionCurrency)
+        ) {
+          setLastTransactionCurrency(storedTransactionCurrency);
+        }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+    void loadPreferences();
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1192,15 +1221,8 @@ export function ExpenseTracker({
 
         setRatesToUsd(nextRates);
         setCurrencyCatalog(nextCatalog);
-        const storedCurrency = window.localStorage.getItem(
-          "globeledger-base-currency",
-        );
         setBaseCurrency((current) =>
-          storedCurrency && nextRates[storedCurrency]
-            ? storedCurrency
-            : nextRates[current]
-              ? current
-              : "USD",
+          nextRates[current] ? current : "USD",
         );
         setRateMeta({
           status: payload.stale ? "stale" : "updated",
@@ -1505,6 +1527,27 @@ export function ExpenseTracker({
         : addButtonRef.current;
   }
 
+  async function saveCurrencyPreference(
+    preference: { baseCurrency: CurrencyCode },
+  ) {
+    try {
+      const response = await fetch("/api/preferences", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(preference),
+      });
+      if (!response.ok) throw new Error("PREFERENCE_SAVE_FAILED");
+    } catch {
+      // The selected value remains active for this session and will be retried
+      // the next time the member changes or uses a currency.
+    }
+  }
+
+  function chooseBaseCurrency(nextCurrency: CurrencyCode) {
+    setBaseCurrency(nextCurrency);
+    void saveCurrencyPreference({ baseCurrency: nextCurrency });
+  }
+
   function openAddDrawer(date = selectedDate) {
     rememberDrawerTrigger();
     drawerReturnDateRef.current = date;
@@ -1513,7 +1556,7 @@ export function ExpenseTracker({
     setKind("expense");
     setDescription("");
     setAmount("");
-    setCurrency("KRW");
+    setCurrency(lastTransactionCurrency);
     setCategory("dining");
     setNote("");
     setOccurredOn(date);
@@ -1759,6 +1802,10 @@ export function ExpenseTracker({
           setViewMonth(savedMonth);
         }
       }
+      if (!editingTransaction) {
+        const usedCurrency = savedTransaction?.originalCurrency ?? currency;
+        setLastTransactionCurrency(usedCurrency);
+      }
       setDescription("");
       setAmount("");
       setNote("");
@@ -1981,7 +2028,7 @@ export function ExpenseTracker({
               className="base-select"
               value={baseCurrency}
               catalog={currencyCatalog}
-              onChange={setBaseCurrency}
+              onChange={chooseBaseCurrency}
               language={language}
               label={copy.baseCurrency}
               pickerCopy={currencyPickerCopy}
