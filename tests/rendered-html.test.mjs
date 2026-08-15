@@ -112,10 +112,11 @@ test("uses Workers Web Crypto sessions and member-owned ledger APIs", async () =
 });
 
 test("keeps currency and language choices as independent member settings", async () => {
-  const [tracker, recurring, languagePicker, preferencesRoute, transactionsRoute, schema, currencyMigration, languageMigration, languageHelpers] =
+  const [tracker, recurring, navigation, languagePicker, preferencesRoute, transactionsRoute, schema, currencyMigration, languageMigration, languageHelpers] =
     await Promise.all([
       readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/recurring/recurring-manager.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../components/ledger-navigation.tsx", import.meta.url), "utf8"),
       readFile(new URL("../components/language-picker.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/api/preferences/route.ts", import.meta.url), "utf8"),
       readFile(new URL("../app/api/transactions/route.ts", import.meta.url), "utf8"),
@@ -137,7 +138,7 @@ test("keeps currency and language choices as independent member settings", async
   assert.match(tracker, /setCurrency\(lastTransactionCurrency\)/u);
   assert.match(tracker, /onChange=\{chooseBaseCurrency\}/u);
   assert.match(tracker, /<LanguagePicker/u);
-  assert.match(tracker, /<a className="nav-item" href="\/recurring">/u);
+  assert.match(navigation, /href: "\/recurring"/u);
   assert.match(recurring, /<LanguagePicker/u);
   assert.match(languagePicker, /code: "ja"[^\n]+name: "日本語"/u);
   assert.match(languagePicker, /code: "ru"[^\n]+name: "Русский"/u);
@@ -162,11 +163,12 @@ test("keeps currency and language choices as independent member settings", async
 });
 
 test("supports durable recurring transaction management", async () => {
-  const [transactionsRoute, recurringRoute, manager, schema, migration, pauseMigration] =
+  const [transactionsRoute, recurringRoute, manager, navigation, schema, migration, pauseMigration] =
     await Promise.all([
       readFile(new URL("../app/api/transactions/route.ts", import.meta.url), "utf8"),
       readFile(new URL("../app/api/recurring/route.ts", import.meta.url), "utf8"),
       readFile(new URL("../app/recurring/recurring-manager.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../components/ledger-navigation.tsx", import.meta.url), "utf8"),
       readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
       readFile(new URL("../drizzle/0003_chilly_unus.sql", import.meta.url), "utf8"),
       readFile(new URL("../drizzle/0004_omniscient_korg.sql", import.meta.url), "utf8"),
@@ -182,7 +184,7 @@ test("supports durable recurring transaction management", async () => {
   assert.match(manager, /className="recurring-category-options" role="listbox"/u);
   assert.match(manager, /aria-expanded=\{isCategoryPickerOpen\}/u);
   assert.doesNotMatch(manager, /<span>\{copy\.category\}<\/span><select/u);
-  assert.match(manager, /<Link href="\/" className="nav-item">/u);
+  assert.match(navigation, /href: "\/recurring"/u);
   assert.match(schema, /uq_transactions_recurring_occurrence/u);
   assert.match(schema, /pausedAtMs/u);
   assert.match(migration, /"note", NULL, NULL, "client_request_id"/u);
@@ -190,9 +192,10 @@ test("supports durable recurring transaction management", async () => {
 });
 
 test("supports member-owned monthly category budgets", async () => {
-  const [tracker, manager, route, schema, migration] = await Promise.all([
+  const [tracker, manager, navigation, route, schema, migration] = await Promise.all([
     readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/budgets/budget-manager.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/ledger-navigation.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/budgets/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(new URL("../drizzle/0008_conscious_franklin_richards.sql", import.meta.url), "utf8"),
@@ -210,7 +213,28 @@ test("supports member-owned monthly category budgets", async () => {
   assert.match(manager, /className="budget-category-row"/u);
   assert.match(manager, /copyPreviousMonth/u);
   assert.match(manager, /<LanguagePicker/u);
-  assert.match(tracker, /href="\/budgets"/u);
+  assert.match(navigation, /href: "\/budgets"/u);
   assert.match(tracker, /monthlyBudgetUsdMinor/u);
   assert.doesNotMatch(tracker, /const budgetUsdMinor = 350_000/u);
+});
+
+test("uses one persistent client-side ledger navigation", async () => {
+  const [layout, navigation, tracker, recurring, budgets, styles] = await Promise.all([
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/ledger-navigation.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/recurring/recurring-manager.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/budgets/budget-manager.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(layout, /<LedgerNavigation>\{children\}<\/LedgerNavigation>/u);
+  assert.match(navigation, /usePathname\(\)/u);
+  assert.match(navigation, /import Link from "next\/link"/u);
+  assert.match(navigation, /className="ledger-mobile-nav"/u);
+  assert.match(tracker, /id="transactions"/u);
+  assert.doesNotMatch(tracker, /<aside className="sidebar"/u);
+  assert.doesNotMatch(recurring, /<aside className="recurring-sidebar"/u);
+  assert.doesNotMatch(budgets, /<aside className="budget-sidebar"/u);
+  assert.match(styles, /\.ledger-mobile-nav/u);
 });

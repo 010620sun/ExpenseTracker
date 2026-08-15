@@ -11,7 +11,6 @@ export default async function BudgetsPage() {
 
   return (
     <BudgetManager
-      firstName={member.displayName.trim().split(/\s+/)[0] ?? member.email}
       today={new Date().toISOString().slice(0, 10)}
     />
   );

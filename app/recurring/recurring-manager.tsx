@@ -310,13 +310,7 @@ function dateLabel(value: string, language: Language) {
   }).format(new Date(`${value}T00:00:00Z`));
 }
 
-export function RecurringManager({
-  firstName,
-  today,
-}: {
-  firstName: string | null;
-  today: string;
-}) {
+export function RecurringManager({ today }: { today: string }) {
   const [language, setLanguage] = useState<Language>("en");
   const [items, setItems] = useState<RecurringItem[]>([]);
   const [summary, setSummary] = useState<RecurringResponse["summary"]>();
@@ -492,11 +486,6 @@ export function RecurringManager({
         ? copy.pausedStatus
         : copy.endedStatus;
 
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    window.location.assign("/auth");
-  }
-
   function chooseLanguage(nextLanguage: Language) {
     setLanguage(nextLanguage);
     void fetch("/api/preferences", {
@@ -508,24 +497,6 @@ export function RecurringManager({
 
   return (
     <div className="recurring-page-shell">
-      <aside className="recurring-sidebar">
-        <Link href="/" className="brand-lockup recurring-brand">
-          <span className="brand-mark" aria-hidden="true"><span /></span>
-          <span className="brand-name">GlobeLedger</span>
-        </Link>
-        <nav className="recurring-nav" aria-label="Primary navigation">
-          <Link href="/" className="nav-item"><span aria-hidden="true">●</span>{copy.back}</Link>
-          <span className="nav-item active"><span aria-hidden="true">↻</span>{copy.title}</span>
-          <Link href="/budgets" className="nav-item"><span aria-hidden="true">◎</span>{copy.budgets}</Link>
-        </nav>
-        <div className="sidebar-spacer" />
-        <div className="account-chip">
-          <span className="avatar">{firstName?.[0]?.toUpperCase() ?? "G"}</span>
-          <span><strong>{firstName ?? "Global citizen"}</strong><small>{copy.privateLedger}</small></span>
-          <button type="button" className="account-logout" onClick={() => void logout()}>{copy.logout}</button>
-        </div>
-      </aside>
-
       <main className="recurring-main">
         <header className="recurring-topbar">
           <div>

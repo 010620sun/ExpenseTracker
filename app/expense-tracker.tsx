@@ -2251,11 +2251,6 @@ export function ExpenseTracker({
     }
   }
 
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    window.location.assign("/auth");
-  }
-
   const locale = LANGUAGE_LOCALES[language];
   const monthLabel = new Intl.DateTimeFormat(locale, {
     month: "long",
@@ -2303,42 +2298,6 @@ export function ExpenseTracker({
 
   return (
     <div className="app-shell">
-      <aside className="sidebar" aria-label="Primary navigation">
-        <div className="brand-lockup">
-          <span className="brand-mark" aria-hidden="true"><span /></span>
-          <span className="brand-name">GlobeLedger</span>
-        </div>
-
-        <nav className="primary-nav">
-          <span className="nav-item active"><span aria-hidden="true">●</span>{copy.overview}</span>
-          <a className="nav-item" href="/recurring"><span aria-hidden="true">↻</span>{recurringFlowCopy.manage}</a>
-          <button className="nav-item"><span aria-hidden="true">·</span>{copy.transactions}</button>
-          <a className="nav-item" href="/budgets"><span aria-hidden="true">◎</span>{copy.budgets}</a>
-          {(["reports", "settings"] as const).map((item) => (
-            <button className="nav-item" key={item}>
-              <span aria-hidden="true">·</span>
-              {copy[item]}
-            </button>
-          ))}
-        </nav>
-
-        <div className="sidebar-spacer" />
-        <div className="borderless-note">
-          <span className="note-orbit" aria-hidden="true">◎</span>
-          <strong>{copy.helpTitle}</strong>
-          <p>{copy.helpBody}</p>
-          <button>{copy.learnMore} <span aria-hidden="true">→</span></button>
-        </div>
-        <div className="account-chip">
-          <span className="avatar">{firstName?.[0]?.toUpperCase() ?? "G"}</span>
-          <span>
-            <strong>{firstName ?? "Global citizen"}</strong>
-            <small>{copy.privateLedger}</small>
-          </span>
-          <button type="button" className="account-logout" onClick={() => void logout()}>{copy.logout}</button>
-        </div>
-      </aside>
-
       <main className="main-content">
         <header className="topbar">
           <div className="mobile-brand">
@@ -2690,7 +2649,7 @@ export function ExpenseTracker({
           </article>
         </section>
 
-        <section className="panel transactions-panel">
+        <section className="panel transactions-panel" id="transactions">
           <div className="panel-heading transactions-heading">
             <div><h2>{copy.recent}</h2><p>{template(copy.recentHint, { currency: baseCurrency })}</p></div>
             <button className="text-button">{copy.allActivity} <span aria-hidden="true">→</span></button>

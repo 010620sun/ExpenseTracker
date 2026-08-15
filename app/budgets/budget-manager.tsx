@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { LanguagePicker } from "@/components/language-picker";
@@ -165,7 +164,7 @@ function inputAmount(usdMinor: number, baseCurrency: string, rate: number) {
   return (usdMinor / 100 / rate).toFixed(exponent);
 }
 
-export function BudgetManager({ firstName, today }: { firstName: string | null; today: string }) {
+export function BudgetManager({ today }: { today: string }) {
   const [language, setLanguage] = useState<Language>("en");
   const [baseCurrency, setBaseCurrency] = useState("USD");
   const [ratesToUsd, setRatesToUsd] = useState<Record<string, number>>({ USD: 1 });
@@ -361,31 +360,8 @@ export function BudgetManager({ firstName, today }: { firstName: string | null; 
     }).catch(() => undefined);
   }
 
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    window.location.assign("/auth");
-  }
-
   return (
     <div className="budget-page-shell">
-      <aside className="budget-sidebar">
-        <Link href="/" className="brand-lockup recurring-brand">
-          <span className="brand-mark" aria-hidden="true"><span /></span>
-          <span className="brand-name">GlobeLedger</span>
-        </Link>
-        <nav className="recurring-nav" aria-label="Primary navigation">
-          <Link href="/" className="nav-item"><span aria-hidden="true">●</span>{copy.overview}</Link>
-          <Link href="/recurring" className="nav-item"><span aria-hidden="true">↻</span>{copy.recurring}</Link>
-          <span className="nav-item active"><span aria-hidden="true">◎</span>{copy.budgets}</span>
-        </nav>
-        <div className="sidebar-spacer" />
-        <div className="account-chip">
-          <span className="avatar">{firstName?.[0]?.toUpperCase() ?? "G"}</span>
-          <span><strong>{firstName ?? "Global citizen"}</strong><small>{copy.privateLedger}</small></span>
-          <button type="button" className="account-logout" onClick={() => void logout()}>{copy.logout}</button>
-        </div>
-      </aside>
-
       <main className="budget-main">
         <header className="budget-topbar">
           <div><span className="eyebrow">GlobeLedger</span><h1>{copy.title}</h1><p>{copy.subtitle}</p></div>
