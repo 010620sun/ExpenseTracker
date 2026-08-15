@@ -2,6 +2,7 @@
 
 import { type FormEvent, useEffect, useState } from "react";
 
+import { LanguagePicker } from "@/components/language-picker";
 import { isLanguage, type Language } from "@/lib/language";
 
 type Mode = "login" | "register";
@@ -200,7 +201,7 @@ export function AuthScreen({ returnTo }: { returnTo: string }) {
       </section>
       <section className="auth-form-panel">
         <div className="auth-card">
-          <div className="auth-card-top"><div className="auth-tabs" role="tablist"><button role="tab" aria-selected={mode === "login"} className={mode === "login" ? "selected" : ""} onClick={() => switchMode("login")}>{copy.login}</button><button role="tab" aria-selected={mode === "register"} className={mode === "register" ? "selected" : ""} onClick={() => switchMode("register")}>{copy.register}</button></div><select className="auth-language" value={language} onChange={(event) => chooseLanguage(event.target.value as Language)} aria-label={copy.language}><option value="en">English</option><option value="ko">한국어</option><option value="ja">日本語</option><option value="ru">Русский</option></select></div>
+          <div className="auth-card-top"><div className="auth-tabs" role="tablist"><button role="tab" aria-selected={mode === "login"} className={mode === "login" ? "selected" : ""} onClick={() => switchMode("login")}>{copy.login}</button><button role="tab" aria-selected={mode === "register"} className={mode === "register" ? "selected" : ""} onClick={() => switchMode("register")}>{copy.register}</button></div><LanguagePicker className="auth-language-picker" value={language} label={copy.language} onChange={chooseLanguage} /></div>
           <h2>{mode === "login" ? copy.login : copy.register}</h2>
           <p>{mode === "login" ? copy.already : copy.newHere}</p>
           <form onSubmit={submit}>

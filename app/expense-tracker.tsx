@@ -14,6 +14,7 @@ import {
 } from "react";
 
 import { currencyExponent } from "@/lib/currency";
+import { LanguagePicker } from "@/components/language-picker";
 import {
   isLanguage,
   LANGUAGE_LOCALES,
@@ -2316,18 +2317,11 @@ export function ExpenseTracker({
               <span className={isSyncing ? "sync-dot pulsing" : "sync-dot"} />
               <span>{isSyncing ? copy.syncing : copy.synced}</span>
             </div>
-            <div className="language-switch" aria-label={copy.language}>
-              <select
-                value={language}
-                onChange={(event) => chooseLanguage(event.target.value as Language)}
-                aria-label={copy.language}
-              >
-                <option value="en">English</option>
-                <option value="ko">한국어</option>
-                <option value="ja">日本語</option>
-                <option value="ru">Русский</option>
-              </select>
-            </div>
+            <LanguagePicker
+              value={language}
+              label={copy.language}
+              onChange={chooseLanguage}
+            />
             <CurrencyPicker
               className="base-select"
               value={baseCurrency}

@@ -110,10 +110,11 @@ test("uses Workers Web Crypto sessions and member-owned ledger APIs", async () =
 });
 
 test("keeps currency and language choices as independent member settings", async () => {
-  const [tracker, recurring, preferencesRoute, transactionsRoute, schema, currencyMigration, languageMigration, languageHelpers] =
+  const [tracker, recurring, languagePicker, preferencesRoute, transactionsRoute, schema, currencyMigration, languageMigration, languageHelpers] =
     await Promise.all([
       readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/recurring/recurring-manager.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../components/language-picker.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/api/preferences/route.ts", import.meta.url), "utf8"),
       readFile(new URL("../app/api/transactions/route.ts", import.meta.url), "utf8"),
       readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
@@ -133,10 +134,12 @@ test("keeps currency and language choices as independent member settings", async
   assert.match(tracker, /fetch\("\/api\/preferences"/u);
   assert.match(tracker, /setCurrency\(lastTransactionCurrency\)/u);
   assert.match(tracker, /onChange=\{chooseBaseCurrency\}/u);
-  assert.match(tracker, /<option value="ja">日本語<\/option>/u);
-  assert.match(tracker, /<option value="ru">Русский<\/option>/u);
-  assert.match(recurring, /<option value="ja">日本語<\/option>/u);
-  assert.match(recurring, /<option value="ru">Русский<\/option>/u);
+  assert.match(tracker, /<LanguagePicker/u);
+  assert.match(recurring, /<LanguagePicker/u);
+  assert.match(languagePicker, /code: "ja"[^\n]+name: "日本語"/u);
+  assert.match(languagePicker, /code: "ru"[^\n]+name: "Русский"/u);
+  assert.match(languagePicker, /aria-haspopup="listbox"/u);
+  assert.match(languagePicker, /aria-selected=\{option\.code === value\}/u);
   assert.doesNotMatch(tracker, /globeledger-base-currency/u);
   assert.match(transactionsRoute, /rememberLastTransactionCurrency/u);
   assert.match(

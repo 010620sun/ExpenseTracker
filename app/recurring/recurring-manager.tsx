@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
+import { LanguagePicker } from "@/components/language-picker";
 import {
   isLanguage,
   LANGUAGE_LOCALES,
@@ -503,14 +504,7 @@ export function RecurringManager({
             <p>{copy.subtitle}</p>
           </div>
           <div className="recurring-top-actions">
-            <div className="language-switch" aria-label={copy.language}>
-              <select value={language} onChange={(event) => chooseLanguage(event.target.value as Language)} aria-label={copy.language}>
-                <option value="en">English</option>
-                <option value="ko">한국어</option>
-                <option value="ja">日本語</option>
-                <option value="ru">Русский</option>
-              </select>
-            </div>
+            <LanguagePicker value={language} label={copy.language} onChange={chooseLanguage} />
             <Link className="primary-button recurring-create" href="/?new=recurring">↻ {copy.add}</Link>
           </div>
         </header>
