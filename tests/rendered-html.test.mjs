@@ -218,7 +218,7 @@ test("supports member-owned monthly category budgets", async () => {
   assert.doesNotMatch(tracker, /const budgetUsdMinor = 350_000/u);
 });
 
-test("uses one persistent client-side ledger navigation", async () => {
+test("uses one shared reliable ledger navigation", async () => {
   const [layout, navigation, tracker, recurring, budgets, styles] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/ledger-navigation.tsx", import.meta.url), "utf8"),
@@ -230,7 +230,9 @@ test("uses one persistent client-side ledger navigation", async () => {
 
   assert.match(layout, /<LedgerNavigation>\{children\}<\/LedgerNavigation>/u);
   assert.match(navigation, /usePathname\(\)/u);
-  assert.match(navigation, /import Link from "next\/link"/u);
+  assert.doesNotMatch(navigation, /import Link from "next\/link"/u);
+  assert.match(navigation, /<a href=\{item\.href\}/u);
+  assert.match(navigation, /setNotice\(`\$\{copy\.reports\}/u);
   assert.match(navigation, /className="ledger-mobile-nav"/u);
   assert.match(tracker, /id="transactions"/u);
   assert.doesNotMatch(tracker, /<aside className="sidebar"/u);

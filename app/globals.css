@@ -175,9 +175,8 @@ a.nav-item {
   text-decoration: none;
 }
 
-.nav-item.pending:disabled {
-  color: rgba(255, 255, 255, 0.34);
-  cursor: not-allowed;
+.nav-item.pending {
+  color: rgba(255, 255, 255, 0.48);
 }
 
 .nav-item.pending small {

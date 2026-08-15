@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+/* eslint-disable @next/next/no-html-link-for-pages -- Native navigation is the reliable fallback for the current vinext Workers runtime. */
+
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
 
@@ -16,6 +17,7 @@ const COPY = {
     reports: "Reports",
     settings: "Settings",
     comingSoon: "Coming soon",
+    unavailable: "This section is being prepared.",
     privateLedger: "Your private global ledger",
     logout: "Log out",
     helpTitle: "Built for borderless lives",
@@ -30,6 +32,7 @@ const COPY = {
     reports: "리포트",
     settings: "설정",
     comingSoon: "준비 중",
+    unavailable: "아직 준비 중인 메뉴입니다.",
     privateLedger: "나만의 글로벌 가계부",
     logout: "로그아웃",
     helpTitle: "국경 없는 일상을 위해",
@@ -44,6 +47,7 @@ const COPY = {
     reports: "レポート",
     settings: "設定",
     comingSoon: "準備中",
+    unavailable: "このメニューは現在準備中です。",
     privateLedger: "自分だけのグローバル家計簿",
     logout: "ログアウト",
     helpTitle: "国境を越える暮らしのために",
@@ -58,6 +62,7 @@ const COPY = {
     reports: "Отчёты",
     settings: "Настройки",
     comingSoon: "Скоро",
+    unavailable: "Этот раздел ещё готовится.",
     privateLedger: "Ваш личный глобальный бюджет",
     logout: "Выйти",
     helpTitle: "Для жизни без границ",
@@ -75,6 +80,7 @@ export function LedgerNavigation({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>("en");
   const [firstName, setFirstName] = useState<string | null>(null);
   const [hash, setHash] = useState("");
+  const [notice, setNotice] = useState("");
   const copy = COPY[language];
 
   useEffect(() => {
@@ -122,6 +128,12 @@ export function LedgerNavigation({ children }: { children: ReactNode }) {
     };
   }, [isLedgerRoute]);
 
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 3200);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
   if (!isLedgerRoute) return children;
 
   const overviewActive = pathname === "/" && hash !== "#transactions";
@@ -142,23 +154,23 @@ export function LedgerNavigation({ children }: { children: ReactNode }) {
   return (
     <div className="ledger-layout">
       <aside className="sidebar ledger-sidebar" aria-label={copy.navigation}>
-        <Link href="/" className="brand-lockup ledger-brand">
+        <a href="/" className="brand-lockup ledger-brand">
           <span className="brand-mark" aria-hidden="true"><span /></span>
           <span className="brand-name">GlobeLedger</span>
-        </Link>
+        </a>
         <nav className="primary-nav">
           {primaryLinks.map((item) => (
-            <Link
+            <a
               href={item.href}
               className={item.active ? "nav-item active" : "nav-item"}
               aria-current={item.active ? "page" : undefined}
               key={item.href}
             >
               <span aria-hidden="true">{item.glyph}</span>{item.label}
-            </Link>
+            </a>
           ))}
-          <button className="nav-item pending" type="button" disabled title={copy.comingSoon}><span aria-hidden="true">◫</span>{copy.reports}<small>{copy.comingSoon}</small></button>
-          <button className="nav-item pending" type="button" disabled title={copy.comingSoon}><span aria-hidden="true">⚙</span>{copy.settings}<small>{copy.comingSoon}</small></button>
+          <button className="nav-item pending" type="button" title={copy.comingSoon} onClick={() => setNotice(`${copy.reports} · ${copy.unavailable}`)}><span aria-hidden="true">◫</span>{copy.reports}<small>{copy.comingSoon}</small></button>
+          <button className="nav-item pending" type="button" title={copy.comingSoon} onClick={() => setNotice(`${copy.settings} · ${copy.unavailable}`)}><span aria-hidden="true">⚙</span>{copy.settings}<small>{copy.comingSoon}</small></button>
         </nav>
         <div className="sidebar-spacer" />
         <div className="borderless-note">
@@ -177,11 +189,12 @@ export function LedgerNavigation({ children }: { children: ReactNode }) {
 
       <nav className="ledger-mobile-nav" aria-label={copy.navigation}>
         {primaryLinks.filter((item) => item.href !== "/#transactions").map((item) => (
-          <Link href={item.href} className={item.active ? "active" : ""} aria-current={item.active ? "page" : undefined} key={item.href}>
+          <a href={item.href} className={item.active ? "active" : ""} aria-current={item.active ? "page" : undefined} key={item.href}>
             <span aria-hidden="true">{item.glyph}</span><small>{item.label}</small>
-          </Link>
+          </a>
         ))}
       </nav>
+      <div className={notice ? "toast visible" : "toast"} aria-live="polite">{notice}</div>
     </div>
   );
 }
