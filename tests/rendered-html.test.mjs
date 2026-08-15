@@ -175,6 +175,10 @@ test("supports durable recurring transaction management", async () => {
   assert.match(recurringRoute, /action === "update"/u);
   assert.match(recurringRoute, /export async function DELETE/u);
   assert.match(manager, /className="recurring-summary-grid"/u);
+  assert.match(manager, /className="recurring-category-trigger"/u);
+  assert.match(manager, /className="recurring-category-options" role="listbox"/u);
+  assert.match(manager, /aria-expanded=\{isCategoryPickerOpen\}/u);
+  assert.doesNotMatch(manager, /<span>\{copy\.category\}<\/span><select/u);
   assert.match(schema, /uq_transactions_recurring_occurrence/u);
   assert.match(schema, /pausedAtMs/u);
   assert.match(migration, /"note", NULL, NULL, "client_request_id"/u);

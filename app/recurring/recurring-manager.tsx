@@ -271,6 +271,25 @@ const CATEGORY_LABELS: Record<string, Record<Language, string>> = {
   income: { en: "Income", ko: "수입", ja: "収入", ru: "Доход" },
 };
 
+function categoryGlyph(category: string) {
+  const glyphs: Record<string, string> = {
+    housing: "🏠",
+    groceries: "🛒",
+    dining: "🍽️",
+    transport: "🚆",
+    utilities: "💡",
+    health: "🩺",
+    education: "🎓",
+    entertainment: "🎬",
+    travel: "✈️",
+    shopping: "🛍️",
+    subscriptions: "↻",
+    other: "•••",
+    income: "+",
+  };
+  return glyphs[category] ?? "•••";
+}
+
 function money(minor: number, currency: string, language: Language) {
   return new Intl.NumberFormat(LANGUAGE_LOCALES[language], {
     style: "currency",
@@ -307,6 +326,7 @@ export function RecurringManager({
   const [amount, setAmount] = useState("");
   const [frequency, setFrequency] = useState<Frequency>("monthly");
   const [category, setCategory] = useState("other");
+  const [isCategoryPickerOpen, setIsCategoryPickerOpen] = useState(false);
   const [endsOn, setEndsOn] = useState("");
   const [note, setNote] = useState("");
   const copy = COPY[language];
@@ -383,6 +403,7 @@ export function RecurringManager({
     setAmount(item.amount);
     setFrequency(item.frequency);
     setCategory(item.category);
+    setIsCategoryPickerOpen(false);
     setEndsOn(item.endsOn ?? "");
     setNote(item.note);
     setError("");
@@ -455,6 +476,10 @@ export function RecurringManager({
       setSaving(false);
     }
   }
+
+  const categoryOptions = Object.entries(CATEGORY_LABELS).filter(([key]) =>
+    editing?.kind === "income" ? key === "income" : key !== "income",
+  );
 
   const statusText = (status: SeriesStatus) =>
     status === "active"
@@ -568,11 +593,11 @@ export function RecurringManager({
 
       {editing && (
         <div className="recurring-dialog-layer">
-          <button className="drawer-scrim" aria-label={copy.cancel} onClick={() => setEditing(null)} disabled={saving} />
+          <button className="drawer-scrim" aria-label={copy.cancel} onClick={() => { setEditing(null); setIsCategoryPickerOpen(false); }} disabled={saving} />
           <section className="recurring-dialog" role="dialog" aria-modal="true" aria-labelledby="recurring-dialog-title">
             <div className="drawer-header">
               <div><span className="eyebrow">GlobeLedger</span><h2 id="recurring-dialog-title">{copy.editTitle}</h2><p>{editing.originalCurrency} · {copy[editing.frequency]}</p></div>
-              <button className="drawer-close" aria-label={copy.cancel} onClick={() => setEditing(null)} disabled={saving}>×</button>
+              <button className="drawer-close" aria-label={copy.cancel} onClick={() => { setEditing(null); setIsCategoryPickerOpen(false); }} disabled={saving}>×</button>
             </div>
             <form onSubmit={saveEdit}>
               <label className="field"><span>{copy.description}</span><input value={description} onChange={(event) => setDescription(event.target.value)} maxLength={120} required /></label>
@@ -581,12 +606,46 @@ export function RecurringManager({
                 <label className="field"><span>{copy.frequency}</span><select value={frequency} onChange={(event) => setFrequency(event.target.value as Frequency)}><option value="weekly">{copy.weekly}</option><option value="monthly">{copy.monthly}</option><option value="yearly">{copy.yearly}</option></select></label>
               </div>
               <div className="field-row">
-                <label className="field"><span>{copy.category}</span><select value={category} onChange={(event) => setCategory(event.target.value)}>{Object.entries(CATEGORY_LABELS).filter(([key]) => editing.kind === "income" ? key === "income" : key !== "income").map(([key, label]) => <option value={key} key={key}>{label[language]}</option>)}</select></label>
+                <div className="field recurring-category-field">
+                  <span>{copy.category}</span>
+                  <button
+                    type="button"
+                    className="recurring-category-trigger"
+                    aria-haspopup="listbox"
+                    aria-expanded={isCategoryPickerOpen}
+                    onClick={() => setIsCategoryPickerOpen((open) => !open)}
+                  >
+                    <span aria-hidden="true">{categoryGlyph(category)}</span>
+                    <strong>{CATEGORY_LABELS[category]?.[language] ?? category}</strong>
+                    <i aria-hidden="true">⌄</i>
+                  </button>
+                  {isCategoryPickerOpen && (
+                    <div className="recurring-category-options" role="listbox" aria-label={copy.category}>
+                      {categoryOptions.map(([key, label]) => (
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={category === key}
+                          className={category === key ? "selected" : ""}
+                          key={key}
+                          onClick={() => {
+                            setCategory(key);
+                            setIsCategoryPickerOpen(false);
+                          }}
+                        >
+                          <span aria-hidden="true">{categoryGlyph(key)}</span>
+                          <strong>{label[language]}</strong>
+                          <i aria-hidden="true">{category === key ? "✓" : ""}</i>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <label className="field"><span>{copy.endDate}</span><input type="date" min={editing.startOn} value={endsOn} onChange={(event) => setEndsOn(event.target.value)} /></label>
               </div>
               <label className="field"><span>{copy.note}</span><textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} /></label>
               {error && <p className="form-error" role="alert">{error}</p>}
-              <div className="drawer-actions"><button type="button" className="secondary-button" onClick={() => setEditing(null)} disabled={saving}>{copy.cancel}</button><button className="primary-button" aria-disabled={saving}>{copy.save}</button></div>
+              <div className="drawer-actions"><button type="button" className="secondary-button" onClick={() => { setEditing(null); setIsCategoryPickerOpen(false); }} disabled={saving}>{copy.cancel}</button><button className="primary-button" aria-disabled={saving}>{copy.save}</button></div>
             </form>
           </section>
         </div>
