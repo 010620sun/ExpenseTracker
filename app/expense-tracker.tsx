@@ -50,6 +50,10 @@ type LedgerTransaction = {
   recurringSeriesId?: string | null;
   recurrenceDate?: string | null;
   isRecurring?: boolean;
+  splitGroupId?: string | null;
+  splitIndex?: number | null;
+  splitCount?: number | null;
+  isDistributed?: boolean;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -617,6 +621,17 @@ const COPY = {
     recurringStopped: "Future repeats stopped.",
     recurringStopFailed: "We couldn’t stop the recurring transaction.",
     recurrenceDateError: "The repeat end date must be on or after the first transaction.",
+    distributeExpense: "Distribute across dates",
+    distributeHint: "Split one total into consecutive daily entries.",
+    distributionCount: "Number of days",
+    distributionPreview: "Distribution preview",
+    distributionRange: "{count} days · {start} to {end}",
+    distributionEach: "About {amount} per day · total stays {total}",
+    distributionError: "Choose between 2 and 365 days, with at least one minor currency unit per day.",
+    distributionSaved: "Expense distributed across the selected dates.",
+    distributedEntry: "Distributed expense {part}/{count}",
+    distributionEditHint: "Changes apply only to this date. Deleting removes the entire distribution.",
+    deleteDistributedConfirm: "Delete all {count} distributed entries for {merchant}?",
   },
   ko: {
     overview: "대시보드",
@@ -733,6 +748,17 @@ const COPY = {
     recurringStopped: "향후 반복을 중단했습니다.",
     recurringStopFailed: "반복 거래를 중단하지 못했습니다.",
     recurrenceDateError: "반복 종료일은 첫 거래일과 같거나 이후여야 합니다.",
+    distributeExpense: "날짜별로 분배",
+    distributeHint: "하나의 총액을 연속된 날짜의 일별 거래로 나눕니다.",
+    distributionCount: "일수",
+    distributionPreview: "분배 미리보기",
+    distributionRange: "{count}일 · {start}~{end}",
+    distributionEach: "하루 약 {amount} · 총액 {total} 유지",
+    distributionError: "2~365일을 선택하고, 하루 금액이 통화 최소 단위 이상이 되게 해주세요.",
+    distributionSaved: "선택한 날짜에 지출을 분배했습니다.",
+    distributedEntry: "분할 지출 {part}/{count}",
+    distributionEditHint: "변경은 이 날짜에만 적용됩니다. 삭제하면 전체 분할 거래가 삭제됩니다.",
+    deleteDistributedConfirm: "{merchant}의 분할 거래 {count}건을 모두 삭제할까요?",
   },
   ja: {
     overview: "概要",
@@ -849,6 +875,17 @@ const COPY = {
     recurringStopped: "今後の繰り返しを停止しました。",
     recurringStopFailed: "繰り返し取引を停止できませんでした。",
     recurrenceDateError: "終了日は最初の取引日以降にしてください。",
+    distributeExpense: "日付ごとに分配",
+    distributeHint: "1つの合計金額を連続する日ごとの取引に分けます。",
+    distributionCount: "日数",
+    distributionPreview: "分配プレビュー",
+    distributionRange: "{count}日 · {start}〜{end}",
+    distributionEach: "1日約{amount} · 合計{total}を維持",
+    distributionError: "2〜365日を選び、1日分を通貨の最小単位以上にしてください。",
+    distributionSaved: "選択した日付に支出を分配しました。",
+    distributedEntry: "分配支出 {part}/{count}",
+    distributionEditHint: "変更はこの日付にのみ適用されます。削除すると分配全体が削除されます。",
+    deleteDistributedConfirm: "{merchant}の分配取引{count}件をすべて削除しますか？",
   },
   ru: {
     overview: "Обзор",
@@ -965,6 +1002,17 @@ const COPY = {
     recurringStopped: "Будущие повторы остановлены.",
     recurringStopFailed: "Не удалось остановить регулярную операцию.",
     recurrenceDateError: "Дата окончания должна быть не раньше первой операции.",
+    distributeExpense: "Распределить по датам",
+    distributeHint: "Разделить одну сумму на ежедневные операции подряд.",
+    distributionCount: "Количество дней",
+    distributionPreview: "Предпросмотр распределения",
+    distributionRange: "{count} дн. · {start}–{end}",
+    distributionEach: "Около {amount} в день · итог {total} сохранится",
+    distributionError: "Выберите от 2 до 365 дней; на день должна приходиться минимум одна денежная единица.",
+    distributionSaved: "Расход распределён по выбранным датам.",
+    distributedEntry: "Распределённый расход {part}/{count}",
+    distributionEditHint: "Изменения относятся только к этой дате. Удаление удалит всё распределение.",
+    deleteDistributedConfirm: "Удалить все распределённые операции ({count}) для {merchant}?",
   },
 } as const;
 
@@ -1397,6 +1445,8 @@ export function ExpenseTracker({
   const [recurrenceFrequency, setRecurrenceFrequency] =
     useState<RecurrenceFrequency>("monthly");
   const [recurrenceEndsOn, setRecurrenceEndsOn] = useState("");
+  const [isDistributed, setIsDistributed] = useState(false);
+  const [distributionCount, setDistributionCount] = useState("3");
   const [formError, setFormError] = useState("");
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const descriptionRef = useRef<HTMLInputElement>(null);
@@ -1688,6 +1738,7 @@ export function ExpenseTracker({
     }, 0);
     setEditingTransaction(null);
     setIsRecurring(false);
+    setIsDistributed(false);
   }, []);
 
   useEffect(() => {
@@ -1968,6 +2019,17 @@ export function ExpenseTracker({
   const selectedRateDate = !usesStoredRate && currency !== "USD" && hasFrankfurterRate
     ? rateMeta.rateDates[currency] ?? rateMeta.asOf
     : null;
+  const parsedDistributionCount = Number(distributionCount);
+  const distributionPreviewEnd =
+    isIsoDate(occurredOn) &&
+    Number.isInteger(parsedDistributionCount) &&
+    parsedDistributionCount >= 2
+      ? shiftIsoDate(occurredOn, parsedDistributionCount - 1)
+      : occurredOn;
+  const distributionDailyPreview =
+    Number.isFinite(Number(amount)) && parsedDistributionCount > 0
+      ? Number(amount) / parsedDistributionCount
+      : 0;
 
   function rememberDrawerTrigger() {
     drawerTriggerRef.current =
@@ -2019,6 +2081,8 @@ export function ExpenseTracker({
     setIsRecurring(false);
     setRecurrenceFrequency("monthly");
     setRecurrenceEndsOn("");
+    setIsDistributed(false);
+    setDistributionCount("3");
     setIsDrawerOpen(true);
     setFormError("");
   }
@@ -2026,6 +2090,7 @@ export function ExpenseTracker({
   function openRecurringDrawer(date = selectedDate) {
     openAddDrawer(date);
     setIsRecurring(true);
+    setIsDistributed(false);
   }
 
   useEffect(() => {
@@ -2061,6 +2126,8 @@ export function ExpenseTracker({
     setIsRecurring(false);
     setRecurrenceFrequency("monthly");
     setRecurrenceEndsOn("");
+    setIsDistributed(false);
+    setDistributionCount("3");
     setIsDrawerOpen(true);
     setFormError("");
   }
@@ -2198,6 +2265,20 @@ export function ExpenseTracker({
       setFormError(copy.recurrenceDateError);
       return;
     }
+    const amountMinorPreview = Math.round(
+      numericAmount * 10 ** (currencyExponent(currency) ?? 2),
+    );
+    if (
+      !editingTransaction &&
+      isDistributed &&
+      (!Number.isInteger(parsedDistributionCount) ||
+        parsedDistributionCount < 2 ||
+        parsedDistributionCount > 365 ||
+        amountMinorPreview < parsedDistributionCount)
+    ) {
+      setFormError(copy.distributionError);
+      return;
+    }
 
     isSavingRef.current = true;
     setIsSaving(true);
@@ -2228,6 +2309,9 @@ export function ExpenseTracker({
                 },
               }
             : {}),
+          ...(!editingTransaction && isDistributed
+            ? { distribution: { count: parsedDistributionCount } }
+            : {}),
           ...(editingTransaction
             ? { expectedUpdatedAt: editingTransaction.updatedAt }
             : { clientRequestId: crypto.randomUUID() }),
@@ -2238,19 +2322,23 @@ export function ExpenseTracker({
         if (response.status === 401) throw new Error("UNAUTHENTICATED");
         throw new Error(payload.error?.code ?? "SAVE_FAILED");
       }
-      const savedTransaction = Array.isArray(payload.data)
-        ? payload.data[0]
-        : payload.data ?? payload.transaction;
+      const savedTransactions = Array.isArray(payload.data)
+        ? payload.data
+        : payload.data ?? payload.transaction
+          ? [payload.data ?? payload.transaction!]
+          : [];
+      const savedTransaction = savedTransactions[0];
       if (savedTransaction) {
         const savedMonth = savedTransaction.occurredOn.slice(0, 7);
         drawerReturnDateRef.current = savedTransaction.occurredOn;
         setTransactions((current) => {
+          const savedIds = new Set(savedTransactions.map((item) => item.id));
           const withoutSaved = current.filter(
-            (transaction) => transaction.id !== savedTransaction.id,
+            (transaction) => !savedIds.has(transaction.id),
           );
           return savedMonth === viewMonth
-            ? [savedTransaction, ...withoutSaved].sort(byNewestTransaction)
-            : [savedTransaction];
+            ? [...savedTransactions, ...withoutSaved].sort(byNewestTransaction)
+            : savedTransactions;
         });
         setSelectedDate(savedTransaction.occurredOn);
         if (savedMonth !== viewMonth) {
@@ -2270,7 +2358,9 @@ export function ExpenseTracker({
           ? calendarCopy.updated
           : isRecurring
             ? recurringFlowCopy.saved
-            : copy.saved,
+            : isDistributed
+              ? copy.distributionSaved
+              : copy.saved,
       );
       isSavingRef.current = false;
       setIsSaving(false);
@@ -2298,15 +2388,26 @@ export function ExpenseTracker({
     }
     if (
       !window.confirm(
-        template(calendarCopy.confirmDelete, {
-          merchant: transaction.description,
-        }),
+        transaction.splitGroupId
+          ? template(copy.deleteDistributedConfirm, {
+              merchant: transaction.description,
+              count: transaction.splitCount ?? 0,
+            })
+          : template(calendarCopy.confirmDelete, {
+              merchant: transaction.description,
+            }),
       )
     ) {
       return;
     }
     const previous = transactions;
-    setTransactions((current) => current.filter((item) => item.id !== transaction.id));
+    setTransactions((current) =>
+      current.filter((item) =>
+        transaction.splitGroupId
+          ? item.splitGroupId !== transaction.splitGroupId
+          : item.id !== transaction.id,
+      ),
+    );
     window.setTimeout(
       () =>
         (
@@ -2572,7 +2673,11 @@ export function ExpenseTracker({
                                   {dayEntries.slice(0, 2).map((transaction) => (
                                     <span className={transaction.kind === "income" ? "calendar-entry-preview income" : "calendar-entry-preview"} key={transaction.id}>
                                       <i style={{ backgroundColor: CATEGORY_COLORS[transaction.category] ?? CATEGORY_COLORS.other }} />
-                                      {transaction.isRecurring && <em>↻</em>}
+                                      {transaction.isRecurring ? (
+                                        <em>↻</em>
+                                      ) : transaction.splitGroupId ? (
+                                        <em>{(transaction.splitIndex ?? 0) + 1}/{transaction.splitCount}</em>
+                                      ) : null}
                                       <b>{transaction.description}</b>
                                     </span>
                                   ))}
@@ -2639,7 +2744,14 @@ export function ExpenseTracker({
                       </span>
                       <span className="day-entry-copy">
                         <strong>{transaction.description}</strong>
-                        <small>{transaction.isRecurring ? "↻ · " : ""}{categoryLabel(transaction.category, language)} · {formatCurrency(originalMajor(transaction), transaction.originalCurrency, language)} {transaction.originalCurrency}</small>
+                        <small>
+                          {transaction.isRecurring
+                            ? "↻ · "
+                            : transaction.splitGroupId
+                              ? `${(transaction.splitIndex ?? 0) + 1}/${transaction.splitCount} · `
+                              : ""}
+                          {categoryLabel(transaction.category, language)} · {formatCurrency(originalMajor(transaction), transaction.originalCurrency, language)} {transaction.originalCurrency}
+                        </small>
                       </span>
                       <span className={transaction.kind === "income" ? "day-entry-value income" : "day-entry-value"}>
                         {transaction.kind === "income" ? "+" : "−"}{formatCurrency(inBaseCurrency(transaction.baseAmountMinor, baseCurrency, ratesToUsd), baseCurrency, language)}
@@ -2816,7 +2928,14 @@ export function ExpenseTracker({
                   </span>
                   <div className="transaction-name">
                     <strong>{transaction.description}</strong>
-                    <span>{transaction.isRecurring ? "↻ · " : ""}{categoryLabel(transaction.category, language)}</span>
+                    <span>
+                      {transaction.isRecurring
+                        ? "↻ · "
+                        : transaction.splitGroupId
+                          ? `${(transaction.splitIndex ?? 0) + 1}/${transaction.splitCount} · `
+                          : ""}
+                      {categoryLabel(transaction.category, language)}
+                    </span>
                   </div>
                   <time dateTime={transaction.occurredOn}>
                     {new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(
@@ -2893,7 +3012,7 @@ export function ExpenseTracker({
             <form onSubmit={handleSubmit}>
               <div className="kind-switch" aria-label={`${copy.expense} / ${copy.income}`}>
                 <button type="button" aria-pressed={kind === "expense"} className={kind === "expense" ? "selected" : ""} onClick={() => { setKind("expense"); if (category === "income") setCategory("dining"); }}>{copy.expense}</button>
-                <button type="button" aria-pressed={kind === "income"} className={kind === "income" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("income"); setCategory("income"); }}>{copy.income}</button>
+                <button type="button" aria-pressed={kind === "income"} className={kind === "income" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("income"); setCategory("income"); setIsDistributed(false); }}>{copy.income}</button>
               </div>
               <label className="field">
                 <span>{copy.merchant}</span>
@@ -2999,6 +3118,56 @@ export function ExpenseTracker({
                 <span>{copy.date}</span>
                 <input type="date" value={occurredOn} onChange={(event) => setOccurredOn(event.target.value)} required />
               </label>
+              {!editingTransaction && kind === "expense" && !isRecurring && (
+                <div className={isDistributed ? "distribution-card active" : "distribution-card"}>
+                  <label className="distribution-toggle">
+                    <span>
+                      <strong>{copy.distributeExpense}</strong>
+                      <small>{copy.distributeHint}</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      aria-label={copy.distributeExpense}
+                      checked={isDistributed}
+                      onChange={(event) => setIsDistributed(event.target.checked)}
+                    />
+                  </label>
+                  {isDistributed && (
+                    <div className="distribution-options">
+                      <label className="field distribution-count-field">
+                        <span>{copy.distributionCount}</span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min="2"
+                          max="365"
+                          step="1"
+                          value={distributionCount}
+                          onChange={(event) => setDistributionCount(event.target.value)}
+                        />
+                      </label>
+                      <div className="distribution-preview" aria-live="polite">
+                        <span>{copy.distributionPreview}</span>
+                        <strong>
+                          {template(copy.distributionRange, {
+                            count: Number.isInteger(parsedDistributionCount)
+                              ? parsedDistributionCount
+                              : 0,
+                            start: occurredOn,
+                            end: distributionPreviewEnd,
+                          })}
+                        </strong>
+                        <small>
+                          {template(copy.distributionEach, {
+                            amount: `${formatCurrency(distributionDailyPreview, currency, language)} ${currency}`,
+                            total: `${formatCurrency(Number(amount) || 0, currency, language)} ${currency}`,
+                          })}
+                        </small>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               {!editingTransaction && isRecurring && (
                 <div className="recurrence-card active">
                   <div className="recurrence-heading">
@@ -3048,6 +3217,17 @@ export function ExpenseTracker({
                   >
                     {copy.stopRecurring}
                   </button>
+                </div>
+              )}
+              {editingTransaction?.splitGroupId && (
+                <div className="distribution-edit-card">
+                  <strong>
+                    {template(copy.distributedEntry, {
+                      part: (editingTransaction.splitIndex ?? 0) + 1,
+                      count: editingTransaction.splitCount ?? 0,
+                    })}
+                  </strong>
+                  <small>{copy.distributionEditHint}</small>
                 </div>
               )}
               <label className="field">

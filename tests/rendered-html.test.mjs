@@ -262,3 +262,32 @@ test("filters monthly transactions by search, kind, category, and currency", asy
   assert.match(styles, /\.transaction-filter-bar/u);
   assert.match(styles, /\.transaction-search-field/u);
 });
+
+test("distributes one expense exactly across consecutive calendar dates", async () => {
+  const [tracker, route, schema, migration, styles] = await Promise.all([
+    readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/transactions/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../drizzle/0009_steep_maverick.sql", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(schema, /splitGroupId: text\("split_group_id"\)/u);
+  assert.match(schema, /transactions_split_shape/u);
+  assert.match(schema, /idx_transactions_owner_split_group/u);
+  assert.match(route, /function parseDistribution/u);
+  assert.match(route, /function distributedTransactionsFromTransaction/u);
+  assert.match(route, /originalEach \+ \(index < originalRemainder \? 1 : 0\)/u);
+  assert.match(route, /baseEach \+ \(index < baseRemainder \? 1 : 0\)/u);
+  assert.match(route, /shiftIsoDate\(transaction\.occurredOn, index\)/u);
+  assert.match(route, /eq\(transactions\.splitGroupId, existing\.splitGroupId\)/u);
+  assert.match(migration, /NULL, NULL, NULL, "client_request_id"/u);
+  assert.match(tracker, /distribution: \{ count: parsedDistributionCount \}/u);
+  assert.match(tracker, /className="distribution-preview"/u);
+  assert.match(tracker, /savedTransactions\.map/u);
+  assert.match(tracker, /deleteDistributedConfirm/u);
+  assert.match(tracker, /날짜별로 분배/u);
+  assert.match(tracker, /日付ごとに分配/u);
+  assert.match(tracker, /Распределить по датам/u);
+  assert.match(styles, /\.distribution-card/u);
+});

@@ -417,6 +417,9 @@ export const transactions = sqliteTable(
       { onDelete: "cascade" },
     ),
     recurrenceDate: text("recurrence_date"),
+    splitGroupId: text("split_group_id"),
+    splitIndex: integer("split_index"),
+    splitCount: integer("split_count"),
     clientRequestId: text("client_request_id"),
     createdAtMs: integer("created_at_ms").notNull(),
     updatedAtMs: integer("updated_at_ms").notNull(),
@@ -495,6 +498,10 @@ export const transactions = sqliteTable(
       sql`(${table.recurringSeriesId} IS NULL AND ${table.recurrenceDate} IS NULL) OR (${table.recurringSeriesId} IS NOT NULL AND length(${table.recurrenceDate}) = 10 AND ${table.recurrenceDate} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')`,
     ),
     check(
+      "transactions_split_shape",
+      sql`(${table.splitGroupId} IS NULL AND ${table.splitIndex} IS NULL AND ${table.splitCount} IS NULL) OR (${table.splitGroupId} IS NOT NULL AND length(${table.splitGroupId}) BETWEEN 1 AND 64 AND ${table.splitIndex} BETWEEN 0 AND ${table.splitCount} - 1 AND ${table.splitCount} BETWEEN 2 AND 365)`,
+    ),
+    check(
       "transactions_client_request_id_length",
       sql`${table.clientRequestId} IS NULL OR length(${table.clientRequestId}) BETWEEN 1 AND 64`,
     ),
@@ -510,6 +517,10 @@ export const transactions = sqliteTable(
     uniqueIndex("uq_transactions_recurring_occurrence")
       .on(table.ownerId, table.recurringSeriesId, table.recurrenceDate)
       .where(sql`${table.recurringSeriesId} IS NOT NULL`),
+    index("idx_transactions_owner_split_group").on(
+      table.ownerId,
+      table.splitGroupId,
+    ),
   ],
 );
 

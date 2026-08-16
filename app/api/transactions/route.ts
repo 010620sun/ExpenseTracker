@@ -73,6 +73,10 @@ type RecurrenceConfig = {
   endsOn: string | null;
 };
 
+type DistributionConfig = {
+  count: number;
+};
+
 function errorResponse(code: string, status: number, field?: string) {
   return Response.json(
     { error: { code, ...(field ? { field } : {}) } },
@@ -333,6 +337,33 @@ function parseRecurrence(body: JsonRecord, startOn: string): RecurrenceConfig | 
   return { frequency, endsOn };
 }
 
+function parseDistribution(
+  body: JsonRecord,
+  kind: NewTransaction["kind"],
+): DistributionConfig | null {
+  const raw = body.distribution;
+  if (raw === undefined || raw === null || raw === false) return null;
+  if (!isPlainRecord(raw)) {
+    throw new ApiValidationError("INVALID_DISTRIBUTION", 400, "distribution");
+  }
+  if (kind !== "expense") {
+    throw new ApiValidationError(
+      "DISTRIBUTION_REQUIRES_EXPENSE",
+      400,
+      "distribution",
+    );
+  }
+  const count = raw.count;
+  if (!Number.isInteger(count) || Number(count) < 2 || Number(count) > 365) {
+    throw new ApiValidationError(
+      "INVALID_DISTRIBUTION_COUNT",
+      400,
+      "distribution.count",
+    );
+  }
+  return { count: Number(count) };
+}
+
 function shiftIsoDate(date: string, days: number) {
   const shifted = new Date(`${date}T00:00:00Z`);
   shifted.setUTCDate(shifted.getUTCDate() + days);
@@ -501,6 +532,10 @@ function serializeTransaction(transaction: Transaction) {
     recurringSeriesId: transaction.recurringSeriesId,
     recurrenceDate: transaction.recurrenceDate,
     isRecurring: transaction.recurringSeriesId !== null,
+    splitGroupId: transaction.splitGroupId,
+    splitIndex: transaction.splitIndex,
+    splitCount: transaction.splitCount,
+    isDistributed: transaction.splitGroupId !== null,
     createdAt: new Date(transaction.createdAtMs).toISOString(),
     updatedAt: new Date(transaction.updatedAtMs).toISOString(),
   };
@@ -653,6 +688,9 @@ async function materializeRecurringTransactions(
         note: series.note,
         recurringSeriesId: series.id,
         recurrenceDate: occurrenceOn,
+        splitGroupId: null,
+        splitIndex: null,
+        splitCount: null,
         clientRequestId: `rec:${series.id}:${occurrenceOn}`,
         createdAtMs: timestamp,
         updatedAtMs: timestamp,
@@ -841,10 +879,98 @@ async function buildNewTransaction(
     category,
     description,
     note,
+    recurringSeriesId: null,
+    recurrenceDate: null,
+    splitGroupId: null,
+    splitIndex: null,
+    splitCount: null,
     clientRequestId,
     createdAtMs: now,
     updatedAtMs: now,
   };
+}
+
+function distributedTransactionsFromTransaction(
+  transaction: NewTransaction,
+  distribution: DistributionConfig,
+) {
+  const count = distribution.count;
+  if (
+    transaction.originalAmountMinor < count ||
+    transaction.baseAmountMinor < count
+  ) {
+    throw new ApiValidationError(
+      "DISTRIBUTION_AMOUNT_TOO_SMALL",
+      400,
+      "distribution.count",
+    );
+  }
+
+  const groupId = crypto.randomUUID();
+  const originalEach = Math.floor(transaction.originalAmountMinor / count);
+  const originalRemainder = transaction.originalAmountMinor % count;
+  const baseEach = Math.floor(transaction.baseAmountMinor / count);
+  const baseRemainder = transaction.baseAmountMinor % count;
+  return Array.from({ length: count }, (_, index): NewTransaction => ({
+    ...transaction,
+    id: crypto.randomUUID(),
+    occurredOn: shiftIsoDate(transaction.occurredOn, index),
+    originalAmountMinor: originalEach + (index < originalRemainder ? 1 : 0),
+    baseAmountMinor: baseEach + (index < baseRemainder ? 1 : 0),
+    recurringSeriesId: null,
+    recurrenceDate: null,
+    splitGroupId: groupId,
+    splitIndex: index,
+    splitCount: count,
+    clientRequestId:
+      index === 0
+        ? transaction.clientRequestId
+        : `split:${groupId}:${index}`,
+    createdAtMs: transaction.createdAtMs + index,
+    updatedAtMs: transaction.updatedAtMs + index,
+  }));
+}
+
+function sameDistribution(
+  existing: Transaction[],
+  proposed: NewTransaction,
+  count: number,
+) {
+  if (
+    existing.length !== count ||
+    existing.some(
+      (row) =>
+        row.splitCount !== count ||
+        row.splitGroupId !== existing[0]?.splitGroupId,
+    )
+  ) {
+    return false;
+  }
+  const ordered = [...existing].sort(
+    (left, right) => (left.splitIndex ?? 0) - (right.splitIndex ?? 0),
+  );
+  return (
+    ordered[0]?.occurredOn === proposed.occurredOn &&
+    ordered.every(
+      (row, index) =>
+        row.occurredOn === shiftIsoDate(proposed.occurredOn, index) &&
+        row.kind === proposed.kind &&
+        row.originalCurrency === proposed.originalCurrency &&
+        row.originalCurrencyExponent === proposed.originalCurrencyExponent &&
+        row.fxRate === proposed.fxRate &&
+        row.fxSource === proposed.fxSource &&
+        row.fxRateDate === proposed.fxRateDate &&
+        row.baseCurrency === proposed.baseCurrency &&
+        row.baseCurrencyExponent === proposed.baseCurrencyExponent &&
+        row.category === proposed.category &&
+        row.description === proposed.description &&
+        row.note === proposed.note
+    ) &&
+    ordered.reduce((sum, row) => sum + row.originalAmountMinor, 0) ===
+      proposed.originalAmountMinor &&
+    ordered.reduce((sum, row) => sum + row.baseAmountMinor, 0) ===
+      proposed.baseAmountMinor
+  );
 }
 
 function sameMutation(existing: Transaction, proposed: NewTransaction) {
@@ -987,7 +1113,96 @@ export async function POST(request: Request) {
     const db = getDb();
     const newTransaction = await buildNewTransaction(ownerId, body, db);
     const recurrence = parseRecurrence(body, newTransaction.occurredOn);
+    const distribution = parseDistribution(body, newTransaction.kind);
+    if (recurrence && distribution) {
+      throw new ApiValidationError(
+        "RECURRENCE_DISTRIBUTION_CONFLICT",
+        400,
+        "distribution",
+      );
+    }
     await ensureUserState(db, ownerId);
+
+    if (distribution) {
+      if (newTransaction.clientRequestId) {
+        const firstRows = await db
+          .select()
+          .from(transactions)
+          .where(
+            and(
+              eq(transactions.ownerId, ownerId),
+              eq(
+                transactions.clientRequestId,
+                newTransaction.clientRequestId,
+              ),
+            ),
+          )
+          .limit(1);
+        const first = firstRows[0];
+        if (first) {
+          const existing = first.splitGroupId
+            ? await db
+                .select()
+                .from(transactions)
+                .where(
+                  and(
+                    eq(transactions.ownerId, ownerId),
+                    eq(transactions.splitGroupId, first.splitGroupId),
+                  ),
+                )
+            : [first];
+          if (sameDistribution(existing, newTransaction, distribution.count)) {
+            await rememberLastTransactionCurrency(
+              db,
+              ownerId,
+              first.originalCurrency,
+            );
+            return Response.json(
+              {
+                data: existing
+                  .sort(
+                    (left, right) =>
+                      (left.splitIndex ?? 0) - (right.splitIndex ?? 0),
+                  )
+                  .map(serializeTransaction),
+                idempotent: true,
+              },
+              { status: 200, headers: NO_STORE_HEADERS },
+            );
+          }
+          return errorResponse("IDEMPOTENCY_CONFLICT", 409, "clientRequestId");
+        }
+      }
+
+      const distributed = distributedTransactionsFromTransaction(
+        newTransaction,
+        distribution,
+      );
+      const insertQueries = [];
+      for (let index = 0; index < distributed.length; index += 4) {
+        insertQueries.push(
+          db
+            .insert(transactions)
+            .values(distributed.slice(index, index + 4))
+            .returning(),
+        );
+      }
+      const [firstInsert, ...remainingInserts] = insertQueries;
+      const insertedBatches = await db.batch([
+        firstInsert,
+        ...remainingInserts,
+      ]);
+      const inserted = insertedBatches.flat();
+      await rememberLastTransactionCurrency(
+        db,
+        ownerId,
+        inserted[0].originalCurrency,
+      );
+      return Response.json(
+        { data: inserted.map(serializeTransaction) },
+        { status: 201, headers: NO_STORE_HEADERS },
+      );
+    }
 
     if (recurrence) {
       if (newTransaction.clientRequestId) {
@@ -1250,6 +1465,7 @@ export async function DELETE(request: Request) {
         id: transactions.id,
         recurringSeriesId: transactions.recurringSeriesId,
         recurrenceDate: transactions.recurrenceDate,
+        splitGroupId: transactions.splitGroupId,
       })
       .from(transactions)
       .where(and(eq(transactions.id, id), eq(transactions.ownerId, ownerId)))
@@ -1258,7 +1474,17 @@ export async function DELETE(request: Request) {
     if (!existing) return errorResponse("TRANSACTION_NOT_FOUND", 404);
 
     let deleted: Array<{ id: string }>;
-    if (existing.recurringSeriesId && existing.recurrenceDate) {
+    if (existing.splitGroupId) {
+      deleted = await db
+        .delete(transactions)
+        .where(
+          and(
+            eq(transactions.ownerId, ownerId),
+            eq(transactions.splitGroupId, existing.splitGroupId),
+          ),
+        )
+        .returning({ id: transactions.id });
+    } else if (existing.recurringSeriesId && existing.recurrenceDate) {
       const [, deletedRows] = await db.batch([
         db
           .insert(recurringExceptions)
