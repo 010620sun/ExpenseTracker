@@ -547,6 +547,13 @@ const COPY = {
     recent: "Recent transactions",
     recentHint: "Original amount and {currency} value",
     allActivity: "All activity",
+    searchTransactions: "Search transactions",
+    searchTransactionPlaceholder: "Search merchant, note, category, or currency",
+    allTypes: "All types",
+    allCategories: "All categories",
+    clearFilters: "Clear filters",
+    filterResults: "{count} results",
+    noFilterResults: "No transactions match these filters.",
     merchant: "Merchant or description",
     category: "Category",
     chooseCategory: "Choose a category",
@@ -656,6 +663,13 @@ const COPY = {
     recent: "최근 거래",
     recentHint: "원 결제 금액과 {currency} 환산 금액",
     allActivity: "전체 내역",
+    searchTransactions: "거래 검색",
+    searchTransactionPlaceholder: "사용처, 메모, 카테고리 또는 통화 검색",
+    allTypes: "전체 유형",
+    allCategories: "전체 카테고리",
+    clearFilters: "필터 초기화",
+    filterResults: "{count}건의 결과",
+    noFilterResults: "조건에 맞는 거래가 없습니다.",
     merchant: "사용처 또는 설명",
     category: "카테고리",
     chooseCategory: "카테고리 선택",
@@ -765,6 +779,13 @@ const COPY = {
     recent: "最近の取引",
     recentHint: "元の金額と{currency}換算額",
     allActivity: "すべての履歴",
+    searchTransactions: "取引を検索",
+    searchTransactionPlaceholder: "店舗、メモ、カテゴリー、通貨を検索",
+    allTypes: "すべての種類",
+    allCategories: "すべてのカテゴリー",
+    clearFilters: "フィルターを解除",
+    filterResults: "{count}件",
+    noFilterResults: "条件に一致する取引はありません。",
     merchant: "店舗名または説明",
     category: "カテゴリー",
     chooseCategory: "カテゴリーを選択",
@@ -874,6 +895,13 @@ const COPY = {
     recent: "Недавние операции",
     recentHint: "Исходная сумма и значение в {currency}",
     allActivity: "Вся активность",
+    searchTransactions: "Поиск операций",
+    searchTransactionPlaceholder: "Магазин, заметка, категория или валюта",
+    allTypes: "Все типы",
+    allCategories: "Все категории",
+    clearFilters: "Сбросить фильтры",
+    filterResults: "Результатов: {count}",
+    noFilterResults: "Нет операций, соответствующих фильтрам.",
     merchant: "Продавец или описание",
     category: "Категория",
     chooseCategory: "Выберите категорию",
@@ -1339,6 +1367,13 @@ export function ExpenseTracker({
     useState<LedgerTransaction[]>(FALLBACK_TRANSACTIONS);
   const [monthlyBudgetUsdMinor, setMonthlyBudgetUsdMinor] =
     useState<number | null>(null);
+  const [transactionQuery, setTransactionQuery] = useState("");
+  const [transactionKindFilter, setTransactionKindFilter] =
+    useState<"all" | TransactionKind>("all");
+  const [transactionCategoryFilter, setTransactionCategoryFilter] =
+    useState("all");
+  const [transactionCurrencyFilter, setTransactionCurrencyFilter] =
+    useState("all");
   const [isSyncing, setIsSyncing] = useState(true);
   const [currentDate, setCurrentDate] = useState(today);
   const [viewMonth, setViewMonth] = useState(today.slice(0, 7));
@@ -1742,6 +1777,83 @@ export function ExpenseTracker({
       ),
     [transactions, viewMonth],
   );
+
+  const transactionFilterOptions = useMemo(
+    () => ({
+      categories: [
+        ...new Set(monthlyTransactions.map((item) => item.category)),
+      ].sort((a, b) =>
+        categoryLabel(a, language).localeCompare(
+          categoryLabel(b, language),
+          LANGUAGE_LOCALES[language],
+        ),
+      ),
+      currencies: [
+        ...new Set(
+          monthlyTransactions.map((item) => item.originalCurrency),
+        ),
+      ].sort((a, b) => a.localeCompare(b)),
+    }),
+    [language, monthlyTransactions],
+  );
+
+  const filteredTransactions = useMemo(() => {
+    const languageLocale = LANGUAGE_LOCALES[language];
+    const query = transactionQuery
+      .trim()
+      .toLocaleLowerCase(languageLocale);
+    return monthlyTransactions.filter((transaction) => {
+      if (
+        transactionKindFilter !== "all" &&
+        transaction.kind !== transactionKindFilter
+      ) {
+        return false;
+      }
+      if (
+        transactionCategoryFilter !== "all" &&
+        transaction.category !== transactionCategoryFilter
+      ) {
+        return false;
+      }
+      if (
+        transactionCurrencyFilter !== "all" &&
+        transaction.originalCurrency !== transactionCurrencyFilter
+      ) {
+        return false;
+      }
+      if (!query) return true;
+      return [
+        transaction.description,
+        transaction.note ?? "",
+        transaction.category,
+        categoryLabel(transaction.category, language),
+        transaction.originalCurrency,
+      ].some((value) =>
+        value.toLocaleLowerCase(languageLocale).includes(query),
+      );
+    });
+  }, [
+    language,
+    monthlyTransactions,
+    transactionCategoryFilter,
+    transactionCurrencyFilter,
+    transactionKindFilter,
+    transactionQuery,
+  ]);
+
+  const hasTransactionFilters = Boolean(
+    transactionQuery.trim() ||
+      transactionKindFilter !== "all" ||
+      transactionCategoryFilter !== "all" ||
+      transactionCurrencyFilter !== "all",
+  );
+
+  function clearTransactionFilters() {
+    setTransactionQuery("");
+    setTransactionKindFilter("all");
+    setTransactionCategoryFilter("all");
+    setTransactionCurrencyFilter("all");
+  }
 
   const totals = useMemo(() => {
     let expenseUsdMinor = 0;
@@ -2651,12 +2763,46 @@ export function ExpenseTracker({
 
         <section className="panel transactions-panel" id="transactions">
           <div className="panel-heading transactions-heading">
-            <div><h2>{copy.recent}</h2><p>{template(copy.recentHint, { currency: baseCurrency })}</p></div>
-            <button className="text-button">{copy.allActivity} <span aria-hidden="true">→</span></button>
+            <div><h2>{copy.transactions}</h2><p>{template(copy.recentHint, { currency: baseCurrency })}</p></div>
+            <span className="transaction-result-count">{template(copy.filterResults, { count: filteredTransactions.length })}</span>
           </div>
-          {monthlyTransactions.length ? (
+          <div className="transaction-filter-bar" role="search" aria-label={copy.searchTransactions}>
+            <label className="transaction-search-field">
+              <span aria-hidden="true">⌕</span>
+              <span className="sr-only">{copy.searchTransactions}</span>
+              <input type="search" value={transactionQuery} onChange={(event) => setTransactionQuery(event.target.value)} placeholder={copy.searchTransactionPlaceholder} />
+            </label>
+            <label className="transaction-filter-select">
+              <span className="sr-only">{copy.allTypes}</span>
+              <select value={transactionKindFilter} onChange={(event) => setTransactionKindFilter(event.target.value as "all" | TransactionKind)}>
+                <option value="all">{copy.allTypes}</option>
+                <option value="expense">{copy.expense}</option>
+                <option value="income">{copy.income}</option>
+              </select>
+            </label>
+            <label className="transaction-filter-select">
+              <span className="sr-only">{copy.allCategories}</span>
+              <select value={transactionCategoryFilter} onChange={(event) => setTransactionCategoryFilter(event.target.value)}>
+                <option value="all">{copy.allCategories}</option>
+                {transactionFilterOptions.categories.map((filterCategory) => (
+                  <option value={filterCategory} key={filterCategory}>{categoryLabel(filterCategory, language)}</option>
+                ))}
+              </select>
+            </label>
+            <label className="transaction-filter-select currency">
+              <span className="sr-only">{copy.allCurrencies}</span>
+              <select value={transactionCurrencyFilter} onChange={(event) => setTransactionCurrencyFilter(event.target.value)}>
+                <option value="all">{copy.allCurrencies}</option>
+                {transactionFilterOptions.currencies.map((filterCurrency) => (
+                  <option value={filterCurrency} key={filterCurrency}>{filterCurrency}</option>
+                ))}
+              </select>
+            </label>
+            <button type="button" className="transaction-filter-clear" onClick={clearTransactionFilters} disabled={!hasTransactionFilters}>{copy.clearFilters}</button>
+          </div>
+          {filteredTransactions.length ? (
             <div className="transaction-list">
-              {monthlyTransactions.slice(0, 6).map((transaction) => (
+              {filteredTransactions.map((transaction) => (
                 <article className="transaction-row" key={transaction.id}>
                   <span
                     className="transaction-glyph"
@@ -2708,7 +2854,7 @@ export function ExpenseTracker({
                 </article>
               ))}
             </div>
-          ) : <p className="empty-state">{copy.empty}</p>}
+          ) : <p className="empty-state">{monthlyTransactions.length ? copy.noFilterResults : copy.empty}</p>}
         </section>
 
         <footer className="product-footer">

@@ -1739,6 +1739,95 @@ a.nav-item {
   padding: 24px 24px 18px;
 }
 
+.transaction-result-count {
+  background: #eef2ee;
+  border-radius: 999px;
+  color: #64716c;
+  font-size: 9px;
+  font-weight: 740;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
+.transaction-filter-bar {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(220px, 1.45fr) minmax(110px, 0.55fr) minmax(145px, 0.75fr) minmax(110px, 0.5fr) auto;
+  padding: 12px 24px;
+}
+
+.transaction-search-field {
+  align-items: center;
+  background: #f7f8f5;
+  border: 1px solid #dfe4de;
+  border-radius: 10px;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  min-height: 40px;
+  padding: 0 9px;
+}
+
+.transaction-search-field > span:first-child {
+  color: #76817d;
+  font-size: 17px;
+}
+
+.transaction-search-field input,
+.transaction-filter-select select {
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  font: inherit;
+  font-size: 10px;
+  min-width: 0;
+  outline: 0;
+  width: 100%;
+}
+
+.transaction-search-field input::placeholder {
+  color: #98a09c;
+}
+
+.transaction-search-field:focus-within,
+.transaction-filter-select:focus-within {
+  border-color: #6f8f86;
+  box-shadow: 0 0 0 3px rgba(59, 111, 96, 0.1);
+}
+
+.transaction-filter-select {
+  align-items: center;
+  background: #f7f8f5;
+  border: 1px solid #dfe4de;
+  border-radius: 10px;
+  display: flex;
+  min-height: 40px;
+  padding: 0 9px;
+}
+
+.transaction-filter-clear {
+  background: #edf1ed;
+  border: 0;
+  border-radius: 9px;
+  color: #53615c;
+  font-size: 9px;
+  font-weight: 740;
+  min-height: 40px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.transaction-filter-clear:hover:not(:disabled) {
+  background: #e2e9e4;
+  color: var(--ink);
+}
+
+.transaction-filter-clear:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
 .transaction-list {
   border-top: 1px solid var(--line);
 }
@@ -2644,6 +2733,7 @@ a.nav-item {
   .insights-grid { grid-template-columns: 1fr; }
   .currency-panel { min-height: auto; }
   .currency-chart-wrap { justify-content: flex-start; }
+  .transaction-filter-bar { grid-template-columns: minmax(200px, 1.2fr) repeat(3, minmax(100px, 0.6fr)) auto; }
 }
 
 @media (max-width: 850px) {
@@ -2707,6 +2797,10 @@ a.nav-item {
   .month-heading { align-items: flex-start; gap: 18px; padding-top: 25px; }
   .rate-note { padding-bottom: 0; }
   .transaction-row { grid-template-columns: 34px minmax(130px, 1fr) minmax(100px, auto) 25px 25px; }
+  .transaction-filter-bar { grid-template-columns: 1fr 1fr; padding: 12px 18px; }
+  .transaction-search-field { grid-column: 1 / -1; }
+  .transaction-filter-select.currency { grid-column: 1; }
+  .transaction-filter-clear { grid-column: 2; }
   .transaction-row time, .original-value { display: none; }
   .edit-transaction, .delete-transaction { opacity: 1; }
 }
@@ -2751,6 +2845,10 @@ a.nav-item {
   .currency-chart-wrap { gap: 24px; }
   .donut { height: 125px; width: 125px; }
   .transactions-heading { padding: 18px; }
+  .transaction-filter-bar { grid-template-columns: 1fr 1fr; padding: 12px 18px; }
+  .transaction-search-field { grid-column: 1 / -1; }
+  .transaction-filter-select.currency { grid-column: 1; }
+  .transaction-filter-clear { grid-column: 2; }
   .transaction-row { gap: 9px; grid-template-columns: 34px minmax(0, 1fr) minmax(82px, auto) 25px; padding: 8px 13px; }
   .transaction-name strong { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .delete-transaction { display: none; }

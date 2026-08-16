@@ -240,3 +240,25 @@ test("uses one shared reliable ledger navigation", async () => {
   assert.doesNotMatch(budgets, /<aside className="budget-sidebar"/u);
   assert.match(styles, /\.ledger-mobile-nav/u);
 });
+
+test("filters monthly transactions by search, kind, category, and currency", async () => {
+  const [tracker, styles] = await Promise.all([
+    readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(tracker, /transactionQuery/u);
+  assert.match(tracker, /transactionKindFilter/u);
+  assert.match(tracker, /transactionCategoryFilter/u);
+  assert.match(tracker, /transactionCurrencyFilter/u);
+  assert.match(tracker, /transaction\.note \?\? ""/u);
+  assert.match(tracker, /role="search" aria-label=\{copy\.searchTransactions\}/u);
+  assert.match(tracker, /filteredTransactions\.map/u);
+  assert.match(tracker, /clearTransactionFilters/u);
+  assert.match(tracker, /거래 검색/u);
+  assert.match(tracker, /取引を検索/u);
+  assert.match(tracker, /Поиск операций/u);
+  assert.doesNotMatch(tracker, /monthlyTransactions\.slice\(0, 6\)/u);
+  assert.match(styles, /\.transaction-filter-bar/u);
+  assert.match(styles, /\.transaction-search-field/u);
+});
