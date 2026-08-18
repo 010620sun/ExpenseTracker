@@ -287,6 +287,20 @@ test("shows three recent transactions on the dashboard and full history on its o
   assert.match(styles, /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/u);
 });
 
+test("keeps cash-flow and active-currency details inside their metric cards", async () => {
+  const [tracker, styles] = await Promise.all([
+    readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(tracker, /className="metric-card metric-flow-card">\s*<div className="metric-label"><span>\{copy\.netFlow\}/u);
+  assert.match(tracker, /className="metric-card metric-currency-card">\s*<div className="metric-label"><span>\{copy\.activeCurrencies\}/u);
+  assert.match(tracker, /className="currency-more"/u);
+  assert.match(styles, /\.metric-flow-card,\s*\.metric-currency-card \{[\s\S]*?flex-direction: column/u);
+  assert.match(styles, /\.income-pill \{[\s\S]*?margin-top: auto/u);
+  assert.match(styles, /\.currency-stack \{[\s\S]*?margin-top: auto/u);
+});
+
 test("provides member-owned monthly cash-flow reports", async () => {
   const [route, manager, navigation, styles] = await Promise.all([
     readFile(new URL("../app/api/reports/route.ts", import.meta.url), "utf8"),

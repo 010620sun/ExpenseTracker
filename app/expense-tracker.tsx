@@ -2820,7 +2820,7 @@ export function ExpenseTracker({
               <span style={{ width: `${Math.min(budgetProgress, 100)}%` }} />
             </div>
           </article>
-          <article className="metric-card">
+          <article className="metric-card metric-flow-card">
             <div className="metric-label"><span>{copy.netFlow}</span><span className="metric-icon green">↕</span></div>
             <strong className="positive-amount">
               {formatCurrency(
@@ -2830,14 +2830,18 @@ export function ExpenseTracker({
               )}
             </strong>
             <p>{copy.incomeMinusSpend}</p>
-            <span className="income-pill">+ {formatCurrency(inBaseCurrency(totals.incomeUsdMinor, baseCurrency, ratesToUsd), baseCurrency, language)}</span>
+            <div className="income-pill">
+              <span>{copy.income}</span>
+              <strong>+{formatCurrency(inBaseCurrency(totals.incomeUsdMinor, baseCurrency, ratesToUsd), baseCurrency, language)}</strong>
+            </div>
           </article>
-          <article className="metric-card">
+          <article className="metric-card metric-currency-card">
             <div className="metric-label"><span>{copy.activeCurrencies}</span><span className="metric-icon blue">◎</span></div>
             <strong>{totals.currencies.size}</strong>
             <p>{copy.originalAmounts}</p>
             <div className="currency-stack" aria-label={[...totals.currencies].join(", ")}>
-              {[...totals.currencies].slice(0, 5).map((code) => <span key={code}>{code}</span>)}
+              {[...totals.currencies].slice(0, 4).map((code) => <span key={code}>{code}</span>)}
+              {totals.currencies.size > 4 && <span className="currency-more">+{totals.currencies.size - 4}</span>}
             </div>
           </article>
         </section>
