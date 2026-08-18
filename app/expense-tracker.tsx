@@ -515,6 +515,7 @@ const COPY = {
     greeting: "Good morning",
     greetingFallback: "Good morning",
     subtitle: "Every currency, one clear picture.",
+    transactionsSubtitle: "Your complete transaction history.",
     baseCurrency: "Base currency",
     currencySearch: "Search currencies",
     currencySearchPlaceholder: "Search code, currency, or country",
@@ -642,6 +643,7 @@ const COPY = {
     greeting: "좋은 아침이에요",
     greetingFallback: "좋은 아침이에요",
     subtitle: "모든 통화를 한눈에 명확하게.",
+    transactionsSubtitle: "모든 거래 내역을 한곳에서 확인하세요.",
     baseCurrency: "기준 통화",
     currencySearch: "통화 검색",
     currencySearchPlaceholder: "통화 코드, 이름 또는 국가 검색",
@@ -769,6 +771,7 @@ const COPY = {
     greeting: "おはようございます",
     greetingFallback: "おはようございます",
     subtitle: "すべての通貨を、ひと目で明確に。",
+    transactionsSubtitle: "すべての取引履歴を一か所で確認。",
     baseCurrency: "基準通貨",
     currencySearch: "通貨を検索",
     currencySearchPlaceholder: "通貨コード、名称、国名で検索",
@@ -896,6 +899,7 @@ const COPY = {
     greeting: "Доброе утро",
     greetingFallback: "Доброе утро",
     subtitle: "Все валюты в одной ясной картине.",
+    transactionsSubtitle: "Полная история операций в одном месте.",
     baseCurrency: "Основная валюта",
     currencySearch: "Поиск валют",
     currencySearchPlaceholder: "Код, название валюты или страна",
@@ -1394,10 +1398,13 @@ function isPersistedTransaction(transaction: LedgerTransaction) {
 export function ExpenseTracker({
   firstName,
   today,
+  view = "dashboard",
 }: {
   firstName: string | null;
   today: string;
+  view?: "dashboard" | "transactions";
 }) {
+  const isTransactionsView = view === "transactions";
   const [language, setLanguage] = useState<Language>("en");
   const [baseCurrency, setBaseCurrency] = useState<CurrencyCode>("USD");
   const [currencyCatalog, setCurrencyCatalog] = useState<CurrencyMetadata[]>(
@@ -1891,6 +1898,14 @@ export function ExpenseTracker({
     transactionKindFilter,
     transactionQuery,
   ]);
+
+  const recentTransactions = useMemo(
+    () => [...monthlyTransactions].sort(byNewestTransaction).slice(0, 3),
+    [monthlyTransactions],
+  );
+  const visibleTransactions = isTransactionsView
+    ? filteredTransactions
+    : recentTransactions;
 
   const hasTransactionFilters = Boolean(
     transactionQuery.trim() ||
@@ -2519,7 +2534,7 @@ export function ExpenseTracker({
           </div>
           <div className="page-title">
             <p>{firstName ? `${copy.greeting}, ${firstName}.` : `${copy.greetingFallback}.`}</p>
-            <h1>{copy.subtitle}</h1>
+            <h1>{isTransactionsView ? copy.transactionsSubtitle : copy.subtitle}</h1>
           </div>
           <div className="topbar-actions">
             <div className="sync-state" aria-live="polite">
@@ -2548,7 +2563,7 @@ export function ExpenseTracker({
 
         <section className="month-heading" aria-labelledby="month-overview-title">
           <div className="month-heading-copy">
-            <span className="eyebrow">{copy.overview}</span>
+            <span className="eyebrow">{isTransactionsView ? copy.transactions : copy.overview}</span>
             <div className="month-title-row">
               <h2 id="month-overview-title" aria-live="polite">{monthLabel}</h2>
               <div className="month-controls" role="group" aria-label={calendarCopy.calendar}>
@@ -2556,15 +2571,17 @@ export function ExpenseTracker({
                 <button type="button" className="month-today" onClick={goToToday}>{calendarCopy.thisMonth}</button>
                 <button type="button" onClick={() => navigateMonth(1)} aria-label={calendarCopy.nextMonth}>›</button>
               </div>
-              <button
-                type="button"
-                className="recurring-add-button"
-                onClick={() => openRecurringDrawer()}
-                aria-label={`${recurringFlowCopy.add}: ${recurringFlowCopy.buttonHint}`}
-              >
-                <span aria-hidden="true">↻</span>
-                <strong>{recurringFlowCopy.add}</strong>
-              </button>
+              {!isTransactionsView && (
+                <button
+                  type="button"
+                  className="recurring-add-button"
+                  onClick={() => openRecurringDrawer()}
+                  aria-label={`${recurringFlowCopy.add}: ${recurringFlowCopy.buttonHint}`}
+                >
+                  <span aria-hidden="true">↻</span>
+                  <strong>{recurringFlowCopy.add}</strong>
+                </button>
+              )}
             </div>
           </div>
           <div
@@ -2587,6 +2604,7 @@ export function ExpenseTracker({
           </div>
         </section>
 
+        {!isTransactionsView && <>
         <section className="calendar-workspace" aria-label={calendarCopy.calendar}>
           <article className="panel calendar-panel" aria-busy={isSyncing}>
             <div className="calendar-panel-heading">
@@ -2873,12 +2891,18 @@ export function ExpenseTracker({
           </article>
         </section>
 
-        <section className="panel transactions-panel" id="transactions">
+        </>}
+
+        <section className={isTransactionsView ? "panel transactions-panel transactions-page-panel" : "panel transactions-panel"} id="transactions">
           <div className="panel-heading transactions-heading">
-            <div><h2>{copy.transactions}</h2><p>{template(copy.recentHint, { currency: baseCurrency })}</p></div>
-            <span className="transaction-result-count">{template(copy.filterResults, { count: filteredTransactions.length })}</span>
+            <div><h2>{isTransactionsView ? copy.transactions : copy.recent}</h2><p>{template(copy.recentHint, { currency: baseCurrency })}</p></div>
+            {isTransactionsView ? (
+              <span className="transaction-result-count">{template(copy.filterResults, { count: filteredTransactions.length })}</span>
+            ) : (
+              <a className="transactions-view-all" href="/transactions">{copy.allActivity} →</a>
+            )}
           </div>
-          <div className="transaction-filter-bar" role="search" aria-label={copy.searchTransactions}>
+          {isTransactionsView && <div className="transaction-filter-bar" role="search" aria-label={copy.searchTransactions}>
             <label className="transaction-search-field">
               <span aria-hidden="true">⌕</span>
               <span className="sr-only">{copy.searchTransactions}</span>
@@ -2911,10 +2935,10 @@ export function ExpenseTracker({
               </select>
             </label>
             <button type="button" className="transaction-filter-clear" onClick={clearTransactionFilters} disabled={!hasTransactionFilters}>{copy.clearFilters}</button>
-          </div>
-          {filteredTransactions.length ? (
+          </div>}
+          {visibleTransactions.length ? (
             <div className="transaction-list">
-              {filteredTransactions.map((transaction) => (
+              {visibleTransactions.map((transaction) => (
                 <article className="transaction-row" key={transaction.id}>
                   <span
                     className="transaction-glyph"
@@ -2973,7 +2997,7 @@ export function ExpenseTracker({
                 </article>
               ))}
             </div>
-          ) : <p className="empty-state">{monthlyTransactions.length ? copy.noFilterResults : copy.empty}</p>}
+          ) : <p className="empty-state">{isTransactionsView && monthlyTransactions.length ? copy.noFilterResults : copy.empty}</p>}
         </section>
 
         <footer className="product-footer">

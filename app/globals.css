@@ -1759,6 +1759,30 @@ a.nav-item {
   white-space: nowrap;
 }
 
+.transactions-view-all {
+  align-items: center;
+  background: #edf4f0;
+  border: 1px solid #d5e4dc;
+  border-radius: 9px;
+  color: var(--green);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 740;
+  min-height: 36px;
+  padding: 0 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.transactions-view-all:hover {
+  background: #e3efe9;
+  border-color: #bcd2c7;
+}
+
+.transactions-page-panel {
+  margin-bottom: 18px;
+}
+
 .transaction-filter-bar {
   align-items: center;
   border-top: 1px solid var(--line);
@@ -2981,7 +3005,7 @@ a.nav-item {
     box-shadow: 0 14px 40px rgba(19, 43, 37, 0.24);
     display: grid;
     gap: 4px;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     left: 50%;
     padding: 5px;
     position: fixed;

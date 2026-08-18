@@ -76,10 +76,9 @@ type MemberResponse = {
 
 export function LedgerNavigation({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const isLedgerRoute = pathname === "/" || pathname === "/recurring" || pathname === "/budgets" || pathname === "/reports";
+  const isLedgerRoute = pathname === "/" || pathname === "/transactions" || pathname === "/recurring" || pathname === "/budgets" || pathname === "/reports";
   const [language, setLanguage] = useState<Language>("en");
   const [firstName, setFirstName] = useState<string | null>(null);
-  const [hash, setHash] = useState("");
   const [notice, setNotice] = useState("");
   const copy = COPY[language];
 
@@ -88,7 +87,6 @@ export function LedgerNavigation({ children }: { children: ReactNode }) {
     const frame = window.requestAnimationFrame(() => {
       const stored = window.localStorage.getItem("globeledger-language");
       if (isLanguage(stored)) setLanguage(stored);
-      setHash(window.location.hash);
     });
     const syncLanguage = () => {
       if (isLanguage(document.documentElement.lang)) {
@@ -100,9 +98,6 @@ export function LedgerNavigation({ children }: { children: ReactNode }) {
       attributes: true,
       attributeFilter: ["lang"],
     });
-    const syncHash = () => setHash(window.location.hash);
-    window.addEventListener("hashchange", syncHash);
-
     const controller = new AbortController();
     async function loadMember() {
       try {
@@ -124,7 +119,6 @@ export function LedgerNavigation({ children }: { children: ReactNode }) {
       controller.abort();
       languageObserver.disconnect();
       window.cancelAnimationFrame(frame);
-      window.removeEventListener("hashchange", syncHash);
     };
   }, [isLedgerRoute]);
 
@@ -136,8 +130,8 @@ export function LedgerNavigation({ children }: { children: ReactNode }) {
 
   if (!isLedgerRoute) return children;
 
-  const overviewActive = pathname === "/" && hash !== "#transactions";
-  const transactionsActive = pathname === "/" && hash === "#transactions";
+  const overviewActive = pathname === "/";
+  const transactionsActive = pathname === "/transactions";
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -147,7 +141,7 @@ export function LedgerNavigation({ children }: { children: ReactNode }) {
   const primaryLinks = [
     { href: "/", label: copy.overview, glyph: "●", active: overviewActive },
     { href: "/recurring", label: copy.recurring, glyph: "↻", active: pathname === "/recurring" },
-    { href: "/#transactions", label: copy.transactions, glyph: "≡", active: transactionsActive },
+    { href: "/transactions", label: copy.transactions, glyph: "≡", active: transactionsActive },
     { href: "/budgets", label: copy.budgets, glyph: "◎", active: pathname === "/budgets" },
     { href: "/reports", label: copy.reports, glyph: "◫", active: pathname === "/reports" },
   ];
@@ -188,7 +182,7 @@ export function LedgerNavigation({ children }: { children: ReactNode }) {
       <div className="ledger-route">{children}</div>
 
       <nav className="ledger-mobile-nav" aria-label={copy.navigation}>
-        {primaryLinks.filter((item) => item.href !== "/#transactions").map((item) => (
+        {primaryLinks.map((item) => (
           <a href={item.href} className={item.active ? "active" : ""} aria-current={item.active ? "page" : undefined} key={item.href}>
             <span aria-hidden="true">{item.glyph}</span><small>{item.label}</small>
           </a>

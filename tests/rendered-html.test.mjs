@@ -20,13 +20,15 @@ test("provides login and registration", async () => {
 });
 
 test("protects member ledger pages", async () => {
-  const [dashboard, recurring, budgets, reports] = await Promise.all([
+  const [dashboard, transactions, recurring, budgets, reports] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/transactions/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/recurring/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/budgets/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/reports/page.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(dashboard, /if \(!member\) redirect\("\/auth\?return_to=\/"\)/u);
+  assert.match(transactions, /if \(!member\) redirect\("\/auth\?return_to=\/transactions"\)/u);
   assert.match(recurring, /if \(!member\) redirect\("\/auth\?return_to=\/recurring"\)/u);
   assert.match(budgets, /if \(!member\) redirect\("\/auth\?return_to=\/budgets"\)/u);
   assert.match(reports, /if \(!member\) redirect\("\/auth\?return_to=\/reports"\)/u);
@@ -235,6 +237,7 @@ test("uses one shared reliable ledger navigation", async () => {
   assert.doesNotMatch(navigation, /import Link from "next\/link"/u);
   assert.match(navigation, /<a href=\{item\.href\}/u);
   assert.match(navigation, /href: "\/reports"/u);
+  assert.match(navigation, /href: "\/transactions"/u);
   assert.doesNotMatch(navigation, /setNotice\(`\$\{copy\.reports\}/u);
   assert.match(navigation, /className="ledger-mobile-nav"/u);
   assert.match(tracker, /id="transactions"/u);
@@ -256,7 +259,7 @@ test("filters monthly transactions by search, kind, category, and currency", asy
   assert.match(tracker, /transactionCurrencyFilter/u);
   assert.match(tracker, /transaction\.note \?\? ""/u);
   assert.match(tracker, /role="search" aria-label=\{copy\.searchTransactions\}/u);
-  assert.match(tracker, /filteredTransactions\.map/u);
+  assert.match(tracker, /visibleTransactions\.map/u);
   assert.match(tracker, /clearTransactionFilters/u);
   assert.match(tracker, /거래 검색/u);
   assert.match(tracker, /取引を検索/u);
@@ -264,6 +267,24 @@ test("filters monthly transactions by search, kind, category, and currency", asy
   assert.doesNotMatch(tracker, /monthlyTransactions\.slice\(0, 6\)/u);
   assert.match(styles, /\.transaction-filter-bar/u);
   assert.match(styles, /\.transaction-search-field/u);
+});
+
+test("shows three recent transactions on the dashboard and full history on its own page", async () => {
+  const [tracker, page, navigation, styles] = await Promise.all([
+    readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/transactions/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/ledger-navigation.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(tracker, /slice\(0, 3\)/u);
+  assert.match(tracker, /view\?: "dashboard" \| "transactions"/u);
+  assert.match(tracker, /href="\/transactions"/u);
+  assert.match(tracker, /isTransactionsView && <div className="transaction-filter-bar"/u);
+  assert.match(page, /view="transactions"/u);
+  assert.match(navigation, /pathname === "\/transactions"/u);
+  assert.doesNotMatch(navigation, /\/#transactions/u);
+  assert.match(styles, /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/u);
 });
 
 test("provides member-owned monthly cash-flow reports", async () => {
