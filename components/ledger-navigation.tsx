@@ -76,7 +76,7 @@ type MemberResponse = {
 
 export function LedgerNavigation({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const isLedgerRoute = pathname === "/" || pathname === "/recurring" || pathname === "/budgets";
+  const isLedgerRoute = pathname === "/" || pathname === "/recurring" || pathname === "/budgets" || pathname === "/reports";
   const [language, setLanguage] = useState<Language>("en");
   const [firstName, setFirstName] = useState<string | null>(null);
   const [hash, setHash] = useState("");
@@ -149,6 +149,7 @@ export function LedgerNavigation({ children }: { children: ReactNode }) {
     { href: "/recurring", label: copy.recurring, glyph: "↻", active: pathname === "/recurring" },
     { href: "/#transactions", label: copy.transactions, glyph: "≡", active: transactionsActive },
     { href: "/budgets", label: copy.budgets, glyph: "◎", active: pathname === "/budgets" },
+    { href: "/reports", label: copy.reports, glyph: "◫", active: pathname === "/reports" },
   ];
 
   return (
@@ -169,7 +170,6 @@ export function LedgerNavigation({ children }: { children: ReactNode }) {
               <span aria-hidden="true">{item.glyph}</span>{item.label}
             </a>
           ))}
-          <button className="nav-item pending" type="button" title={copy.comingSoon} onClick={() => setNotice(`${copy.reports} · ${copy.unavailable}`)}><span aria-hidden="true">◫</span>{copy.reports}<small>{copy.comingSoon}</small></button>
           <button className="nav-item pending" type="button" title={copy.comingSoon} onClick={() => setNotice(`${copy.settings} · ${copy.unavailable}`)}><span aria-hidden="true">⚙</span>{copy.settings}<small>{copy.comingSoon}</small></button>
         </nav>
         <div className="sidebar-spacer" />

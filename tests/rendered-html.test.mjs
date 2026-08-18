@@ -20,14 +20,16 @@ test("provides login and registration", async () => {
 });
 
 test("protects member ledger pages", async () => {
-  const [dashboard, recurring, budgets] = await Promise.all([
+  const [dashboard, recurring, budgets, reports] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/recurring/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/budgets/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/reports/page.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(dashboard, /if \(!member\) redirect\("\/auth\?return_to=\/"\)/u);
   assert.match(recurring, /if \(!member\) redirect\("\/auth\?return_to=\/recurring"\)/u);
   assert.match(budgets, /if \(!member\) redirect\("\/auth\?return_to=\/budgets"\)/u);
+  assert.match(reports, /if \(!member\) redirect\("\/auth\?return_to=\/reports"\)/u);
 });
 
 test("pins direct Cloudflare Workers and D1 metadata", async () => {
@@ -232,7 +234,8 @@ test("uses one shared reliable ledger navigation", async () => {
   assert.match(navigation, /usePathname\(\)/u);
   assert.doesNotMatch(navigation, /import Link from "next\/link"/u);
   assert.match(navigation, /<a href=\{item\.href\}/u);
-  assert.match(navigation, /setNotice\(`\$\{copy\.reports\}/u);
+  assert.match(navigation, /href: "\/reports"/u);
+  assert.doesNotMatch(navigation, /setNotice\(`\$\{copy\.reports\}/u);
   assert.match(navigation, /className="ledger-mobile-nav"/u);
   assert.match(tracker, /id="transactions"/u);
   assert.doesNotMatch(tracker, /<aside className="sidebar"/u);
@@ -261,6 +264,34 @@ test("filters monthly transactions by search, kind, category, and currency", asy
   assert.doesNotMatch(tracker, /monthlyTransactions\.slice\(0, 6\)/u);
   assert.match(styles, /\.transaction-filter-bar/u);
   assert.match(styles, /\.transaction-search-field/u);
+});
+
+test("provides member-owned monthly cash-flow reports", async () => {
+  const [route, manager, navigation, styles] = await Promise.all([
+    readFile(new URL("../app/api/reports/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/reports/report-manager.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/ledger-navigation.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(route, /memberFromRequest/u);
+  assert.match(route, /eq\(transactions\.ownerId, member\.id\)/u);
+  assert.match(route, /groupBy\(transactions\.category\)/u);
+  assert.match(route, /groupBy\(transactions\.occurredOn\)/u);
+  assert.match(route, /transactions\.originalCurrency/u);
+  assert.match(route, /previousSummaryRows/u);
+  assert.match(manager, /className="report-summary-grid"/u);
+  assert.match(manager, /className="daily-flow-chart"/u);
+  assert.match(manager, /className="report-category-list"/u);
+  assert.match(manager, /className="report-currency-list"/u);
+  assert.match(manager, /className="report-merchant-list"/u);
+  assert.match(manager, /\/api\/transactions\?month=/u);
+  assert.match(manager, /월간 리포트/u);
+  assert.match(manager, /月間レポート/u);
+  assert.match(manager, /Месячный отчёт/u);
+  assert.match(navigation, /href: "\/reports"/u);
+  assert.match(styles, /\.report-grid-primary/u);
+  assert.match(styles, /\.daily-flow-chart/u);
 });
 
 test("distributes one expense exactly across consecutive calendar dates", async () => {
