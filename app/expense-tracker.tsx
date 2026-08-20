@@ -23,6 +23,7 @@ import {
 type CurrencyCode = string;
 type TransactionKind = "expense" | "income";
 type RecurrenceFrequency = "weekly" | "monthly" | "yearly";
+type ValuationMode = "historical" | "current";
 
 type CurrencyMetadata = {
   code: CurrencyCode;
@@ -82,6 +83,15 @@ type RatesApiResponse = RatesPayload & {
   data?: RatesPayload;
 };
 
+type HistoricalRatesApiResponse = {
+  data?: {
+    baseCurrency?: string;
+    quote?: string;
+    direction?: string;
+    rates?: Record<string, string>;
+  };
+};
+
 type PreferencesApiResponse = {
   data?: {
     baseCurrency?: string;
@@ -101,6 +111,14 @@ type RateMeta = {
   asOf: string | null;
   fetchedAt: string | null;
   rateDates: Record<CurrencyCode, string>;
+};
+
+type FormRateSnapshot = {
+  requestedDate: string | null;
+  status: "idle" | "loading" | "ready" | "error";
+  rates: Record<CurrencyCode, number>;
+  rateDates: Record<CurrencyCode, string>;
+  asOf: string | null;
 };
 
 const FALLBACK_CURRENCIES = {
@@ -526,6 +544,12 @@ const COPY = {
     sync: "Rates saved per transaction",
     rateProvider: "Frankfurter reference rates",
     rateLatest: "Latest available reference rates",
+    valuationMode: "Value basis",
+    historicalValue: "Transaction date",
+    currentValue: "Current value",
+    historicalUnavailable: "Some transaction-date rates are unavailable",
+    transactionRateLoading: "Loading the transaction-date rate…",
+    transactionRateError: "The transaction-date rate is unavailable. Try again shortly.",
     rateUpdating: "Updating reference rates…",
     rateStale: "Using last available rate dated {date}",
     rateError: "Connection failed · using fallback rates",
@@ -654,6 +678,12 @@ const COPY = {
     sync: "거래별 환율 저장",
     rateProvider: "Frankfurter 기준 환율",
     rateLatest: "최신 가용 기준 환율",
+    valuationMode: "금액 기준",
+    historicalValue: "거래일 기준",
+    currentValue: "현재 가치",
+    historicalUnavailable: "일부 거래일 환율을 불러오지 못했습니다",
+    transactionRateLoading: "거래일 기준 환율을 불러오는 중…",
+    transactionRateError: "거래일 기준 환율을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     rateUpdating: "기준 환율 업데이트 중…",
     rateStale: "{date} 기준 마지막 가용 환율 사용 중",
     rateError: "연결 실패 · 기본 환율 사용 중",
@@ -782,6 +812,12 @@ const COPY = {
     sync: "取引ごとに為替レートを保存",
     rateProvider: "Frankfurter参照レート",
     rateLatest: "利用可能な最新の参照レート",
+    valuationMode: "金額の基準",
+    historicalValue: "取引日基準",
+    currentValue: "現在価値",
+    historicalUnavailable: "一部の取引日レートを取得できませんでした",
+    transactionRateLoading: "取引日のレートを取得中…",
+    transactionRateError: "取引日のレートを取得できません。しばらくしてから再試行してください。",
     rateUpdating: "参照レートを更新中…",
     rateStale: "{date}時点の最新レートを使用中",
     rateError: "接続に失敗しました · 予備レートを使用中",
@@ -910,6 +946,12 @@ const COPY = {
     sync: "Курс сохраняется для каждой операции",
     rateProvider: "Справочные курсы Frankfurter",
     rateLatest: "Последние доступные справочные курсы",
+    valuationMode: "Основа оценки",
+    historicalValue: "На дату операции",
+    currentValue: "Текущая стоимость",
+    historicalUnavailable: "Некоторые курсы на дату операции недоступны",
+    transactionRateLoading: "Загружаем курс на дату операции…",
+    transactionRateError: "Курс на дату операции недоступен. Повторите попытку позже.",
     rateUpdating: "Обновляем справочные курсы…",
     rateStale: "Используется последний курс на {date}",
     rateError: "Нет соединения · используется резервный курс",
@@ -1289,9 +1331,25 @@ function transactionInBaseCurrency(
   transaction: LedgerTransaction,
   currency: CurrencyCode,
   ratesToUsd: Record<CurrencyCode, number>,
+  valuationMode: ValuationMode,
+  historicalBaseRates: Record<string, number>,
 ) {
   if (transaction.originalCurrency === currency) {
     return originalMajor(transaction);
+  }
+
+  if (valuationMode === "current") {
+    const originalRate = ratesToUsd[transaction.originalCurrency];
+    const displayRate = ratesToUsd[currency];
+    if (originalRate && displayRate) {
+      return (originalMajor(transaction) * originalRate) / displayRate;
+    }
+  } else {
+    const originalRate = Number(transaction.fxRate);
+    const displayRate = historicalBaseRates[transaction.occurredOn];
+    if (Number.isFinite(originalRate) && originalRate > 0 && displayRate > 0) {
+      return (originalMajor(transaction) * originalRate) / displayRate;
+    }
   }
 
   return inBaseCurrency(transaction.baseAmountMinor, currency, ratesToUsd);
@@ -1430,6 +1488,19 @@ export function ExpenseTracker({
     fetchedAt: null,
     rateDates: {},
   });
+  const [valuationMode, setValuationMode] =
+    useState<ValuationMode>("historical");
+  const [historicalBaseRates, setHistoricalBaseRates] =
+    useState<Record<string, number>>({});
+  const [historicalRatesStatus, setHistoricalRatesStatus] =
+    useState<"loading" | "ready" | "error">("loading");
+  const [formRateSnapshot, setFormRateSnapshot] = useState<FormRateSnapshot>({
+    requestedDate: null,
+    status: "idle",
+    rates: {},
+    rateDates: {},
+    asOf: null,
+  });
   const [transactions, setTransactions] =
     useState<LedgerTransaction[]>(FALLBACK_TRANSACTIONS);
   const [monthlyBudgetUsdMinor, setMonthlyBudgetUsdMinor] =
@@ -1515,6 +1586,12 @@ export function ExpenseTracker({
       if (isLanguage(storedLanguage)) {
         setLanguage(storedLanguage);
       }
+      const storedValuationMode = window.localStorage.getItem(
+        "globeledger-valuation-mode",
+      );
+      if (storedValuationMode === "historical" || storedValuationMode === "current") {
+        setValuationMode(storedValuationMode);
+      }
       if (localToday !== today) {
         setTransactions([]);
         setViewMonth(localToday.slice(0, 7));
@@ -1531,6 +1608,10 @@ export function ExpenseTracker({
     document.documentElement.lang = language;
     window.localStorage.setItem("globeledger-language", language);
   }, [language]);
+
+  useEffect(() => {
+    window.localStorage.setItem("globeledger-valuation-mode", valuationMode);
+  }, [valuationMode]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1710,6 +1791,133 @@ export function ExpenseTracker({
     void loadTransactions();
     return () => controller.abort();
   }, [viewMonth, copy.previewMode]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadHistoricalBaseRates() {
+      setHistoricalRatesStatus("loading");
+      try {
+        const from = `${viewMonth}-01`;
+        if (from > currentDate) {
+          setHistoricalBaseRates({});
+          setHistoricalRatesStatus("ready");
+          return;
+        }
+        const monthEnd = shiftIsoDate(`${shiftMonth(viewMonth, 1)}-01`, -1);
+        const to = monthEnd > currentDate ? currentDate : monthEnd;
+        const search = new URLSearchParams({
+          quote: baseCurrency,
+          from,
+          to,
+        });
+        const response = await fetch(`/api/rates/history?${search}`, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        const payload = (await response.json()) as HistoricalRatesApiResponse;
+        const data = payload.data;
+        if (
+          !response.ok ||
+          data?.baseCurrency !== "USD" ||
+          data.quote !== baseCurrency ||
+          data.direction !== "USD_PER_ORIGINAL" ||
+          !data.rates ||
+          typeof data.rates !== "object"
+        ) {
+          throw new Error("INVALID_HISTORICAL_RATES");
+        }
+        const nextRates: Record<string, number> = {};
+        for (const [date, rawRate] of Object.entries(data.rates)) {
+          const rate = Number(rawRate);
+          if (!isIsoDate(date) || !Number.isFinite(rate) || rate <= 0) {
+            throw new Error("INVALID_HISTORICAL_RATE");
+          }
+          nextRates[date] = rate;
+        }
+        setHistoricalBaseRates(nextRates);
+        setHistoricalRatesStatus("ready");
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setHistoricalBaseRates({});
+        setHistoricalRatesStatus("error");
+      }
+    }
+    void loadHistoricalBaseRates();
+    return () => controller.abort();
+  }, [baseCurrency, currentDate, viewMonth]);
+
+  useEffect(() => {
+    if (!isDrawerOpen || !isIsoDate(occurredOn)) return;
+
+    const controller = new AbortController();
+    async function loadTransactionDateRates() {
+      setFormRateSnapshot({
+        requestedDate: occurredOn,
+        status: "loading",
+        rates: {},
+        rateDates: {},
+        asOf: null,
+      });
+      try {
+        const response = await fetch(
+          `/api/rates?date=${encodeURIComponent(occurredOn)}`,
+          { signal: controller.signal, cache: "no-store" },
+        );
+        const responseBody = (await response.json()) as RatesApiResponse;
+        const payload = responseBody.data ?? responseBody;
+        if (
+          !response.ok ||
+          payload.baseCurrency !== "USD" ||
+          payload.direction !== "USD_PER_ORIGINAL" ||
+          payload.source !== "frankfurter" ||
+          !payload.rates ||
+          !payload.rateDates ||
+          !isIsoDate(payload.asOf)
+        ) {
+          throw new Error("INVALID_TRANSACTION_DATE_RATES");
+        }
+        const nextRates: Record<string, number> = { USD: 1 };
+        const nextRateDates: Record<string, string> = {};
+        for (const [code, rawRate] of Object.entries(payload.rates)) {
+          const rate = Number(rawRate);
+          const rateDate = payload.rateDates[code];
+          if (
+            !/^[A-Z]{3}$/u.test(code) ||
+            !Number.isFinite(rate) ||
+            rate <= 0 ||
+            !isIsoDate(rateDate)
+          ) {
+            throw new Error("INVALID_TRANSACTION_DATE_RATE");
+          }
+          nextRates[code] = rate;
+          nextRateDates[code] = rateDate;
+        }
+        setFormRateSnapshot({
+          requestedDate: occurredOn,
+          status: "ready",
+          rates: nextRates,
+          rateDates: nextRateDates,
+          asOf: payload.asOf,
+        });
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setFormRateSnapshot({
+          requestedDate: occurredOn,
+          status: "error",
+          rates: {},
+          rateDates: {},
+          asOf: null,
+        });
+      }
+    }
+    const frame = window.requestAnimationFrame(() => {
+      void loadTransactionDateRates();
+    });
+    return () => {
+      controller.abort();
+      window.cancelAnimationFrame(frame);
+    };
+  }, [isDrawerOpen, occurredOn]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1946,6 +2154,8 @@ export function ExpenseTracker({
         transaction,
         baseCurrency,
         ratesToUsd,
+        valuationMode,
+        historicalBaseRates,
       );
       if (transaction.kind === "income") {
         incomeBaseAmount += displayAmount;
@@ -1969,7 +2179,13 @@ export function ExpenseTracker({
       categories: [...categories.entries()].sort((a, b) => b[1] - a[1]),
       currencyTotals: [...currencyTotals.entries()].sort((a, b) => b[1] - a[1]),
     };
-  }, [baseCurrency, monthlyTransactions, ratesToUsd]);
+  }, [
+    baseCurrency,
+    historicalBaseRates,
+    monthlyTransactions,
+    ratesToUsd,
+    valuationMode,
+  ]);
 
   const transactionsByDate = useMemo(() => {
     const grouped = new Map<string, LedgerTransaction[]>();
@@ -1997,6 +2213,8 @@ export function ExpenseTracker({
         transaction,
         baseCurrency,
         ratesToUsd,
+        valuationMode,
+        historicalBaseRates,
       );
       if (transaction.kind === "income") {
         incomeBaseAmount += displayAmount;
@@ -2005,7 +2223,13 @@ export function ExpenseTracker({
       }
     }
     return { expenseBaseAmount, incomeBaseAmount };
-  }, [baseCurrency, ratesToUsd, selectedTransactions]);
+  }, [
+    baseCurrency,
+    historicalBaseRates,
+    ratesToUsd,
+    selectedTransactions,
+    valuationMode,
+  ]);
 
   const budgetUsdMinor = monthlyBudgetUsdMinor ?? 0;
   const budgetBaseAmount = inBaseCurrency(budgetUsdMinor, baseCurrency, ratesToUsd);
@@ -2030,20 +2254,28 @@ export function ExpenseTracker({
   const usesStoredRate = Boolean(
     editingTransaction &&
       currency === editingTransaction.originalCurrency &&
+      occurredOn === editingTransaction.occurredOn &&
       Number.isFinite(Number(editingTransaction.fxRate)) &&
       Number(editingTransaction.fxRate) > 0,
   );
+  const hasTransactionDateRates = Boolean(
+    formRateSnapshot.status === "ready" &&
+      formRateSnapshot.requestedDate === occurredOn,
+  );
+  const formRatesToUsd = hasTransactionDateRates
+    ? formRateSnapshot.rates
+    : ratesToUsd;
   const formRateToUsd = usesStoredRate
     ? Number(editingTransaction?.fxRate)
-    : ratesToUsd[currency] ?? 1;
+    : formRatesToUsd[currency] ?? 1;
   const conversionRate = currency === baseCurrency
     ? 1
-    : formRateToUsd / (ratesToUsd[baseCurrency] ?? 1);
+    : formRateToUsd / (formRatesToUsd[baseCurrency] ?? 1);
   const convertedPreview = Number(amount) ? Number(amount) * conversionRate : 0;
   const hasFrankfurterRate = Boolean(
-    (rateMeta.status === "updated" || rateMeta.status === "stale") &&
-      ratesToUsd[currency] &&
-      rateMeta.rateDates[currency],
+    hasTransactionDateRates &&
+      formRateSnapshot.rates[currency] &&
+      formRateSnapshot.rateDates[currency],
   );
   const selectedRateSource =
     usesStoredRate
@@ -2056,8 +2288,11 @@ export function ExpenseTracker({
         ? "frankfurter"
         : "manual";
   const selectedRateDate = !usesStoredRate && currency !== "USD" && hasFrankfurterRate
-    ? rateMeta.rateDates[currency] ?? rateMeta.asOf
+    ? formRateSnapshot.rateDates[currency] ?? formRateSnapshot.asOf
     : null;
+  const requiresTransactionDateRate = currency !== "USD" && !usesStoredRate;
+  const transactionDateRateReady =
+    !requiresTransactionDateRate || hasTransactionDateRates;
   const parsedDistributionCount = Number(distributionCount);
   const distributionPreviewEnd =
     isIsoDate(occurredOn) &&
@@ -2291,8 +2526,16 @@ export function ExpenseTracker({
       setFormError(copy.amountError);
       return;
     }
-    if (!isIsoDate(occurredOn)) {
+    if (!isIsoDate(occurredOn) || occurredOn > currentDate) {
       setFormError(copy.dateError);
+      return;
+    }
+    if (requiresTransactionDateRate && !hasTransactionDateRates) {
+      setFormError(
+        formRateSnapshot.status === "loading"
+          ? copy.transactionRateLoading
+          : copy.transactionRateError,
+      );
       return;
     }
     if (
@@ -2608,23 +2851,50 @@ export function ExpenseTracker({
               )}
             </div>
           </div>
-          <div
-            className={`rate-note rate-note-${rateMeta.status}`}
-            role="status"
-            aria-live="polite"
-          >
-            <span className="rate-indicator" aria-hidden="true">↻</span>
-            <span className="rate-note-copy">
-              <strong>{copy.rateProvider}</strong>
-              <span>{rateStatusMessage}</span>
-              {(rateDateLabel || fetchedAtLabel) && (
-                <small>
-                  {rateDateLabel ? `${copy.rateDate}: ${rateDateLabel}` : ""}
-                  {rateDateLabel && fetchedAtLabel ? " · " : ""}
-                  {fetchedAtLabel ? `${copy.fetchedAt}: ${fetchedAtLabel}` : ""}
-                </small>
-              )}
-            </span>
+          <div className="valuation-tools">
+            <div
+              className="valuation-switch"
+              role="group"
+              aria-label={copy.valuationMode}
+            >
+              <button
+                type="button"
+                className={valuationMode === "historical" ? "selected" : ""}
+                aria-pressed={valuationMode === "historical"}
+                onClick={() => setValuationMode("historical")}
+              >
+                {copy.historicalValue}
+              </button>
+              <button
+                type="button"
+                className={valuationMode === "current" ? "selected" : ""}
+                aria-pressed={valuationMode === "current"}
+                onClick={() => setValuationMode("current")}
+              >
+                {copy.currentValue}
+              </button>
+            </div>
+            {valuationMode === "historical" && historicalRatesStatus === "error" && (
+              <small className="valuation-warning">{copy.historicalUnavailable}</small>
+            )}
+            <div
+              className={`rate-note rate-note-${rateMeta.status}`}
+              role="status"
+              aria-live="polite"
+            >
+              <span className="rate-indicator" aria-hidden="true">↻</span>
+              <span className="rate-note-copy">
+                <strong>{copy.rateProvider}</strong>
+                <span>{rateStatusMessage}</span>
+                {(rateDateLabel || fetchedAtLabel) && (
+                  <small>
+                    {rateDateLabel ? `${copy.rateDate}: ${rateDateLabel}` : ""}
+                    {rateDateLabel && fetchedAtLabel ? " · " : ""}
+                    {fetchedAtLabel ? `${copy.fetchedAt}: ${fetchedAtLabel}` : ""}
+                  </small>
+                )}
+              </span>
+            </div>
           </div>
         </section>
 
@@ -2666,6 +2936,8 @@ export function ExpenseTracker({
                               transaction,
                               baseCurrency,
                               ratesToUsd,
+                              valuationMode,
+                              historicalBaseRates,
                             );
                             if (transaction.kind === "income") {
                               incomeBaseAmount += displayAmount;
@@ -2801,7 +3073,7 @@ export function ExpenseTracker({
                         </small>
                       </span>
                       <span className={transaction.kind === "income" ? "day-entry-value income" : "day-entry-value"}>
-                        {transaction.kind === "income" ? "+" : "−"}{formatCurrency(transactionInBaseCurrency(transaction, baseCurrency, ratesToUsd), baseCurrency, language)}
+                        {transaction.kind === "income" ? "+" : "−"}{formatCurrency(transactionInBaseCurrency(transaction, baseCurrency, ratesToUsd, valuationMode, historicalBaseRates), baseCurrency, language)}
                       </span>
                     </button>
                     {canModify && (
@@ -3004,7 +3276,7 @@ export function ExpenseTracker({
                     <span>{transaction.originalCurrency}</span>
                   </div>
                   <div className={transaction.kind === "income" ? "base-value income" : "base-value"}>
-                    <strong>{transaction.kind === "income" ? "+" : "−"}{formatCurrency(transactionInBaseCurrency(transaction, baseCurrency, ratesToUsd), baseCurrency, language)}</strong>
+                    <strong>{transaction.kind === "income" ? "+" : "−"}{formatCurrency(transactionInBaseCurrency(transaction, baseCurrency, ratesToUsd, valuationMode, historicalBaseRates), baseCurrency, language)}</strong>
                     <span>{transaction.originalCurrency === baseCurrency ? baseCurrency : template(copy.convertedTo, { currency: baseCurrency })}</span>
                   </div>
                   {isPersistedTransaction(transaction) && (
@@ -3091,12 +3363,18 @@ export function ExpenseTracker({
                 />
               </div>
               <div className="conversion-preview" id="conversion-preview" aria-live="polite">
-                <div><span>{copy.converted}</span><strong>{formatCurrency(convertedPreview, baseCurrency, language)} <small>{baseCurrency}</small></strong></div>
+                <div><span>{copy.converted}</span><strong>{transactionDateRateReady ? formatCurrency(convertedPreview, baseCurrency, language) : "—"} <small>{baseCurrency}</small></strong></div>
                 <p>
-                  1 {currency} = {conversionRate < 0.01 ? conversionRate.toFixed(6) : conversionRate.toFixed(4)} {baseCurrency}
-                  {" · "}{usesStoredRate ? calendarCopy.historicalRate : currency === "USD" ? copy.identityRate : hasFrankfurterRate ? copy.rateProvider : copy.fallbackRate}
-                  {selectedRateDate ? ` · ${copy.rateDate}: ${selectedRateDate}` : ""}
-                  {" · "}{copy.savedRate}
+                  {!transactionDateRateReady
+                    ? formRateSnapshot.status === "loading"
+                      ? copy.transactionRateLoading
+                      : copy.transactionRateError
+                    : <>
+                        1 {currency} = {conversionRate < 0.01 ? conversionRate.toFixed(6) : conversionRate.toFixed(4)} {baseCurrency}
+                        {" · "}{usesStoredRate ? calendarCopy.historicalRate : currency === "USD" ? copy.identityRate : hasFrankfurterRate ? copy.rateProvider : copy.fallbackRate}
+                        {selectedRateDate ? ` · ${copy.rateDate}: ${selectedRateDate}` : ""}
+                        {" · "}{copy.savedRate}
+                      </>}
                 </p>
               </div>
               {kind === "expense" && (
@@ -3173,7 +3451,7 @@ export function ExpenseTracker({
               )}
               <label className="field">
                 <span>{copy.date}</span>
-                <input type="date" value={occurredOn} onChange={(event) => setOccurredOn(event.target.value)} required />
+                <input type="date" value={occurredOn} max={currentDate} onChange={(event) => setOccurredOn(event.target.value)} required />
               </label>
               {!editingTransaction && kind === "expense" && !isRecurring && (
                 <div className={isDistributed ? "distribution-card active" : "distribution-card"}>

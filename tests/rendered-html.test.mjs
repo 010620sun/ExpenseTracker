@@ -319,6 +319,38 @@ test("uses original amounts when the transaction and service currencies match", 
   );
 });
 
+test("supports transaction-date and current exchange-rate valuations", async () => {
+  const [tracker, ratesRoute, historyRoute, transactionRoute, reportsRoute, reportManager, styles] =
+    await Promise.all([
+      readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/api/rates/route.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/api/rates/history/route.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/api/transactions/route.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/api/reports/route.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/reports/report-manager.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    ]);
+
+  assert.match(ratesRoute, /endpoint\.searchParams\.set\("date", requestedDate\)/u);
+  assert.match(ratesRoute, /readHistoricalSnapshot/u);
+  assert.match(ratesRoute, /await writeSnapshots\(db, historicalRates\)/u);
+  assert.match(historyRoute, /endpoint\.searchParams\.set\("from"/u);
+  assert.match(historyRoute, /direction: "USD_PER_ORIGINAL"/u);
+  assert.match(tracker, /type ValuationMode = "historical" \| "current"/u);
+  assert.match(tracker, /globeledger-valuation-mode/u);
+  assert.match(
+    tracker,
+    /fetch\(\s*`\/api\/rates\?date=\$\{encodeURIComponent\(occurredOn\)\}`/u,
+  );
+  assert.match(tracker, /valuationMode === "current"/u);
+  assert.match(tracker, /historicalBaseRates\[transaction\.occurredOn\]/u);
+  assert.match(transactionRoute, /proposedBody\.occurredOn === existing\.occurredOn/u);
+  assert.match(reportsRoute, /valuationBuckets: valuationRows/u);
+  assert.match(reportManager, /const valuedReport = useMemo/u);
+  assert.match(reportManager, /historicalBaseRates\[bucket\.occurredOn\]/u);
+  assert.match(styles, /\.valuation-switch button\.selected/u);
+});
+
 test("provides member-owned monthly cash-flow reports", async () => {
   const [route, manager, navigation, styles] = await Promise.all([
     readFile(new URL("../app/api/reports/route.ts", import.meta.url), "utf8"),

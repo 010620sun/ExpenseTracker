@@ -1384,7 +1384,8 @@ export async function PATCH(request: Request) {
         ? rawCurrency.trim().toUpperCase()
         : rawCurrency;
     const preserveStoredFx =
-      submittedCurrency === existing.originalCurrency;
+      submittedCurrency === existing.originalCurrency &&
+      proposedBody.occurredOn === existing.occurredOn;
 
     if (preserveStoredFx) {
       proposedBody.currency = existing.originalCurrency;

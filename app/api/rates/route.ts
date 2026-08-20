@@ -1,10 +1,11 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { getDb, type AppDatabase } from "@/db";
 import {
   exchangeRateCache,
   exchangeRateSnapshots,
   type ExchangeRateCache,
+  type ExchangeRateSnapshot,
 } from "@/db/schema";
 import {
   currencyExponent,
@@ -190,9 +191,10 @@ function snapshotId(rate: Pick<NormalizedRate, "quoteCurrency" | "rateDate" | "u
   return `${rate.quoteCurrency}:${rate.rateDate}:${rate.usdPerUnit}`;
 }
 
-async function fetchFrankfurterRates(): Promise<NormalizedRate[]> {
+async function fetchFrankfurterRates(requestedDate?: string): Promise<NormalizedRate[]> {
   const endpoint = new URL("https://api.frankfurter.dev/v2/rates");
   endpoint.searchParams.set("base", BASE_CURRENCY);
+  if (requestedDate) endpoint.searchParams.set("date", requestedDate);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -322,26 +324,7 @@ async function readCompleteCache(db: AppDatabase, now: number) {
 }
 
 async function writeCache(db: AppDatabase, rates: NormalizedRate[]) {
-  for (let index = 0; index < rates.length; index += CACHE_WRITE_CHUNK_SIZE) {
-    const chunk = rates.slice(index, index + CACHE_WRITE_CHUNK_SIZE);
-    await db
-      .insert(exchangeRateSnapshots)
-      .values(
-        chunk.map((rate) => ({
-          snapshotId: snapshotId(rate),
-          quoteCurrency: rate.quoteCurrency,
-          baseCurrency: BASE_CURRENCY,
-          usdPerUnit: rate.usdPerUnit,
-          rateDate: rate.rateDate,
-          fetchedAtMs: rate.fetchedAtMs,
-          source: rate.source,
-        })),
-      )
-      .onConflictDoUpdate({
-        target: exchangeRateSnapshots.snapshotId,
-        set: { fetchedAtMs: chunk[0].fetchedAtMs },
-      });
-  }
+  await writeSnapshots(db, rates);
 
   for (let index = 0; index < rates.length; index += CACHE_WRITE_CHUNK_SIZE) {
     const chunk = rates.slice(index, index + CACHE_WRITE_CHUNK_SIZE);
@@ -368,6 +351,55 @@ async function writeCache(db: AppDatabase, rates: NormalizedRate[]) {
         },
       });
   }
+}
+
+async function writeSnapshots(db: AppDatabase, rates: NormalizedRate[]) {
+  for (let index = 0; index < rates.length; index += CACHE_WRITE_CHUNK_SIZE) {
+    const chunk = rates.slice(index, index + CACHE_WRITE_CHUNK_SIZE);
+    await db
+      .insert(exchangeRateSnapshots)
+      .values(
+        chunk.map((rate) => ({
+          snapshotId: snapshotId(rate),
+          quoteCurrency: rate.quoteCurrency,
+          baseCurrency: BASE_CURRENCY,
+          usdPerUnit: rate.usdPerUnit,
+          rateDate: rate.rateDate,
+          fetchedAtMs: rate.fetchedAtMs,
+          source: rate.source,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: exchangeRateSnapshots.snapshotId,
+        set: { fetchedAtMs: chunk[0].fetchedAtMs },
+      });
+  }
+}
+
+async function readHistoricalSnapshot(db: AppDatabase, requestedDate: string) {
+  const rows = await db
+    .select()
+    .from(exchangeRateSnapshots)
+    .where(
+      and(
+        eq(exchangeRateSnapshots.baseCurrency, BASE_CURRENCY),
+        eq(exchangeRateSnapshots.rateDate, requestedDate),
+      ),
+    );
+  const latestByQuote = new Map<string, ExchangeRateSnapshot>();
+  for (const row of rows) {
+    const current = latestByQuote.get(row.quoteCurrency);
+    if (!current || current.fetchedAtMs < row.fetchedAtMs) {
+      latestByQuote.set(row.quoteCurrency, row);
+    }
+  }
+  const snapshot = [...latestByQuote.values()];
+  return snapshot.length >= MIN_REMOTE_CURRENCY_COUNT &&
+    snapshot.length <= MAX_REMOTE_CURRENCY_COUNT
+    ? snapshot.sort((left, right) =>
+        left.quoteCurrency.localeCompare(right.quoteCurrency),
+      )
+    : null;
 }
 
 function rateResponse(
@@ -437,9 +469,39 @@ function unavailableResponse() {
   );
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const now = Date.now();
   const db = getDb();
+  const requestedDate = new URL(request.url).searchParams.get("date");
+  if (requestedDate !== null) {
+    const latestAllowedDate = new Date(now + 36 * 60 * 60 * 1_000)
+      .toISOString()
+      .slice(0, 10);
+    if (!isValidDate(requestedDate) || requestedDate > latestAllowedDate) {
+      return Response.json(
+        { error: { code: "INVALID_RATE_DATE", field: "date" } },
+        { status: 400, headers: RESPONSE_HEADERS },
+      );
+    }
+    try {
+      try {
+        const stored = await readHistoricalSnapshot(db, requestedDate);
+        if (stored) return rateResponse(stored, false);
+      } catch (error) {
+        console.error("[rates] Historical cache read failed", error);
+      }
+      const historicalRates = await fetchFrankfurterRates(requestedDate);
+      try {
+        await writeSnapshots(db, historicalRates);
+      } catch (error) {
+        console.error("[rates] Historical cache write failed", error);
+      }
+      return rateResponse(historicalRates, false);
+    } catch (error) {
+      console.error("[rates] Historical lookup failed", error);
+      return unavailableResponse();
+    }
+  }
   let cached: ExchangeRateCache[] | null = null;
 
   try {

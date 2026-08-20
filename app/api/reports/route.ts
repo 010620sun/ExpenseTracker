@@ -56,7 +56,7 @@ export async function GET(request: Request) {
     const previousStart = `${previousMonth}-01`;
     const db = getDb();
 
-    const [summaryRows, previousSummaryRows, categoryRows, dailyRows, currencyRows, merchantRows] =
+    const [summaryRows, previousSummaryRows, categoryRows, dailyRows, currencyRows, merchantRows, valuationRows] =
       await db.batch([
         summaryQuery(db, member.id, start, end),
         summaryQuery(db, member.id, previousStart, start),
@@ -135,6 +135,36 @@ export async function GET(request: Request) {
           .groupBy(transactions.description, transactions.category)
           .orderBy(desc(sql`sum(${transactions.baseAmountMinor})`))
           .limit(5),
+        db
+          .select({
+            kind: transactions.kind,
+            occurredOn: transactions.occurredOn,
+            currency: transactions.originalCurrency,
+            currencyExponent: transactions.originalCurrencyExponent,
+            fxRate: transactions.fxRate,
+            category: transactions.category,
+            description: transactions.description,
+            originalAmountMinor: sql<number>`sum(${transactions.originalAmountMinor})`,
+            baseAmountMinor: sql<number>`sum(${transactions.baseAmountMinor})`,
+            transactionCount: sql<number>`count(*)`,
+          })
+          .from(transactions)
+          .where(
+            and(
+              eq(transactions.ownerId, member.id),
+              gte(transactions.occurredOn, previousStart),
+              lt(transactions.occurredOn, end),
+            ),
+          )
+          .groupBy(
+            transactions.kind,
+            transactions.occurredOn,
+            transactions.originalCurrency,
+            transactions.originalCurrencyExponent,
+            transactions.fxRate,
+            transactions.category,
+            transactions.description,
+          ),
       ]);
 
     const normalizeSummary = (row: (typeof summaryRows)[number] | undefined) => {
@@ -181,6 +211,12 @@ export async function GET(request: Request) {
           merchants: merchantRows.map((row) => ({
             ...row,
             expenseUsdMinor: Number(row.expenseUsdMinor) || 0,
+            transactionCount: Number(row.transactionCount) || 0,
+          })),
+          valuationBuckets: valuationRows.map((row) => ({
+            ...row,
+            originalAmountMinor: Number(row.originalAmountMinor) || 0,
+            baseAmountMinor: Number(row.baseAmountMinor) || 0,
             transactionCount: Number(row.transactionCount) || 0,
           })),
         },

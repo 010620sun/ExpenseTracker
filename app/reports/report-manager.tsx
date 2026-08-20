@@ -39,6 +39,18 @@ type ReportData = {
     expenseUsdMinor: number;
     transactionCount: number;
   }>;
+  valuationBuckets: Array<{
+    kind: "expense" | "income";
+    occurredOn: string;
+    currency: string;
+    currencyExponent: number;
+    fxRate: string;
+    category: string;
+    description: string;
+    originalAmountMinor: number;
+    baseAmountMinor: number;
+    transactionCount: number;
+  }>;
 };
 
 type ReportSummary = {
@@ -56,6 +68,15 @@ type PreferencesResponse = { data?: { baseCurrency?: string; language?: Language
 type RatesResponse = {
   data?: { baseCurrency?: string; rates?: Record<string, string> };
 };
+type HistoricalRatesResponse = {
+  data?: {
+    baseCurrency?: string;
+    quote?: string;
+    direction?: string;
+    rates?: Record<string, string>;
+  };
+};
+type ValuationMode = "historical" | "current";
 
 const COPY = {
   en: {
@@ -66,6 +87,9 @@ const COPY = {
     next: "Next month",
     current: "This month",
     baseNote: "Shown in your base currency",
+    valuationMode: "Value basis",
+    historicalValue: "Transaction date",
+    currentValue: "Current value",
     income: "Income",
     expenses: "Expenses",
     net: "Net cash flow",
@@ -106,6 +130,9 @@ const COPY = {
     next: "다음 달",
     current: "이번 달",
     baseNote: "기본 통화 기준으로 표시",
+    valuationMode: "금액 기준",
+    historicalValue: "거래일 기준",
+    currentValue: "현재 가치",
     income: "수입",
     expenses: "지출",
     net: "순현금흐름",
@@ -146,6 +173,9 @@ const COPY = {
     next: "次の月",
     current: "今月",
     baseNote: "基本通貨で表示",
+    valuationMode: "金額の基準",
+    historicalValue: "取引日基準",
+    currentValue: "現在価値",
     income: "収入",
     expenses: "支出",
     net: "純キャッシュフロー",
@@ -186,6 +216,9 @@ const COPY = {
     next: "Следующий месяц",
     current: "Текущий месяц",
     baseNote: "Суммы в основной валюте",
+    valuationMode: "Основа оценки",
+    historicalValue: "На дату операции",
+    currentValue: "Текущая стоимость",
     income: "Доходы",
     expenses: "Расходы",
     net: "Чистый денежный поток",
@@ -281,6 +314,10 @@ export function ReportManager({ today }: { today: string }) {
   const [ratesToUsd, setRatesToUsd] = useState<Record<string, number>>({ USD: 1 });
   const [month, setMonth] = useState(today.slice(0, 7));
   const [report, setReport] = useState<ReportData | null>(null);
+  const [valuationMode, setValuationMode] =
+    useState<ValuationMode>("historical");
+  const [historicalBaseRates, setHistoricalBaseRates] =
+    useState<Record<string, number>>({});
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -296,6 +333,12 @@ export function ReportManager({ today }: { today: string }) {
     const frame = window.requestAnimationFrame(() => {
       const stored = window.localStorage.getItem("globeledger-language");
       if (isLanguage(stored)) setLanguage(stored);
+      const storedValuationMode = window.localStorage.getItem(
+        "globeledger-valuation-mode",
+      );
+      if (storedValuationMode === "historical" || storedValuationMode === "current") {
+        setValuationMode(storedValuationMode);
+      }
     });
     async function bootstrap() {
       try {
@@ -337,6 +380,10 @@ export function ReportManager({ today }: { today: string }) {
     window.localStorage.setItem("globeledger-language", language);
   }, [language]);
 
+  useEffect(() => {
+    window.localStorage.setItem("globeledger-valuation-mode", valuationMode);
+  }, [valuationMode]);
+
   const loadReport = useCallback(async (targetMonth: string, signal?: AbortSignal) => {
     setLoading(true);
     setError("");
@@ -351,12 +398,39 @@ export function ReportManager({ today }: { today: string }) {
         ),
       );
       if (materialized.some((response) => !response.ok)) throw new Error();
-      const response = await fetch(`/api/reports?month=${encodeURIComponent(targetMonth)}`, {
-        cache: "no-store",
-        signal,
+      const historySearch = new URLSearchParams({
+        quote: baseCurrency,
+        from: `${shiftMonth(targetMonth, -1)}-01`,
+        to: `${targetMonth}-${String(daysInMonth(targetMonth)).padStart(2, "0")}`,
       });
+      const [response, historyResponse] = await Promise.all([
+        fetch(`/api/reports?month=${encodeURIComponent(targetMonth)}`, {
+          cache: "no-store",
+          signal,
+        }),
+        fetch(`/api/rates/history?${historySearch}`, {
+          cache: "no-store",
+          signal,
+        }),
+      ]);
       const payload = (await response.json()) as ReportResponse;
+      const historyPayload = (await historyResponse.json()) as HistoricalRatesResponse;
       if (!response.ok || !payload.data) throw new Error();
+      const nextHistoricalRates: Record<string, number> = {};
+      if (
+        historyResponse.ok &&
+        historyPayload.data?.baseCurrency === "USD" &&
+        historyPayload.data.quote === baseCurrency &&
+        historyPayload.data.direction === "USD_PER_ORIGINAL"
+      ) {
+        for (const [date, rawRate] of Object.entries(historyPayload.data.rates ?? {})) {
+          const parsed = Number(rawRate);
+          if (/^\d{4}-\d{2}-\d{2}$/u.test(date) && Number.isFinite(parsed) && parsed > 0) {
+            nextHistoricalRates[date] = parsed;
+          }
+        }
+      }
+      setHistoricalBaseRates(nextHistoricalRates);
       setReport(payload.data);
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === "AbortError") return;
@@ -364,7 +438,7 @@ export function ReportManager({ today }: { today: string }) {
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, [language]);
+  }, [baseCurrency, language]);
 
   useEffect(() => {
     if (!ready) return;
@@ -378,8 +452,160 @@ export function ReportManager({ today }: { today: string }) {
     };
   }, [loadReport, month, ready]);
 
+  const valuedReport = useMemo(() => {
+    if (!report || !report.valuationBuckets?.length) return report;
+
+    const toPseudoUsdMinor = (amount: number) => amount * baseRate * 100;
+    const bucketAmount = (bucket: ReportData["valuationBuckets"][number]) => {
+      const original = bucket.originalAmountMinor / 10 ** bucket.currencyExponent;
+      if (bucket.currency === baseCurrency) return original;
+      if (valuationMode === "current") {
+        const originalRate = ratesToUsd[bucket.currency];
+        if (originalRate && baseRate > 0) return (original * originalRate) / baseRate;
+      } else {
+        const originalRate = Number(bucket.fxRate);
+        const displayRate = historicalBaseRates[bucket.occurredOn];
+        if (Number.isFinite(originalRate) && originalRate > 0 && displayRate > 0) {
+          return (original * originalRate) / displayRate;
+        }
+      }
+      return bucket.baseAmountMinor / 100 / baseRate;
+    };
+    const emptySummary = (): ReportSummary => ({
+      incomeUsdMinor: 0,
+      expenseUsdMinor: 0,
+      netUsdMinor: 0,
+      incomeCount: 0,
+      expenseCount: 0,
+      transactionCount: 0,
+      activeDays: 0,
+    });
+    const currentSummary = emptySummary();
+    const previousSummary = emptySummary();
+    const currentDays = new Set<string>();
+    const previousDays = new Set<string>();
+    const categories = new Map<string, { amount: number; count: number }>();
+    const daily = new Map<string, { income: number; expense: number; count: number }>();
+    const currencies = new Map<string, {
+      exponent: number;
+      originalMinor: number;
+      amount: number;
+      count: number;
+    }>();
+    const merchants = new Map<string, {
+      description: string;
+      category: string;
+      amount: number;
+      count: number;
+    }>();
+
+    for (const bucket of report.valuationBuckets) {
+      const amount = bucketAmount(bucket);
+      const pseudoUsdMinor = toPseudoUsdMinor(amount);
+      const isCurrentMonth = bucket.occurredOn.slice(0, 7) === report.month;
+      const summary = isCurrentMonth ? currentSummary : previousSummary;
+      const activeDays = isCurrentMonth ? currentDays : previousDays;
+      summary.transactionCount += bucket.transactionCount;
+      activeDays.add(bucket.occurredOn);
+      if (bucket.kind === "income") {
+        summary.incomeUsdMinor += pseudoUsdMinor;
+        summary.incomeCount += bucket.transactionCount;
+      } else {
+        summary.expenseUsdMinor += pseudoUsdMinor;
+        summary.expenseCount += bucket.transactionCount;
+      }
+      if (!isCurrentMonth) continue;
+
+      const day = daily.get(bucket.occurredOn) ?? { income: 0, expense: 0, count: 0 };
+      day[bucket.kind] += pseudoUsdMinor;
+      day.count += bucket.transactionCount;
+      daily.set(bucket.occurredOn, day);
+      if (bucket.kind === "income") continue;
+
+      const category = categories.get(bucket.category) ?? { amount: 0, count: 0 };
+      category.amount += pseudoUsdMinor;
+      category.count += bucket.transactionCount;
+      categories.set(bucket.category, category);
+
+      const currency = currencies.get(bucket.currency) ?? {
+        exponent: bucket.currencyExponent,
+        originalMinor: 0,
+        amount: 0,
+        count: 0,
+      };
+      currency.originalMinor += bucket.originalAmountMinor;
+      currency.amount += pseudoUsdMinor;
+      currency.count += bucket.transactionCount;
+      currencies.set(bucket.currency, currency);
+
+      const merchantKey = `${bucket.description}\u0000${bucket.category}`;
+      const merchant = merchants.get(merchantKey) ?? {
+        description: bucket.description,
+        category: bucket.category,
+        amount: 0,
+        count: 0,
+      };
+      merchant.amount += pseudoUsdMinor;
+      merchant.count += bucket.transactionCount;
+      merchants.set(merchantKey, merchant);
+    }
+
+    currentSummary.activeDays = currentDays.size;
+    previousSummary.activeDays = previousDays.size;
+    currentSummary.netUsdMinor =
+      currentSummary.incomeUsdMinor - currentSummary.expenseUsdMinor;
+    previousSummary.netUsdMinor =
+      previousSummary.incomeUsdMinor - previousSummary.expenseUsdMinor;
+
+    return {
+      ...report,
+      summary: currentSummary,
+      previous: { ...previousSummary, month: report.previous.month },
+      categories: [...categories.entries()]
+        .map(([category, item]) => ({
+          category,
+          expenseUsdMinor: item.amount,
+          transactionCount: item.count,
+        }))
+        .sort((left, right) => right.expenseUsdMinor - left.expenseUsdMinor),
+      daily: [...daily.entries()]
+        .map(([occurredOn, item]) => ({
+          occurredOn,
+          incomeUsdMinor: item.income,
+          expenseUsdMinor: item.expense,
+          transactionCount: item.count,
+        }))
+        .sort((left, right) => left.occurredOn.localeCompare(right.occurredOn)),
+      currencies: [...currencies.entries()]
+        .map(([currency, item]) => ({
+          currency,
+          currencyExponent: item.exponent,
+          originalAmountMinor: item.originalMinor,
+          expenseUsdMinor: item.amount,
+          transactionCount: item.count,
+        }))
+        .sort((left, right) => right.expenseUsdMinor - left.expenseUsdMinor),
+      merchants: [...merchants.values()]
+        .map((item) => ({
+          description: item.description,
+          category: item.category,
+          expenseUsdMinor: item.amount,
+          transactionCount: item.count,
+        }))
+        .sort((left, right) => right.expenseUsdMinor - left.expenseUsdMinor)
+        .slice(0, 5),
+    };
+  }, [
+    baseCurrency,
+    baseRate,
+    historicalBaseRates,
+    ratesToUsd,
+    report,
+    valuationMode,
+  ]);
+
   const dailySeries = useMemo(() => {
-    const byDate = new Map(report?.daily.map((item) => [item.occurredOn, item]) ?? []);
+    const byDate = new Map(valuedReport?.daily.map((item) => [item.occurredOn, item]) ?? []);
     return Array.from({ length: daysInMonth(month) }, (_, index) => {
       const date = `${month}-${String(index + 1).padStart(2, "0")}`;
       return byDate.get(date) ?? {
@@ -389,19 +615,19 @@ export function ReportManager({ today }: { today: string }) {
         transactionCount: 0,
       };
     });
-  }, [month, report?.daily]);
+  }, [month, valuedReport?.daily]);
   const dailyMax = Math.max(
     1,
     ...dailySeries.flatMap((item) => [item.expenseUsdMinor, item.incomeUsdMinor]),
   );
-  const summary = report?.summary;
+  const summary = valuedReport?.summary;
   const expenseChange = summary
-    ? changePercent(summary.expenseUsdMinor, report?.previous.expenseUsdMinor ?? 0)
+    ? changePercent(summary.expenseUsdMinor, valuedReport?.previous.expenseUsdMinor ?? 0)
     : null;
   const savingsRate = summary && summary.incomeUsdMinor > 0
     ? Math.round((summary.netUsdMinor / summary.incomeUsdMinor) * 100)
     : null;
-  const topCategory = report?.categories[0];
+  const topCategory = valuedReport?.categories[0];
   const isEmpty = !loading && !error && (summary?.transactionCount ?? 0) === 0;
 
   function categoryName(category: string) {
@@ -443,6 +669,24 @@ export function ReportManager({ today }: { today: string }) {
           </div>
           <div className="report-period-meta">
             <span>{copy.baseNote}: <strong>{baseCurrency}</strong></span>
+            <div className="valuation-switch" role="group" aria-label={copy.valuationMode}>
+              <button
+                type="button"
+                className={valuationMode === "historical" ? "selected" : ""}
+                aria-pressed={valuationMode === "historical"}
+                onClick={() => setValuationMode("historical")}
+              >
+                {copy.historicalValue}
+              </button>
+              <button
+                type="button"
+                className={valuationMode === "current" ? "selected" : ""}
+                aria-pressed={valuationMode === "current"}
+                onClick={() => setValuationMode("current")}
+              >
+                {copy.currentValue}
+              </button>
+            </div>
             {month !== today.slice(0, 7) && (
               <button type="button" onClick={() => setMonth(today.slice(0, 7))}>{copy.current}</button>
             )}
@@ -465,28 +709,28 @@ export function ReportManager({ today }: { today: string }) {
             <p>{copy.emptyBody}</p>
             <button type="button" aria-label={copy.emptyBody} onClick={() => window.location.assign("/")}>＋</button>
           </section>
-        ) : report ? (
+        ) : valuedReport ? (
           <div className={loading ? "report-content loading" : "report-content"} aria-busy={loading}>
             <section className="report-summary-grid" aria-label={copy.title}>
               <article className="income">
                 <span>{copy.income}</span>
-                <strong>{formatMoney(toBase(report.summary.incomeUsdMinor), baseCurrency, language)}</strong>
-                <small>{report.summary.incomeCount} {copy.transactions}</small>
+                <strong>{formatMoney(toBase(valuedReport.summary.incomeUsdMinor), baseCurrency, language)}</strong>
+                <small>{valuedReport.summary.incomeCount} {copy.transactions}</small>
               </article>
               <article className="expense">
                 <span>{copy.expenses}</span>
-                <strong>{formatMoney(toBase(report.summary.expenseUsdMinor), baseCurrency, language)}</strong>
+                <strong>{formatMoney(toBase(valuedReport.summary.expenseUsdMinor), baseCurrency, language)}</strong>
                 <small>{comparisonLabel(expenseChange)}</small>
               </article>
-              <article className={report.summary.netUsdMinor >= 0 ? "net positive" : "net negative"}>
+              <article className={valuedReport.summary.netUsdMinor >= 0 ? "net positive" : "net negative"}>
                 <span>{copy.net}</span>
-                <strong>{formatMoney(toBase(report.summary.netUsdMinor), baseCurrency, language)}</strong>
-                <small>{report.summary.activeDays} {copy.activeDays}</small>
+                <strong>{formatMoney(toBase(valuedReport.summary.netUsdMinor), baseCurrency, language)}</strong>
+                <small>{valuedReport.summary.activeDays} {copy.activeDays}</small>
               </article>
               <article className="savings">
                 <span>{copy.savingsRate}</span>
                 <strong>{savingsRate === null ? "—" : `${savingsRate}%`}</strong>
-                <small>{copy.averageDay}: {formatMoney(toBase(report.summary.activeDays > 0 ? report.summary.expenseUsdMinor / report.summary.activeDays : 0), baseCurrency, language)}</small>
+                <small>{copy.averageDay}: {formatMoney(toBase(valuedReport.summary.activeDays > 0 ? valuedReport.summary.expenseUsdMinor / valuedReport.summary.activeDays : 0), baseCurrency, language)}</small>
               </article>
             </section>
 
@@ -522,9 +766,9 @@ export function ReportManager({ today }: { today: string }) {
                   {topCategory && <span className="top-category-chip">{copy.topCategory}: {categoryName(topCategory.category)}</span>}
                 </div>
                 <div className="report-category-list">
-                  {report.categories.length === 0 ? <p className="report-panel-empty">{copy.noExpenses}</p> : report.categories.map((item) => {
-                    const share = report.summary.expenseUsdMinor > 0
-                      ? Math.round((item.expenseUsdMinor / report.summary.expenseUsdMinor) * 100)
+                  {valuedReport.categories.length === 0 ? <p className="report-panel-empty">{copy.noExpenses}</p> : valuedReport.categories.map((item) => {
+                    const share = valuedReport.summary.expenseUsdMinor > 0
+                      ? Math.round((item.expenseUsdMinor / valuedReport.summary.expenseUsdMinor) * 100)
                       : 0;
                     const meta = CATEGORY_META[item.category] ?? CATEGORY_META.other;
                     return (
@@ -543,7 +787,7 @@ export function ReportManager({ today }: { today: string }) {
               <article className="report-panel currency-report-panel">
                 <div className="report-panel-heading"><div><h2>{copy.currencyBreakdown}</h2><p>{copy.currencyHint}</p></div></div>
                 <div className="report-currency-list">
-                  {report.currencies.length === 0 ? <p className="report-panel-empty">{copy.noExpenses}</p> : report.currencies.map((item) => (
+                  {valuedReport.currencies.length === 0 ? <p className="report-panel-empty">{copy.noExpenses}</p> : valuedReport.currencies.map((item) => (
                     <div className="report-currency-row" key={item.currency}>
                       <span>{item.currency.slice(0, 1)}</span>
                       <div><strong>{item.currency}</strong><small>{item.transactionCount} {copy.entries}</small></div>
@@ -556,7 +800,7 @@ export function ReportManager({ today }: { today: string }) {
               <article className="report-panel merchant-report-panel">
                 <div className="report-panel-heading"><div><h2>{copy.topMerchants}</h2><p>{copy.topMerchantsHint}</p></div></div>
                 <ol className="report-merchant-list">
-                  {report.merchants.length === 0 ? <li className="report-panel-empty">{copy.noExpenses}</li> : report.merchants.map((item, index) => (
+                  {valuedReport.merchants.length === 0 ? <li className="report-panel-empty">{copy.noExpenses}</li> : valuedReport.merchants.map((item, index) => (
                     <li key={`${item.description}:${item.category}`}>
                       <span>{index + 1}</span>
                       <div><strong>{item.description}</strong><small>{categoryName(item.category)} · {item.transactionCount} {copy.entries}</small></div>
