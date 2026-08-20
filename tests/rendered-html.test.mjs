@@ -301,6 +301,24 @@ test("keeps cash-flow and active-currency details inside their metric cards", as
   assert.match(styles, /\.currency-stack \{[\s\S]*?margin-top: auto/u);
 });
 
+test("uses original amounts when the transaction and service currencies match", async () => {
+  const tracker = await readFile(
+    new URL("../app/expense-tracker.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    tracker,
+    /if \(transaction\.originalCurrency === currency\) \{\s*return originalMajor\(transaction\);/u,
+  );
+  assert.match(tracker, /const displayAmount = transactionInBaseCurrency/u);
+  assert.match(tracker, /const conversionRate = currency === baseCurrency\s*\? 1/u);
+  assert.match(
+    tracker,
+    /transaction\.originalCurrency === baseCurrency \? baseCurrency : template\(copy\.convertedTo/u,
+  );
+});
+
 test("provides member-owned monthly cash-flow reports", async () => {
   const [route, manager, navigation, styles] = await Promise.all([
     readFile(new URL("../app/api/reports/route.ts", import.meta.url), "utf8"),

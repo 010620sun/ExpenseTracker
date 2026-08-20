@@ -1285,6 +1285,18 @@ function inBaseCurrency(
   return usdMinor / 100 / (ratesToUsd[currency] ?? 1);
 }
 
+function transactionInBaseCurrency(
+  transaction: LedgerTransaction,
+  currency: CurrencyCode,
+  ratesToUsd: Record<CurrencyCode, number>,
+) {
+  if (transaction.originalCurrency === currency) {
+    return originalMajor(transaction);
+  }
+
+  return inBaseCurrency(transaction.baseAmountMinor, currency, ratesToUsd);
+}
+
 function categoryLabel(category: string, language: Language) {
   const copy = COPY[language];
   const labels: Record<string, string> = {
@@ -1922,38 +1934,42 @@ export function ExpenseTracker({
   }
 
   const totals = useMemo(() => {
-    let expenseUsdMinor = 0;
-    let incomeUsdMinor = 0;
+    let expenseBaseAmount = 0;
+    let incomeBaseAmount = 0;
     const currencies = new Set<CurrencyCode>();
     const categories = new Map<string, number>();
     const currencyTotals = new Map<CurrencyCode, number>();
 
     for (const transaction of monthlyTransactions) {
       currencies.add(transaction.originalCurrency);
+      const displayAmount = transactionInBaseCurrency(
+        transaction,
+        baseCurrency,
+        ratesToUsd,
+      );
       if (transaction.kind === "income") {
-        incomeUsdMinor += transaction.baseAmountMinor;
+        incomeBaseAmount += displayAmount;
         continue;
       }
-      expenseUsdMinor += transaction.baseAmountMinor;
+      expenseBaseAmount += displayAmount;
       categories.set(
         transaction.category,
-        (categories.get(transaction.category) ?? 0) + transaction.baseAmountMinor,
+        (categories.get(transaction.category) ?? 0) + displayAmount,
       );
       currencyTotals.set(
         transaction.originalCurrency,
-        (currencyTotals.get(transaction.originalCurrency) ?? 0) +
-          transaction.baseAmountMinor,
+        (currencyTotals.get(transaction.originalCurrency) ?? 0) + displayAmount,
       );
     }
 
     return {
-      expenseUsdMinor,
-      incomeUsdMinor,
+      expenseBaseAmount,
+      incomeBaseAmount,
       currencies,
       categories: [...categories.entries()].sort((a, b) => b[1] - a[1]),
       currencyTotals: [...currencyTotals.entries()].sort((a, b) => b[1] - a[1]),
     };
-  }, [monthlyTransactions]);
+  }, [baseCurrency, monthlyTransactions, ratesToUsd]);
 
   const transactionsByDate = useMemo(() => {
     const grouped = new Map<string, LedgerTransaction[]>();
@@ -1974,22 +1990,28 @@ export function ExpenseTracker({
     [selectedDate, transactionsByDate],
   );
   const selectedDayTotals = useMemo(() => {
-    let expenseUsdMinor = 0;
-    let incomeUsdMinor = 0;
+    let expenseBaseAmount = 0;
+    let incomeBaseAmount = 0;
     for (const transaction of selectedTransactions) {
+      const displayAmount = transactionInBaseCurrency(
+        transaction,
+        baseCurrency,
+        ratesToUsd,
+      );
       if (transaction.kind === "income") {
-        incomeUsdMinor += transaction.baseAmountMinor;
+        incomeBaseAmount += displayAmount;
       } else {
-        expenseUsdMinor += transaction.baseAmountMinor;
+        expenseBaseAmount += displayAmount;
       }
     }
-    return { expenseUsdMinor, incomeUsdMinor };
-  }, [selectedTransactions]);
+    return { expenseBaseAmount, incomeBaseAmount };
+  }, [baseCurrency, ratesToUsd, selectedTransactions]);
 
   const budgetUsdMinor = monthlyBudgetUsdMinor ?? 0;
-  const remainingUsdMinor = budgetUsdMinor - totals.expenseUsdMinor;
-  const budgetProgress = budgetUsdMinor > 0
-    ? Math.round((totals.expenseUsdMinor / budgetUsdMinor) * 100)
+  const budgetBaseAmount = inBaseCurrency(budgetUsdMinor, baseCurrency, ratesToUsd);
+  const remainingBaseAmount = budgetBaseAmount - totals.expenseBaseAmount;
+  const budgetProgress = budgetBaseAmount > 0
+    ? Math.round((totals.expenseBaseAmount / budgetBaseAmount) * 100)
     : 0;
   const maxCategory = totals.categories[0]?.[1] ?? 1;
   const currencyMixBackground = useMemo(() => {
@@ -2014,7 +2036,9 @@ export function ExpenseTracker({
   const formRateToUsd = usesStoredRate
     ? Number(editingTransaction?.fxRate)
     : ratesToUsd[currency] ?? 1;
-  const conversionRate = formRateToUsd / (ratesToUsd[baseCurrency] ?? 1);
+  const conversionRate = currency === baseCurrency
+    ? 1
+    : formRateToUsd / (ratesToUsd[baseCurrency] ?? 1);
   const convertedPreview = Number(amount) ? Number(amount) * conversionRate : 0;
   const hasFrankfurterRate = Boolean(
     (rateMeta.status === "updated" || rateMeta.status === "stale") &&
@@ -2635,22 +2659,27 @@ export function ExpenseTracker({
                         .map((calendarDate) => {
                           const dayEntries =
                             transactionsByDate.get(calendarDate.iso) ?? [];
-                          let expenseUsdMinor = 0;
-                          let incomeUsdMinor = 0;
+                          let expenseBaseAmount = 0;
+                          let incomeBaseAmount = 0;
                           for (const transaction of dayEntries) {
+                            const displayAmount = transactionInBaseCurrency(
+                              transaction,
+                              baseCurrency,
+                              ratesToUsd,
+                            );
                             if (transaction.kind === "income") {
-                              incomeUsdMinor += transaction.baseAmountMinor;
+                              incomeBaseAmount += displayAmount;
                             } else {
-                              expenseUsdMinor += transaction.baseAmountMinor;
+                              expenseBaseAmount += displayAmount;
                             }
                           }
                           const expense = formatCompactCurrency(
-                            inBaseCurrency(expenseUsdMinor, baseCurrency, ratesToUsd),
+                            expenseBaseAmount,
                             baseCurrency,
                             language,
                           );
                           const income = formatCompactCurrency(
-                            inBaseCurrency(incomeUsdMinor, baseCurrency, ratesToUsd),
+                            incomeBaseAmount,
                             baseCurrency,
                             language,
                           );
@@ -2710,8 +2739,8 @@ export function ExpenseTracker({
                                 )}
                                 {dayEntries.length > 0 && (
                                   <span className="calendar-day-totals" aria-hidden="true">
-                                    {expenseUsdMinor > 0 && <b>−{expense}</b>}
-                                    {incomeUsdMinor > 0 && <b className="income">+{income}</b>}
+                                    {expenseBaseAmount > 0 && <b>−{expense}</b>}
+                                    {incomeBaseAmount > 0 && <b className="income">+{income}</b>}
                                   </span>
                                 )}
                               </button>
@@ -2737,11 +2766,11 @@ export function ExpenseTracker({
             <div className="day-summary-cards">
               <div>
                 <span>{calendarCopy.expenseTotal}</span>
-                <strong>−{formatCurrency(inBaseCurrency(selectedDayTotals.expenseUsdMinor, baseCurrency, ratesToUsd), baseCurrency, language)}</strong>
+                <strong>−{formatCurrency(selectedDayTotals.expenseBaseAmount, baseCurrency, language)}</strong>
               </div>
               <div className="income">
                 <span>{calendarCopy.incomeTotal}</span>
-                <strong>+{formatCurrency(inBaseCurrency(selectedDayTotals.incomeUsdMinor, baseCurrency, ratesToUsd), baseCurrency, language)}</strong>
+                <strong>+{formatCurrency(selectedDayTotals.incomeBaseAmount, baseCurrency, language)}</strong>
               </div>
             </div>
             {selectedTransactions.length ? (
@@ -2772,7 +2801,7 @@ export function ExpenseTracker({
                         </small>
                       </span>
                       <span className={transaction.kind === "income" ? "day-entry-value income" : "day-entry-value"}>
-                        {transaction.kind === "income" ? "+" : "−"}{formatCurrency(inBaseCurrency(transaction.baseAmountMinor, baseCurrency, ratesToUsd), baseCurrency, language)}
+                        {transaction.kind === "income" ? "+" : "−"}{formatCurrency(transactionInBaseCurrency(transaction, baseCurrency, ratesToUsd), baseCurrency, language)}
                       </span>
                     </button>
                     {canModify && (
@@ -2797,7 +2826,7 @@ export function ExpenseTracker({
         <section className="metric-grid" aria-label={`${monthLabel} overview`}>
           <article className="metric-card metric-featured">
             <div className="metric-label"><span>{copy.spent}</span><span className="metric-icon">↗</span></div>
-            <strong>{formatCurrency(inBaseCurrency(totals.expenseUsdMinor, baseCurrency, ratesToUsd), baseCurrency, language)}</strong>
+            <strong>{formatCurrency(totals.expenseBaseAmount, baseCurrency, language)}</strong>
             <p>{template(copy.across, { count: totals.currencies.size })}</p>
             <div className="micro-bars" aria-hidden="true">
               {[34, 58, 46, 72, 64, 88, 78, 100, 84, 94, 76, 90].map((height, index) => (
@@ -2807,7 +2836,7 @@ export function ExpenseTracker({
           </article>
           <article className="metric-card">
             <div className="metric-label"><span>{copy.budgetLeft}</span><span className="metric-icon pale">◔</span></div>
-            <strong>{budgetUsdMinor > 0 ? formatCurrency(inBaseCurrency(remainingUsdMinor, baseCurrency, ratesToUsd), baseCurrency, language) : "—"}</strong>
+            <strong>{budgetUsdMinor > 0 ? formatCurrency(remainingBaseAmount, baseCurrency, language) : "—"}</strong>
             {budgetUsdMinor > 0 ? <p>{budgetProgress}% {copy.ofBudget}</p> : <p><a className="metric-link" href="/budgets">{copy.setBudget} →</a></p>}
             <div
               className="budget-track"
@@ -2824,7 +2853,7 @@ export function ExpenseTracker({
             <div className="metric-label"><span>{copy.netFlow}</span><span className="metric-icon green">↕</span></div>
             <strong className="positive-amount">
               {formatCurrency(
-                inBaseCurrency(totals.incomeUsdMinor - totals.expenseUsdMinor, baseCurrency, ratesToUsd),
+                totals.incomeBaseAmount - totals.expenseBaseAmount,
                 baseCurrency,
                 language,
               )}
@@ -2832,7 +2861,7 @@ export function ExpenseTracker({
             <p>{copy.incomeMinusSpend}</p>
             <div className="income-pill">
               <span>{copy.income}</span>
-              <strong>+{formatCurrency(inBaseCurrency(totals.incomeUsdMinor, baseCurrency, ratesToUsd), baseCurrency, language)}</strong>
+              <strong>+{formatCurrency(totals.incomeBaseAmount, baseCurrency, language)}</strong>
             </div>
           </article>
           <article className="metric-card metric-currency-card">
@@ -2867,7 +2896,7 @@ export function ExpenseTracker({
                       } as CSSProperties}
                     />
                   </div>
-                  <strong>{formatCurrency(inBaseCurrency(value, baseCurrency, ratesToUsd), baseCurrency, language)}</strong>
+                  <strong>{formatCurrency(value, baseCurrency, language)}</strong>
                 </div>
               ))}
             </div>
@@ -2887,7 +2916,7 @@ export function ExpenseTracker({
                   <div key={code}>
                     <span className={`legend-dot legend-${index + 1}`} />
                     <strong>{code}</strong>
-                    <small>{Math.round(value / Math.max(totals.expenseUsdMinor, 1) * 100)}%</small>
+                    <small>{Math.round(value / Math.max(totals.expenseBaseAmount, 1) * 100)}%</small>
                   </div>
                 ))}
               </div>
@@ -2975,8 +3004,8 @@ export function ExpenseTracker({
                     <span>{transaction.originalCurrency}</span>
                   </div>
                   <div className={transaction.kind === "income" ? "base-value income" : "base-value"}>
-                    <strong>{transaction.kind === "income" ? "+" : "−"}{formatCurrency(inBaseCurrency(transaction.baseAmountMinor, baseCurrency, ratesToUsd), baseCurrency, language)}</strong>
-                    <span>{template(copy.convertedTo, { currency: baseCurrency })}</span>
+                    <strong>{transaction.kind === "income" ? "+" : "−"}{formatCurrency(transactionInBaseCurrency(transaction, baseCurrency, ratesToUsd), baseCurrency, language)}</strong>
+                    <span>{transaction.originalCurrency === baseCurrency ? baseCurrency : template(copy.convertedTo, { currency: baseCurrency })}</span>
                   </div>
                   {isPersistedTransaction(transaction) && (
                     <>
