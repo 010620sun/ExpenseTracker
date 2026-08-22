@@ -51,22 +51,44 @@ test("pins direct Cloudflare Workers and D1 metadata", async () => {
   await assert.rejects(access(new URL("../.openai/hosting.json", templateRoot)));
 });
 
-test("provides an expanded visual expense category picker", async () => {
-  const [source, styles] = await Promise.all([
+test("provides grouped expense and income category pickers", async () => {
+  const [source, recurring, budgets, reports, categoriesSource, styles] = await Promise.all([
     readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/recurring/recurring-manager.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/budgets/budget-manager.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/reports/report-manager.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/categories.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
-  const optionsBlock = source.match(
-    /const CATEGORY_OPTIONS = \[([\s\S]*?)\] as const;/u,
+  const expenseBlock = categoriesSource.match(
+    /export const EXPENSE_CATEGORY_IDS = \[([\s\S]*?)\] as const;/u,
   );
-  assert.ok(optionsBlock);
-  const categories = [...optionsBlock[1].matchAll(/"([a-z]+)"/gu)].map(
+  const incomeBlock = categoriesSource.match(
+    /export const INCOME_CATEGORY_IDS = \[([\s\S]*?)\] as const;/u,
+  );
+  assert.ok(expenseBlock);
+  assert.ok(incomeBlock);
+  const expenseCategories = [...expenseBlock[1].matchAll(/"([a-z_]+)"/gu)].map(
     (match) => match[1],
   );
-  assert.equal(categories.length, 12);
-  assert.equal(new Set(categories).size, categories.length);
+  const incomeCategories = [...incomeBlock[1].matchAll(/"([a-z_]+)"/gu)].map(
+    (match) => match[1],
+  );
+  assert.equal(expenseCategories.length, 21);
+  assert.equal(incomeCategories.length, 7);
+  assert.equal(new Set(expenseCategories).size, expenseCategories.length);
+  assert.equal(new Set(incomeCategories).size, incomeCategories.length);
+  assert.match(categoriesSource, /personal_care/u);
+  assert.match(categoriesSource, /investment_income/u);
+  assert.match(categoriesSource, /Record<LedgerCategoryId, CategoryDefinition>/u);
   assert.match(source, /className="category-popover"/u);
+  assert.match(source, /categoryGroupsForKind\(kind\)/u);
+  assert.match(source, /\n\s+category,\n/u);
+  assert.match(recurring, /categoryGroupsForKind/u);
+  assert.match(budgets, /EXPENSE_CATEGORY_IDS/u);
+  assert.match(reports, /categoryColor/u);
   assert.match(source, /role="listbox"/u);
+  assert.match(styles, /\.category-option-groups/u);
   assert.match(styles, /\.category-option-grid/u);
 });
 
@@ -213,7 +235,8 @@ test("supports member-owned monthly category budgets", async () => {
   assert.match(route, /eq\(transactions\.ownerId, ownerId\)/u);
   assert.match(route, /export async function GET/u);
   assert.match(route, /export async function PUT/u);
-  assert.match(manager, /const CATEGORIES = \[/u);
+  assert.match(manager, /EXPENSE_CATEGORY_IDS/u);
+  assert.match(route, /EXPENSE_CATEGORY_IDS/u);
   assert.match(manager, /className="budget-category-row"/u);
   assert.match(manager, /copyPreviousMonth/u);
   assert.match(manager, /<LanguagePicker/u);

@@ -3,6 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { LanguagePicker } from "@/components/language-picker";
+import {
+  categoryGlyph,
+  categoryGroupLabel,
+  categoryGroupsForKind,
+  categoryLabel,
+  EXPENSE_CATEGORY_IDS,
+  type ExpenseCategoryId,
+} from "@/lib/categories";
 import { currencyExponent } from "@/lib/currency";
 import {
   isLanguage,
@@ -10,21 +18,7 @@ import {
   type Language,
 } from "@/lib/language";
 
-const CATEGORIES = [
-  "housing",
-  "groceries",
-  "dining",
-  "transport",
-  "utilities",
-  "health",
-  "education",
-  "entertainment",
-  "travel",
-  "shopping",
-  "subscriptions",
-  "other",
-] as const;
-type BudgetCategory = (typeof CATEGORIES)[number];
+type BudgetCategory = ExpenseCategoryId;
 
 type BudgetResponse = {
   data?: {
@@ -47,21 +41,6 @@ type RatesResponse = {
     source?: string;
     rates?: Record<string, string>;
   };
-};
-
-const CATEGORY_LABELS: Record<BudgetCategory, Record<Language, string>> = {
-  housing: { en: "Housing", ko: "주거", ja: "住居", ru: "Жильё" },
-  groceries: { en: "Groceries", ko: "식료품", ja: "食料品", ru: "Продукты" },
-  dining: { en: "Food & drink", ko: "식음료", ja: "飲食", ru: "Еда и напитки" },
-  transport: { en: "Transport", ko: "교통", ja: "交通", ru: "Транспорт" },
-  utilities: { en: "Utilities", ko: "공과금", ja: "光熱費", ru: "Коммунальные услуги" },
-  health: { en: "Health", ko: "건강·의료", ja: "健康・医療", ru: "Здоровье" },
-  education: { en: "Education", ko: "교육", ja: "教育", ru: "Образование" },
-  entertainment: { en: "Entertainment", ko: "문화·여가", ja: "娯楽", ru: "Развлечения" },
-  travel: { en: "Travel", ko: "여행", ja: "旅行", ru: "Путешествия" },
-  shopping: { en: "Shopping", ko: "쇼핑", ja: "買い物", ru: "Покупки" },
-  subscriptions: { en: "Subscriptions", ko: "구독", ja: "サブスクリプション", ru: "Подписки" },
-  other: { en: "Other", ko: "기타", ja: "その他", ru: "Другое" },
 };
 
 const COPY = {
@@ -123,12 +102,6 @@ const COPY = {
   },
 } as const;
 
-const GLYPHS: Record<BudgetCategory, string> = {
-  housing: "🏠", groceries: "🛒", dining: "🍽️", transport: "🚆",
-  utilities: "💡", health: "🩺", education: "🎓", entertainment: "🎬",
-  travel: "✈️", shopping: "🛍️", subscriptions: "↻", other: "•••",
-};
-
 function shiftMonth(month: string, amount: number) {
   const [year, monthNumber] = month.split("-").map(Number);
   return new Date(Date.UTC(year, monthNumber - 1 + amount, 1))
@@ -165,6 +138,7 @@ function inputAmount(usdMinor: number, baseCurrency: string, rate: number) {
 }
 
 export function BudgetManager({ today }: { today: string }) {
+  const budgetCategoryGroups = categoryGroupsForKind("expense");
   const [language, setLanguage] = useState<Language>("en");
   const [baseCurrency, setBaseCurrency] = useState("USD");
   const [ratesToUsd, setRatesToUsd] = useState<Record<string, number>>({ USD: 1 });
@@ -286,7 +260,7 @@ export function BudgetManager({ today }: { today: string }) {
   const totals = useMemo(() => {
     let budgetUsdMinor = 0;
     let spentUsdMinor = 0;
-    for (const category of CATEGORIES) {
+    for (const category of EXPENSE_CATEGORY_IDS) {
       const value = Number(drafts[category]);
       if (Number.isFinite(value) && value > 0) budgetUsdMinor += Math.round(value * rate * 100);
       spentUsdMinor += spending[category] ?? 0;
@@ -304,7 +278,7 @@ export function BudgetManager({ today }: { today: string }) {
     setError("");
     try {
       const budgets: Array<{ category: BudgetCategory; amountUsdMinor: number }> = [];
-      for (const category of CATEGORIES) {
+      for (const category of EXPENSE_CATEGORY_IDS) {
         const raw = drafts[category]?.trim();
         if (!raw) continue;
         const amount = Number(raw);
@@ -397,31 +371,36 @@ export function BudgetManager({ today }: { today: string }) {
           <div className="budget-plan-heading"><div><h2>{copy.plan}</h2><p>{copy.planHint}</p></div><strong>{baseCurrency}</strong></div>
           {error && <p className="recurring-error" role="alert">{error}</p>}
           <div className={loading ? "budget-category-list loading" : "budget-category-list"} aria-busy={loading}>
-            {CATEGORIES.map((category) => {
-              const spentUsdMinor = spending[category] ?? 0;
-              const rawBudget = Number(drafts[category]);
-              const budgetUsdMinor = Number.isFinite(rawBudget) && rawBudget > 0 ? Math.round(rawBudget * rate * 100) : 0;
-              const remaining = budgetUsdMinor - spentUsdMinor;
-              const progress = budgetUsdMinor > 0 ? Math.round((spentUsdMinor / budgetUsdMinor) * 100) : 0;
-              return (
-                <article className="budget-category-row" key={category}>
-                  <span className="budget-category-icon" aria-hidden="true">{GLYPHS[category]}</span>
-                  <div className="budget-category-copy">
-                    <strong>{CATEGORY_LABELS[category][language]}</strong>
-                    <span>{copy.spent} {formatMoney(toBase(spentUsdMinor), baseCurrency, language)} · {budgetUsdMinor > 0 ? `${Math.max(0, progress)}% ${copy.used}` : copy.noBudget}</span>
-                    <div className={progress > 100 ? "budget-progress over" : "budget-progress"}><span style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }} /></div>
-                  </div>
-                  <label className="budget-amount-field">
-                    <span>{copy.budget}</span>
-                    <div><b>{baseCurrency}</b><input type="number" min="0" step={10 ** -(currencyExponent(baseCurrency) ?? 2)} inputMode="decimal" placeholder="0" value={drafts[category] ?? ""} onChange={(event) => setDrafts((current) => ({ ...current, [category]: event.target.value }))} /></div>
-                  </label>
-                  <div className={remaining < 0 ? "budget-category-balance over" : "budget-category-balance"}>
-                    <span>{copy.remaining}</span>
-                    <strong>{budgetUsdMinor > 0 ? formatMoney(toBase(remaining), baseCurrency, language) : "—"}</strong>
-                  </div>
-                </article>
-              );
-            })}
+            {budgetCategoryGroups.map(({ group, categories }) => (
+              <section className="budget-category-group" key={group}>
+                <h3>{categoryGroupLabel(group, language)}</h3>
+                {categories.map((category) => {
+                  const spentUsdMinor = spending[category] ?? 0;
+                  const rawBudget = Number(drafts[category]);
+                  const budgetUsdMinor = Number.isFinite(rawBudget) && rawBudget > 0 ? Math.round(rawBudget * rate * 100) : 0;
+                  const remaining = budgetUsdMinor - spentUsdMinor;
+                  const progress = budgetUsdMinor > 0 ? Math.round((spentUsdMinor / budgetUsdMinor) * 100) : 0;
+                  return (
+                    <article className="budget-category-row" key={category}>
+                      <span className="budget-category-icon" aria-hidden="true">{categoryGlyph(category)}</span>
+                      <div className="budget-category-copy">
+                        <strong>{categoryLabel(category, language)}</strong>
+                        <span>{copy.spent} {formatMoney(toBase(spentUsdMinor), baseCurrency, language)} · {budgetUsdMinor > 0 ? `${Math.max(0, progress)}% ${copy.used}` : copy.noBudget}</span>
+                        <div className={progress > 100 ? "budget-progress over" : "budget-progress"}><span style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }} /></div>
+                      </div>
+                      <label className="budget-amount-field">
+                        <span>{copy.budget}</span>
+                        <div><b>{baseCurrency}</b><input type="number" min="0" step={10 ** -(currencyExponent(baseCurrency) ?? 2)} inputMode="decimal" placeholder="0" value={drafts[category] ?? ""} onChange={(event) => setDrafts((current) => ({ ...current, [category]: event.target.value }))} /></div>
+                      </label>
+                      <div className={remaining < 0 ? "budget-category-balance over" : "budget-category-balance"}>
+                        <span>{copy.remaining}</span>
+                        <strong>{budgetUsdMinor > 0 ? formatMoney(toBase(remaining), baseCurrency, language) : "—"}</strong>
+                      </div>
+                    </article>
+                  );
+                })}
+              </section>
+            ))}
           </div>
         </section>
       </main>

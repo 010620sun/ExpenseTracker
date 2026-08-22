@@ -5,6 +5,12 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { LanguagePicker } from "@/components/language-picker";
 import {
+  categoryGlyph,
+  categoryGroupLabel,
+  categoryGroupsForKind,
+  categoryLabel,
+} from "@/lib/categories";
+import {
   isLanguage,
   LANGUAGE_LOCALES,
   type Language,
@@ -259,41 +265,6 @@ const COPY = {
   },
 } as const;
 
-const CATEGORY_LABELS: Record<string, Record<Language, string>> = {
-  housing: { en: "Housing", ko: "주거", ja: "住居", ru: "Жильё" },
-  groceries: { en: "Groceries", ko: "식료품", ja: "食料品", ru: "Продукты" },
-  dining: { en: "Food & drink", ko: "식음료", ja: "飲食", ru: "Еда и напитки" },
-  transport: { en: "Transport", ko: "교통", ja: "交通", ru: "Транспорт" },
-  utilities: { en: "Utilities", ko: "공과금", ja: "光熱費", ru: "Коммунальные услуги" },
-  health: { en: "Health", ko: "건강·의료", ja: "健康・医療", ru: "Здоровье" },
-  education: { en: "Education", ko: "교육", ja: "教育", ru: "Образование" },
-  entertainment: { en: "Entertainment", ko: "문화·여가", ja: "娯楽", ru: "Развлечения" },
-  travel: { en: "Travel", ko: "여행", ja: "旅行", ru: "Путешествия" },
-  shopping: { en: "Shopping", ko: "쇼핑", ja: "買い物", ru: "Покупки" },
-  subscriptions: { en: "Subscriptions", ko: "구독", ja: "サブスクリプション", ru: "Подписки" },
-  other: { en: "Other", ko: "기타", ja: "その他", ru: "Другое" },
-  income: { en: "Income", ko: "수입", ja: "収入", ru: "Доход" },
-};
-
-function categoryGlyph(category: string) {
-  const glyphs: Record<string, string> = {
-    housing: "🏠",
-    groceries: "🛒",
-    dining: "🍽️",
-    transport: "🚆",
-    utilities: "💡",
-    health: "🩺",
-    education: "🎓",
-    entertainment: "🎬",
-    travel: "✈️",
-    shopping: "🛍️",
-    subscriptions: "↻",
-    other: "•••",
-    income: "+",
-  };
-  return glyphs[category] ?? "•••";
-}
-
 function money(minor: number, currency: string, language: Language) {
   return new Intl.NumberFormat(LANGUAGE_LOCALES[language], {
     style: "currency",
@@ -475,9 +446,7 @@ export function RecurringManager({ today }: { today: string }) {
     }
   }
 
-  const categoryOptions = Object.entries(CATEGORY_LABELS).filter(([key]) =>
-    editing?.kind === "income" ? key === "income" : key !== "income",
-  );
+  const categoryGroups = categoryGroupsForKind(editing?.kind ?? "expense");
 
   const statusText = (status: SeriesStatus) =>
     status === "active"
@@ -544,7 +513,7 @@ export function RecurringManager({ today }: { today: string }) {
                       <strong>{item.description}</strong>
                       <span className={`series-status ${item.status}`}>{statusText(item.status)}</span>
                     </div>
-                    <span>{CATEGORY_LABELS[item.category]?.[language] ?? item.category} · {copy[item.frequency]}</span>
+                    <span>{categoryLabel(item.category, language)} · {copy[item.frequency]}</span>
                     <div className="series-dates">
                       <span><b>{copy.next}</b> {item.nextOccurrence ? dateLabel(item.nextOccurrence, language) : copy.noNext}</span>
                       <span><b>{copy.started}</b> {dateLabel(item.startOn, language)}</span>
@@ -592,27 +561,32 @@ export function RecurringManager({ today }: { today: string }) {
                     onClick={() => setIsCategoryPickerOpen((open) => !open)}
                   >
                     <span aria-hidden="true">{categoryGlyph(category)}</span>
-                    <strong>{CATEGORY_LABELS[category]?.[language] ?? category}</strong>
+                    <strong>{categoryLabel(category, language)}</strong>
                     <i aria-hidden="true">⌄</i>
                   </button>
                   {isCategoryPickerOpen && (
                     <div className="recurring-category-options" role="listbox" aria-label={copy.category}>
-                      {categoryOptions.map(([key, label]) => (
-                        <button
-                          type="button"
-                          role="option"
-                          aria-selected={category === key}
-                          className={category === key ? "selected" : ""}
-                          key={key}
-                          onClick={() => {
-                            setCategory(key);
-                            setIsCategoryPickerOpen(false);
-                          }}
-                        >
-                          <span aria-hidden="true">{categoryGlyph(key)}</span>
-                          <strong>{label[language]}</strong>
-                          <i aria-hidden="true">{category === key ? "✓" : ""}</i>
-                        </button>
+                      {categoryGroups.map(({ group, categories }) => (
+                        <section className="recurring-category-group" role="group" aria-label={categoryGroupLabel(group, language)} key={group}>
+                          <span>{categoryGroupLabel(group, language)}</span>
+                          {categories.map((key) => (
+                            <button
+                              type="button"
+                              role="option"
+                              aria-selected={category === key}
+                              className={category === key ? "selected" : ""}
+                              key={key}
+                              onClick={() => {
+                                setCategory(key);
+                                setIsCategoryPickerOpen(false);
+                              }}
+                            >
+                              <span aria-hidden="true">{categoryGlyph(key)}</span>
+                              <strong>{categoryLabel(key, language)}</strong>
+                              <i aria-hidden="true">{category === key ? "✓" : ""}</i>
+                            </button>
+                          ))}
+                        </section>
                       ))}
                     </div>
                   )}

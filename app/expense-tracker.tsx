@@ -15,6 +15,16 @@ import {
 import { currencyExponent } from "@/lib/currency";
 import { LanguagePicker } from "@/components/language-picker";
 import {
+  categoryColor,
+  categoryGlyph,
+  categoryGroupLabel,
+  categoryGroupsForKind,
+  categoryIdsForKind,
+  categoryLabel,
+  isExpenseCategory,
+  isIncomeCategory,
+} from "@/lib/categories";
+import {
   isLanguage,
   LANGUAGE_LOCALES,
   type Language,
@@ -426,22 +436,6 @@ function CurrencyPicker({
   );
 }
 
-const CATEGORY_COLORS: Record<string, string> = {
-  housing: "#ee6c4d",
-  groceries: "#3d7c6a",
-  transport: "#4d6fdd",
-  dining: "#cf8b2c",
-  utilities: "#d59b31",
-  health: "#d45f79",
-  education: "#5277b8",
-  entertainment: "#8b67c7",
-  travel: "#2f8e9d",
-  shopping: "#9b6acb",
-  subscriptions: "#647b96",
-  income: "#278369",
-  other: "#657477",
-};
-
 const FALLBACK_TRANSACTIONS: LedgerTransaction[] = [
   {
     id: "preview-1",
@@ -586,7 +580,7 @@ const COPY = {
     merchant: "Merchant or description",
     category: "Category",
     chooseCategory: "Choose a category",
-    categoryHint: "Pick the best match for this expense.",
+    categoryHint: "Choose the closest match for this transaction.",
     date: "Date",
     amount: "Amount",
     currency: "Currency",
@@ -610,19 +604,6 @@ const COPY = {
     signInNeeded: "Sign in to save your private ledger.",
     previewMode: "Showing preview data while your ledger reconnects.",
     empty: "No transactions yet. Add your first one.",
-    housing: "Housing",
-    groceries: "Groceries",
-    transport: "Transport",
-    dining: "Food & drink",
-    utilities: "Utilities",
-    health: "Health",
-    education: "Education",
-    entertainment: "Entertainment",
-    travel: "Travel",
-    shopping: "Shopping",
-    subscriptions: "Subscriptions",
-    other: "Other",
-    incomeCategory: "Income",
     language: "Language",
     privateLedger: "Your private global ledger",
     logout: "Log out",
@@ -720,7 +701,7 @@ const COPY = {
     merchant: "사용처 또는 설명",
     category: "카테고리",
     chooseCategory: "카테고리 선택",
-    categoryHint: "이 지출에 가장 알맞은 항목을 선택하세요.",
+    categoryHint: "이 거래에 가장 알맞은 항목을 선택하세요.",
     date: "날짜",
     amount: "금액",
     currency: "통화",
@@ -744,19 +725,6 @@ const COPY = {
     signInNeeded: "로그인하면 나만의 가계부에 저장할 수 있어요.",
     previewMode: "가계부를 다시 연결하는 동안 예시 데이터를 표시합니다.",
     empty: "아직 거래가 없습니다. 첫 거래를 추가해 보세요.",
-    housing: "주거",
-    groceries: "식료품",
-    transport: "교통",
-    dining: "식음료",
-    utilities: "공과금",
-    health: "건강·의료",
-    education: "교육",
-    entertainment: "문화·여가",
-    travel: "여행",
-    shopping: "쇼핑",
-    subscriptions: "구독",
-    other: "기타",
-    incomeCategory: "수입",
     language: "언어",
     privateLedger: "나만의 글로벌 가계부",
     logout: "로그아웃",
@@ -854,7 +822,7 @@ const COPY = {
     merchant: "店舗名または説明",
     category: "カテゴリー",
     chooseCategory: "カテゴリーを選択",
-    categoryHint: "この支出に最も合う項目を選んでください。",
+    categoryHint: "この取引に最も合う項目を選んでください。",
     date: "日付",
     amount: "金額",
     currency: "通貨",
@@ -878,19 +846,6 @@ const COPY = {
     signInNeeded: "ログインすると自分の家計簿に保存できます。",
     previewMode: "家計簿に再接続するまでサンプルデータを表示しています。",
     empty: "取引はまだありません。最初の取引を追加しましょう。",
-    housing: "住居",
-    groceries: "食料品",
-    transport: "交通",
-    dining: "飲食",
-    utilities: "光熱費",
-    health: "健康・医療",
-    education: "教育",
-    entertainment: "娯楽",
-    travel: "旅行",
-    shopping: "買い物",
-    subscriptions: "サブスクリプション",
-    other: "その他",
-    incomeCategory: "収入",
     language: "言語",
     privateLedger: "自分だけのグローバル家計簿",
     logout: "ログアウト",
@@ -988,7 +943,7 @@ const COPY = {
     merchant: "Продавец или описание",
     category: "Категория",
     chooseCategory: "Выберите категорию",
-    categoryHint: "Выберите наиболее подходящую категорию расхода.",
+    categoryHint: "Выберите наиболее подходящую категорию операции.",
     date: "Дата",
     amount: "Сумма",
     currency: "Валюта",
@@ -1012,19 +967,6 @@ const COPY = {
     signInNeeded: "Войдите, чтобы сохранить личный бюджет.",
     previewMode: "Показываем пример данных, пока восстанавливается соединение.",
     empty: "Операций пока нет. Добавьте первую.",
-    housing: "Жильё",
-    groceries: "Продукты",
-    transport: "Транспорт",
-    dining: "Еда и напитки",
-    utilities: "Коммунальные услуги",
-    health: "Здоровье",
-    education: "Образование",
-    entertainment: "Развлечения",
-    travel: "Путешествия",
-    shopping: "Покупки",
-    subscriptions: "Подписки",
-    other: "Другое",
-    incomeCategory: "Доход",
     language: "Язык",
     privateLedger: "Ваш личный глобальный бюджет",
     logout: "Выйти",
@@ -1226,21 +1168,6 @@ const CALENDAR_COPY = {
   },
 } as const;
 
-const CATEGORY_OPTIONS = [
-  "housing",
-  "groceries",
-  "dining",
-  "transport",
-  "utilities",
-  "health",
-  "education",
-  "entertainment",
-  "travel",
-  "shopping",
-  "subscriptions",
-  "other",
-] as const;
-
 function template(value: string, variables: Record<string, string | number>) {
   return Object.entries(variables).reduce(
     (result, [key, replacement]) =>
@@ -1353,45 +1280,6 @@ function transactionInBaseCurrency(
   }
 
   return inBaseCurrency(transaction.baseAmountMinor, currency, ratesToUsd);
-}
-
-function categoryLabel(category: string, language: Language) {
-  const copy = COPY[language];
-  const labels: Record<string, string> = {
-    housing: copy.housing,
-    groceries: copy.groceries,
-    transport: copy.transport,
-    dining: copy.dining,
-    utilities: copy.utilities,
-    health: copy.health,
-    education: copy.education,
-    entertainment: copy.entertainment,
-    travel: copy.travel,
-    shopping: copy.shopping,
-    subscriptions: copy.subscriptions,
-    other: copy.other,
-    income: copy.incomeCategory,
-  };
-  return labels[category] ?? category;
-}
-
-function categoryGlyph(category: string) {
-  const glyphs: Record<string, string> = {
-    housing: "🏠",
-    groceries: "🛒",
-    dining: "🍽️",
-    transport: "🚆",
-    utilities: "💡",
-    health: "🩺",
-    education: "🎓",
-    entertainment: "🎬",
-    travel: "✈️",
-    shopping: "🛍️",
-    subscriptions: "🔁",
-    income: "+",
-    other: "•••",
-  };
-  return glyphs[category] ?? "•••";
 }
 
 function shiftIsoDate(date: string, days: number) {
@@ -1563,6 +1451,9 @@ export function ExpenseTracker({
   };
   const calendarCopy = CALENDAR_COPY[language];
   const recurringFlowCopy = RECURRING_FLOW_COPY[language];
+  const activeCategoryOptions = categoryIdsForKind(kind);
+  const activeCategoryGroups = categoryGroupsForKind(kind);
+  const hasSelectedCategory = activeCategoryOptions.some((item) => item === category);
   const transactionCurrencyCatalog = useMemo(() => {
     if (currencyCatalog.some((item) => item.code === currency)) {
       return currencyCatalog;
@@ -2006,7 +1897,9 @@ export function ExpenseTracker({
   useEffect(() => {
     if (!isCategoryPickerOpen) return;
     const frame = window.requestAnimationFrame(() => {
-      categoryOptionRefs.current[category]?.focus();
+      const firstCategory = categoryIdsForKind(kind)[0];
+      (categoryOptionRefs.current[category] ??
+        categoryOptionRefs.current[firstCategory])?.focus();
     });
 
     function handlePointerDown(event: PointerEvent) {
@@ -2040,7 +1933,7 @@ export function ExpenseTracker({
       window.cancelAnimationFrame(frame);
       document.removeEventListener("pointerdown", handlePointerDown);
     };
-  }, [category, isCategoryPickerOpen]);
+  }, [category, isCategoryPickerOpen, kind]);
 
   useEffect(() => {
     if (!toast) return;
@@ -2392,9 +2285,7 @@ export function ExpenseTracker({
     setDescription(transaction.description);
     setAmount(amountForInput(transaction));
     setCurrency(transaction.originalCurrency);
-    setCategory(
-      transaction.kind === "income" ? "income" : transaction.category,
-    );
+    setCategory(transaction.category);
     setNote(transaction.note ?? "");
     setOccurredOn(transaction.occurredOn);
     setIsRecurring(false);
@@ -2427,18 +2318,18 @@ export function ExpenseTracker({
     let targetIndex: number | null = null;
     if (event.key === "ArrowLeft") targetIndex = Math.max(0, index - 1);
     if (event.key === "ArrowRight") {
-      targetIndex = Math.min(CATEGORY_OPTIONS.length - 1, index + 1);
+      targetIndex = Math.min(activeCategoryOptions.length - 1, index + 1);
     }
     if (event.key === "ArrowUp") targetIndex = Math.max(0, index - 3);
     if (event.key === "ArrowDown") {
-      targetIndex = Math.min(CATEGORY_OPTIONS.length - 1, index + 3);
+      targetIndex = Math.min(activeCategoryOptions.length - 1, index + 3);
     }
     if (event.key === "Home") targetIndex = 0;
-    if (event.key === "End") targetIndex = CATEGORY_OPTIONS.length - 1;
+    if (event.key === "End") targetIndex = activeCategoryOptions.length - 1;
     if (targetIndex === null) return;
     event.preventDefault();
     if (targetIndex === index) return;
-    categoryOptionRefs.current[CATEGORY_OPTIONS[targetIndex]]?.focus();
+    categoryOptionRefs.current[activeCategoryOptions[targetIndex]]?.focus();
   }
 
   function moveToMonth(month: string, date: string) {
@@ -2580,7 +2471,7 @@ export function ExpenseTracker({
           rate: String(formRateToUsd),
           rateSource: selectedRateSource,
           rateDate: selectedRateDate,
-          category: kind === "income" ? "income" : category,
+          category,
           description: description.trim(),
           note: note.trim(),
           ...(!editingTransaction && isRecurring
@@ -2991,7 +2882,7 @@ export function ExpenseTracker({
                                 <span className="calendar-entry-previews" aria-hidden="true">
                                   {dayEntries.slice(0, 2).map((transaction) => (
                                     <span className={transaction.kind === "income" ? "calendar-entry-preview income" : "calendar-entry-preview"} key={transaction.id}>
-                                      <i style={{ backgroundColor: CATEGORY_COLORS[transaction.category] ?? CATEGORY_COLORS.other }} />
+                                      <i style={{ backgroundColor: categoryColor(transaction.category) }} />
                                       {transaction.isRecurring ? (
                                         <em>↻</em>
                                       ) : transaction.splitGroupId ? (
@@ -3058,7 +2949,7 @@ export function ExpenseTracker({
                       onClick={canModify ? () => openEditDrawer(transaction) : undefined}
                       aria-label={canModify ? template(calendarCopy.editLabel, { merchant: transaction.description }) : transaction.description}
                     >
-                      <span className="transaction-glyph" style={{ backgroundColor: `${CATEGORY_COLORS[transaction.category] ?? CATEGORY_COLORS.other}18`, color: CATEGORY_COLORS[transaction.category] ?? CATEGORY_COLORS.other }} aria-hidden="true">
+                      <span className="transaction-glyph" style={{ backgroundColor: `${categoryColor(transaction.category)}18`, color: categoryColor(transaction.category) }} aria-hidden="true">
                         {categoryGlyph(transaction.category)}
                       </span>
                       <span className="day-entry-copy">
@@ -3157,13 +3048,13 @@ export function ExpenseTracker({
               {totals.categories.slice(0, 4).map(([item, value]) => (
                 <div className="category-row" key={item}>
                   <div className="category-name">
-                    <span style={{ backgroundColor: CATEGORY_COLORS[item] ?? CATEGORY_COLORS.other }}>{categoryGlyph(item)}</span>
+                    <span style={{ backgroundColor: categoryColor(item) }}>{categoryGlyph(item)}</span>
                     <strong>{categoryLabel(item, language)}</strong>
                   </div>
                   <div className="category-track" aria-hidden="true">
                     <span
                       style={{
-                        "--category-color": CATEGORY_COLORS[item] ?? CATEGORY_COLORS.other,
+                        "--category-color": categoryColor(item),
                         "--bar-width": `${Math.max(8, (value / maxCategory) * 100)}%`,
                       } as CSSProperties}
                     />
@@ -3248,8 +3139,8 @@ export function ExpenseTracker({
                   <span
                     className="transaction-glyph"
                     style={{
-                      backgroundColor: `${CATEGORY_COLORS[transaction.category] ?? CATEGORY_COLORS.other}18`,
-                      color: CATEGORY_COLORS[transaction.category] ?? CATEGORY_COLORS.other,
+                      backgroundColor: `${categoryColor(transaction.category)}18`,
+                      color: categoryColor(transaction.category),
                     }}
                     aria-hidden="true"
                   >
@@ -3340,8 +3231,8 @@ export function ExpenseTracker({
             </div>
             <form onSubmit={handleSubmit}>
               <div className="kind-switch" aria-label={`${copy.expense} / ${copy.income}`}>
-                <button type="button" aria-pressed={kind === "expense"} className={kind === "expense" ? "selected" : ""} onClick={() => { setKind("expense"); if (category === "income") setCategory("dining"); }}>{copy.expense}</button>
-                <button type="button" aria-pressed={kind === "income"} className={kind === "income" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("income"); setCategory("income"); setIsDistributed(false); }}>{copy.income}</button>
+                <button type="button" aria-pressed={kind === "expense"} className={kind === "expense" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("expense"); if (!isExpenseCategory(category)) setCategory("dining"); }}>{copy.expense}</button>
+                <button type="button" aria-pressed={kind === "income"} className={kind === "income" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("income"); if (!isIncomeCategory(category)) setCategory("salary"); setIsDistributed(false); }}>{copy.income}</button>
               </div>
               <label className="field">
                 <span>{copy.merchant}</span>
@@ -3377,8 +3268,7 @@ export function ExpenseTracker({
                       </>}
                 </p>
               </div>
-              {kind === "expense" && (
-                <div className="field category-field">
+              <div className="field category-field">
                   <span id="category-field-label">{copy.category}</span>
                   <div className="category-picker">
                     <button
@@ -3394,8 +3284,8 @@ export function ExpenseTracker({
                       <span
                         className="category-trigger-art"
                         style={{
-                          backgroundColor: `${CATEGORY_COLORS[category] ?? CATEGORY_COLORS.other}18`,
-                          color: CATEGORY_COLORS[category] ?? CATEGORY_COLORS.other,
+                          backgroundColor: `${categoryColor(category)}18`,
+                          color: categoryColor(category),
                         }}
                         aria-hidden="true"
                       >
@@ -3413,42 +3303,49 @@ export function ExpenseTracker({
                           <strong>{copy.chooseCategory}</strong>
                           <span>{copy.categoryHint}</span>
                         </div>
-                        <div id="category-options" className="category-option-grid" role="listbox" aria-labelledby="category-field-label">
-                          {CATEGORY_OPTIONS.map((item, index) => {
-                            const selected = item === category;
-                            const color = CATEGORY_COLORS[item] ?? CATEGORY_COLORS.other;
-                            return (
-                              <button
-                                ref={(node) => {
-                                  categoryOptionRefs.current[item] = node;
-                                }}
-                                type="button"
-                                role="option"
-                                aria-selected={selected}
-                                tabIndex={selected ? 0 : -1}
-                                className={selected ? "category-option selected" : "category-option"}
-                                key={item}
-                                onClick={() => chooseCategory(item)}
-                                onKeyDown={(event) => handleCategoryKeyDown(event, index)}
-                              >
-                                <span
-                                  className="category-option-art"
-                                  style={{ backgroundColor: `${color}18`, color }}
-                                  aria-hidden="true"
-                                >
-                                  {categoryGlyph(item)}
-                                </span>
-                                <span>{categoryLabel(item, language)}</span>
-                                {selected && <i aria-hidden="true">✓</i>}
-                              </button>
-                            );
-                          })}
+                        <div id="category-options" className="category-option-groups" role="listbox" aria-labelledby="category-field-label">
+                          {activeCategoryGroups.map(({ group, categories }) => (
+                            <section className="category-option-group" role="group" aria-label={categoryGroupLabel(group, language)} key={group}>
+                              <strong>{categoryGroupLabel(group, language)}</strong>
+                              <div className="category-option-grid">
+                                {categories.map((item) => {
+                                  const index = activeCategoryOptions.indexOf(item);
+                                  const selected = item === category;
+                                  const color = categoryColor(item);
+                                  return (
+                                    <button
+                                      ref={(node) => {
+                                        categoryOptionRefs.current[item] = node;
+                                      }}
+                                      type="button"
+                                      role="option"
+                                      aria-selected={selected}
+                                      tabIndex={selected || (!hasSelectedCategory && index === 0) ? 0 : -1}
+                                      className={selected ? "category-option selected" : "category-option"}
+                                      key={item}
+                                      onClick={() => chooseCategory(item)}
+                                      onKeyDown={(event) => handleCategoryKeyDown(event, index)}
+                                    >
+                                      <span
+                                        className="category-option-art"
+                                        style={{ backgroundColor: `${color}18`, color }}
+                                        aria-hidden="true"
+                                      >
+                                        {categoryGlyph(item)}
+                                      </span>
+                                      <span>{categoryLabel(item, language)}</span>
+                                      {selected && <i aria-hidden="true">✓</i>}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </section>
+                          ))}
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
-              )}
               <label className="field">
                 <span>{copy.date}</span>
                 <input type="date" value={occurredOn} max={currentDate} onChange={(event) => setOccurredOn(event.target.value)} required />

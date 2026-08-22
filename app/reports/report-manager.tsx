@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { LanguagePicker } from "@/components/language-picker";
+import { categoryColor, categoryGlyph, categoryLabel } from "@/lib/categories";
 import { currencyExponent } from "@/lib/currency";
 import {
   isLanguage,
@@ -252,21 +253,6 @@ const COPY = {
     noExpenses: "В этом месяце расходов не зафиксировано.",
   },
 } as const;
-
-const CATEGORY_META: Record<string, { color: string; glyph: string; labels: Record<Language, string> }> = {
-  housing: { color: "#4d6fdd", glyph: "🏠", labels: { en: "Housing", ko: "주거", ja: "住居", ru: "Жильё" } },
-  groceries: { color: "#4f8f6f", glyph: "🛒", labels: { en: "Groceries", ko: "식료품", ja: "食料品", ru: "Продукты" } },
-  dining: { color: "#ee6c4d", glyph: "🍽️", labels: { en: "Food & drink", ko: "식음료", ja: "飲食", ru: "Еда и напитки" } },
-  transport: { color: "#d49b45", glyph: "🚆", labels: { en: "Transport", ko: "교통", ja: "交通", ru: "Транспорт" } },
-  utilities: { color: "#54a7a3", glyph: "💡", labels: { en: "Utilities", ko: "공과금", ja: "光熱費", ru: "Коммунальные услуги" } },
-  health: { color: "#d9687b", glyph: "🩺", labels: { en: "Health", ko: "건강·의료", ja: "健康・医療", ru: "Здоровье" } },
-  education: { color: "#6d81be", glyph: "🎓", labels: { en: "Education", ko: "교육", ja: "教育", ru: "Образование" } },
-  entertainment: { color: "#9b6acb", glyph: "🎬", labels: { en: "Entertainment", ko: "문화·여가", ja: "娯楽", ru: "Развлечения" } },
-  travel: { color: "#2d8b9b", glyph: "✈️", labels: { en: "Travel", ko: "여행", ja: "旅行", ru: "Путешествия" } },
-  shopping: { color: "#d1749c", glyph: "🛍️", labels: { en: "Shopping", ko: "쇼핑", ja: "買い物", ru: "Покупки" } },
-  subscriptions: { color: "#7d78b8", glyph: "↻", labels: { en: "Subscriptions", ko: "구독", ja: "サブスクリプション", ru: "Подписки" } },
-  other: { color: "#7e8b86", glyph: "•••", labels: { en: "Other", ko: "기타", ja: "その他", ru: "Другое" } },
-};
 
 function shiftMonth(month: string, amount: number) {
   const [year, monthNumber] = month.split("-").map(Number);
@@ -631,7 +617,7 @@ export function ReportManager({ today }: { today: string }) {
   const isEmpty = !loading && !error && (summary?.transactionCount ?? 0) === 0;
 
   function categoryName(category: string) {
-    return CATEGORY_META[category]?.labels[language] ?? category;
+    return categoryLabel(category, language);
   }
 
   function chooseLanguage(nextLanguage: Language) {
@@ -770,11 +756,11 @@ export function ReportManager({ today }: { today: string }) {
                     const share = valuedReport.summary.expenseUsdMinor > 0
                       ? Math.round((item.expenseUsdMinor / valuedReport.summary.expenseUsdMinor) * 100)
                       : 0;
-                    const meta = CATEGORY_META[item.category] ?? CATEGORY_META.other;
+                    const color = categoryColor(item.category);
                     return (
                       <div className="report-category-row" key={item.category}>
-                        <span className="report-category-glyph" style={{ backgroundColor: `${meta.color}18`, color: meta.color }} aria-hidden="true">{meta.glyph}</span>
-                        <div><strong>{categoryName(item.category)}</strong><span>{item.transactionCount} {copy.entries}</span><div className="report-progress"><i style={{ backgroundColor: meta.color, width: `${share}%` }} /></div></div>
+                        <span className="report-category-glyph" style={{ backgroundColor: `${color}18`, color }} aria-hidden="true">{categoryGlyph(item.category)}</span>
+                        <div><strong>{categoryName(item.category)}</strong><span>{item.transactionCount} {copy.entries}</span><div className="report-progress"><i style={{ backgroundColor: color, width: `${share}%` }} /></div></div>
                         <p><strong>{formatMoney(toBase(item.expenseUsdMinor), baseCurrency, language)}</strong><span>{share}% {copy.ofExpenses}</span></p>
                       </div>
                     );

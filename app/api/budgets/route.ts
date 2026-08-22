@@ -3,6 +3,10 @@ import { and, eq, gte, lt, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { monthlyBudgets, transactions, userStates } from "@/db/schema";
 import { memberFromRequest } from "@/lib/auth";
+import {
+  EXPENSE_CATEGORY_IDS,
+  type ExpenseCategoryId,
+} from "@/lib/categories";
 
 import {
   authError,
@@ -14,22 +18,8 @@ import {
 export const dynamic = "force-dynamic";
 
 const MAX_AMOUNT_USD_MINOR = 9_000_000_000_000;
-const BUDGET_CATEGORIES = [
-  "housing",
-  "groceries",
-  "dining",
-  "transport",
-  "utilities",
-  "health",
-  "education",
-  "entertainment",
-  "travel",
-  "shopping",
-  "subscriptions",
-  "other",
-] as const;
-type BudgetCategory = (typeof BUDGET_CATEGORIES)[number];
-const BUDGET_CATEGORY_SET = new Set<string>(BUDGET_CATEGORIES);
+type BudgetCategory = ExpenseCategoryId;
+const BUDGET_CATEGORY_SET = new Set<string>(EXPENSE_CATEGORY_IDS);
 
 function isMonth(value: unknown): value is string {
   if (typeof value !== "string") return false;
@@ -121,7 +111,7 @@ export async function PUT(request: Request) {
     if (!body || !isMonth(body.month) || !Array.isArray(body.budgets)) {
       return authError("INVALID_BODY", 400);
     }
-    if (body.budgets.length > BUDGET_CATEGORIES.length) {
+    if (body.budgets.length > EXPENSE_CATEGORY_IDS.length) {
       return authError("TOO_MANY_BUDGETS", 400, "budgets");
     }
 
