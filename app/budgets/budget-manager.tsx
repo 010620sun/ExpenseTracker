@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { LanguagePicker } from "@/components/language-picker";
@@ -13,8 +14,11 @@ import {
 } from "@/lib/categories";
 import { currencyExponent } from "@/lib/currency";
 import {
+  DEFAULT_LANGUAGE,
   isLanguage,
   LANGUAGE_LOCALES,
+  LANGUAGE_STORAGE_KEY,
+  persistLanguagePreference,
   type Language,
 } from "@/lib/language";
 
@@ -64,25 +68,25 @@ const COPY = {
     language: "언어", save: "예산 저장", saving: "저장 중…",
     previous: "이전 달", next: "다음 달", current: "이번 달",
     copyPrevious: "지난달 예산 복사", copied: "지난달 예산을 복사했습니다. 확인 후 저장하세요.",
-    totalBudget: "총 예산", spent: "사용 금액", remaining: "남은 금액", used: "사용",
+    totalBudget: "총 예산", spent: "지출액", remaining: "남은 금액", used: "사용",
     plan: "카테고리별 계획", planHint: "관리할 카테고리에만 예산을 입력하세요.",
     budget: "예산", noBudget: "설정 안 됨", over: "예산 초과",
     loadFailed: "이번 달 예산을 불러오지 못했습니다.",
     saveFailed: "예산을 저장하지 못했습니다.", invalid: "올바른 양수 금액을 입력하세요.",
     saved: "월간 예산을 저장했습니다.", privateLedger: "나만의 글로벌 가계부", logout: "로그아웃",
-    baseNote: "기본 통화로 표시된 금액", noPlan: "예산 미설정",
+    baseNote: "기준 통화로 표시", noPlan: "예산 미설정",
   },
   ja: {
-    overview: "概要", recurring: "繰り返し取引", budgets: "予算管理",
+    overview: "ダッシュボード", recurring: "定期取引", budgets: "予算管理",
     title: "月間予算", subtitle: "カテゴリーごとに明確な支出上限を設定します。",
     language: "言語", save: "予算を保存", saving: "保存中…",
     previous: "前の月", next: "次の月", current: "今月",
     copyPrevious: "前月の予算をコピー", copied: "前月の予算をコピーしました。確認して保存してください。",
-    totalBudget: "総予算", spent: "支出済み", remaining: "残額", used: "使用",
-    plan: "カテゴリー別プラン", planHint: "管理したいカテゴリーだけ予算を入力できます。",
+    totalBudget: "総予算", spent: "支出額", remaining: "残額", used: "消化済み",
+    plan: "カテゴリー別予算", planHint: "管理したいカテゴリーだけ予算を入力できます。",
     budget: "予算", noBudget: "未設定", over: "予算超過",
     loadFailed: "今月の予算を読み込めませんでした。",
-    saveFailed: "予算を保存できませんでした。", invalid: "有効な正の金額を入力してください。",
+    saveFailed: "予算を保存できませんでした。", invalid: "0より大きい有効な金額を入力してください。",
     saved: "月間予算を保存しました。", privateLedger: "自分だけのグローバル家計簿", logout: "ログアウト",
     baseNote: "基本通貨で表示", noPlan: "予算未設定",
   },
@@ -97,7 +101,7 @@ const COPY = {
     budget: "Бюджет", noBudget: "Не задан", over: "сверх бюджета",
     loadFailed: "Не удалось загрузить бюджет за этот месяц.",
     saveFailed: "Не удалось сохранить бюджеты.", invalid: "Введите корректные положительные суммы.",
-    saved: "Месячные бюджеты сохранены.", privateLedger: "Ваш личный глобальный бюджет", logout: "Выйти",
+    saved: "Месячные бюджеты сохранены.", privateLedger: "Ваш личный глобальный учёт финансов", logout: "Выйти",
     baseNote: "Суммы в основной валюте", noPlan: "Бюджет не задан",
   },
 } as const;
@@ -137,9 +141,17 @@ function inputAmount(usdMinor: number, baseCurrency: string, rate: number) {
   return (usdMinor / 100 / rate).toFixed(exponent);
 }
 
-export function BudgetManager({ today }: { today: string }) {
+export function BudgetManager({
+  today,
+  initialLanguage = DEFAULT_LANGUAGE,
+}: {
+  today: string;
+  initialLanguage?: Language;
+}) {
+  const router = useRouter();
   const budgetCategoryGroups = categoryGroupsForKind("expense");
-  const [language, setLanguage] = useState<Language>("en");
+  const [language, setLanguage] = useState<Language>(initialLanguage);
+  const [languageReady, setLanguageReady] = useState(false);
   const [baseCurrency, setBaseCurrency] = useState("USD");
   const [ratesToUsd, setRatesToUsd] = useState<Record<string, number>>({ USD: 1 });
   const [month, setMonth] = useState(today.slice(0, 7));
@@ -156,8 +168,10 @@ export function BudgetManager({ today }: { today: string }) {
   useEffect(() => {
     const controller = new AbortController();
     const frame = window.requestAnimationFrame(() => {
-      const stored = window.localStorage.getItem("globeledger-language");
+      const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
       if (isLanguage(stored)) setLanguage(stored);
+      setLanguageReady(true);
+      void bootstrap();
     });
     async function bootstrap() {
       try {
@@ -190,7 +204,6 @@ export function BudgetManager({ today }: { today: string }) {
         if (!controller.signal.aborted) setReady(true);
       }
     }
-    void bootstrap();
     return () => {
       controller.abort();
       window.cancelAnimationFrame(frame);
@@ -199,8 +212,8 @@ export function BudgetManager({ today }: { today: string }) {
 
   useEffect(() => {
     document.documentElement.lang = language;
-    window.localStorage.setItem("globeledger-language", language);
-  }, [language]);
+    if (languageReady) persistLanguagePreference(language);
+  }, [language, languageReady]);
 
   const applyBudget = useCallback((payload: BudgetResponse, currency: string, currencyRate: number) => {
     const nextDrafts: Record<string, string> = {};
@@ -326,12 +339,14 @@ export function BudgetManager({ today }: { today: string }) {
   }
 
   function chooseLanguage(nextLanguage: Language) {
+    persistLanguagePreference(nextLanguage);
     setLanguage(nextLanguage);
     void fetch("/api/preferences", {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ language: nextLanguage }),
     }).catch(() => undefined);
+    router.refresh();
   }
 
   return (

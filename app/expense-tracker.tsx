@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   type CSSProperties,
   type FormEvent,
@@ -28,8 +29,12 @@ import {
   subcategoryLabel,
 } from "@/lib/categories";
 import {
+  DEFAULT_LANGUAGE,
+  formatLocalizedCount,
   isLanguage,
   LANGUAGE_LOCALES,
+  LANGUAGE_STORAGE_KEY,
+  persistLanguagePreference,
   type Language,
 } from "@/lib/language";
 
@@ -354,7 +359,7 @@ function CurrencyPicker({
               <span className="currency-code">{currency.metadata.code}</span>
               <span className="currency-option-name">
                 <strong>{currency.localizedName}</strong>
-                {currency.localizedName !== currency.metadata.name && (
+                {language === "en" && currency.localizedName !== currency.metadata.name && (
                   <small>{currency.metadata.name}</small>
                 )}
               </span>
@@ -524,17 +529,18 @@ const FALLBACK_TRANSACTIONS: LedgerTransaction[] = [
 const COPY = {
   en: {
     overview: "Overview",
+    monthOverview: "{month} overview",
     transactions: "Transactions",
     budgets: "Budgets",
     reports: "Reports",
     settings: "Settings",
-    greeting: "Good morning",
-    greetingFallback: "Good morning",
+    greeting: "Welcome back, {name}.",
+    greetingFallback: "Welcome back.",
     subtitle: "Every currency, one clear picture.",
     transactionsSubtitle: "Your complete transaction history.",
     baseCurrency: "Base currency",
     currencySearch: "Search currencies",
-    currencySearchPlaceholder: "Search code, currency, or country",
+    currencySearchPlaceholder: "Search currency code or name",
     popularCurrencies: "Popular currencies",
     allCurrencies: "All currencies",
     currencyResults: "Search results",
@@ -542,9 +548,9 @@ const COPY = {
     sync: "Rates saved per transaction",
     rateProvider: "Frankfurter reference rates",
     rateLatest: "Latest available reference rates",
-    valuationMode: "Value basis",
-    historicalValue: "Transaction date",
-    currentValue: "Current value",
+    valuationMode: "Exchange-rate basis",
+    historicalValue: "Transaction-date rate",
+    currentValue: "Current rate",
     historicalUnavailable: "Some transaction-date rates are unavailable",
     transactionRateLoading: "Loading the transaction-date rate…",
     transactionRateError: "The transaction-date rate is unavailable. Try again shortly.",
@@ -554,14 +560,15 @@ const COPY = {
     rateDate: "Rate date",
     fetchedAt: "Fetched",
     fallbackRate: "Fallback rate",
-    identityRate: "USD identity rate",
+    identityRate: "USD reference rate",
+    sameCurrencyRate: "No conversion",
     syncing: "Syncing your ledger",
     synced: "Ledger synced",
     addExpense: "Add transaction",
     spent: "Spent this month",
-    across: "Across {count} currencies",
+    across: "Across {count}",
     budgetLeft: "Budget left",
-    ofBudget: "of monthly budget",
+    ofBudget: "used",
     setBudget: "Set a monthly budget",
     netFlow: "Net flow",
     incomeMinusSpend: "Income minus spending",
@@ -570,7 +577,7 @@ const COPY = {
     spendingBreakdown: "Spending breakdown",
     byCategory: "By category · converted to {currency}",
     currencyMix: "Currency mix",
-    originalSpend: "Share of original transactions",
+    originalSpend: "Share of spending by transaction currency",
     recent: "Recent transactions",
     recentHint: "Original amount and {currency} value",
     allActivity: "All activity",
@@ -581,13 +588,15 @@ const COPY = {
     clearFilters: "Clear filters",
     filterResults: "{count} results",
     noFilterResults: "No transactions match these filters.",
-    merchant: "Merchant or description",
+    merchant: "Merchant, payer, or description",
+    merchantPlaceholderExpense: "e.g. Corner Cafe",
+    merchantPlaceholderIncome: "e.g. Acme Studio",
     category: "Category",
     chooseCategory: "Choose a category",
     categoryHint: "Choose the closest match for this transaction.",
-    subcategory: "Details (optional)",
+    subcategory: "Subcategory (optional)",
     subcategoryHint: "Add a more precise label, or leave it unset.",
-    noSubcategory: "No detail",
+    noSubcategory: "None",
     date: "Date",
     amount: "Amount",
     currency: "Currency",
@@ -648,53 +657,55 @@ const COPY = {
   },
   ko: {
     overview: "대시보드",
+    monthOverview: "{month} 요약",
     transactions: "거래 내역",
     budgets: "예산",
     reports: "리포트",
     settings: "설정",
-    greeting: "좋은 아침이에요",
-    greetingFallback: "좋은 아침이에요",
+    greeting: "{name}님, 다시 오신 것을 환영합니다.",
+    greetingFallback: "다시 오신 것을 환영합니다.",
     subtitle: "모든 통화를 한눈에 명확하게.",
     transactionsSubtitle: "모든 거래 내역을 한곳에서 확인하세요.",
     baseCurrency: "기준 통화",
     currencySearch: "통화 검색",
-    currencySearchPlaceholder: "통화 코드, 이름 또는 국가 검색",
+    currencySearchPlaceholder: "통화 코드 또는 이름 검색",
     popularCurrencies: "자주 쓰는 통화",
     allCurrencies: "전체 통화",
     currencyResults: "검색 결과",
     noCurrencies: "일치하는 통화를 찾지 못했습니다.",
     sync: "거래별 환율 저장",
     rateProvider: "Frankfurter 기준 환율",
-    rateLatest: "최신 가용 기준 환율",
-    valuationMode: "금액 기준",
-    historicalValue: "거래일 기준",
-    currentValue: "현재 가치",
+    rateLatest: "사용 가능한 최신 기준 환율",
+    valuationMode: "환산 기준",
+    historicalValue: "거래일 환율 기준",
+    currentValue: "현재 환율 기준",
     historicalUnavailable: "일부 거래일 환율을 불러오지 못했습니다",
     transactionRateLoading: "거래일 기준 환율을 불러오는 중…",
     transactionRateError: "거래일 기준 환율을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     rateUpdating: "기준 환율 업데이트 중…",
     rateStale: "{date} 기준 마지막 가용 환율 사용 중",
-    rateError: "연결 실패 · 기본 환율 사용 중",
+    rateError: "연결 실패 · 예비 환율 사용 중",
     rateDate: "기준일",
-    fetchedAt: "가져온 시각",
-    fallbackRate: "기본 환율",
-    identityRate: "USD 고정 환율",
+    fetchedAt: "업데이트 시각",
+    fallbackRate: "예비 환율",
+    identityRate: "USD 기준 환율",
+    sameCurrencyRate: "환산 없음",
     syncing: "가계부 동기화 중",
     synced: "가계부 동기화 완료",
     addExpense: "거래 추가",
     spent: "이번 달 지출",
-    across: "{count}개 통화 합산",
+    across: "{count} 합산",
     budgetLeft: "남은 예산",
-    ofBudget: "월 예산 기준",
+    ofBudget: "사용",
     setBudget: "월 예산 설정하기",
     netFlow: "순 현금 흐름",
-    incomeMinusSpend: "수입에서 지출을 제외",
+    incomeMinusSpend: "수입에서 지출을 뺀 금액",
     activeCurrencies: "사용 통화",
     originalAmounts: "원 결제 금액 그대로 보관",
     spendingBreakdown: "지출 분석",
     byCategory: "카테고리별 · {currency} 환산",
     currencyMix: "통화 구성",
-    originalSpend: "원 통화 거래 비중",
+    originalSpend: "거래 통화별 지출 비중",
     recent: "최근 거래",
     recentHint: "원 결제 금액과 {currency} 환산 금액",
     allActivity: "전체 내역",
@@ -705,7 +716,9 @@ const COPY = {
     clearFilters: "필터 초기화",
     filterResults: "{count}건의 결과",
     noFilterResults: "조건에 맞는 거래가 없습니다.",
-    merchant: "사용처 또는 설명",
+    merchant: "거래처 또는 설명",
+    merchantPlaceholderExpense: "예: 동네 카페",
+    merchantPlaceholderIncome: "예: 프로젝트 대금",
     category: "카테고리",
     chooseCategory: "카테고리 선택",
     categoryHint: "이 거래에 가장 알맞은 항목을 선택하세요.",
@@ -732,7 +745,7 @@ const COPY = {
     deleted: "거래가 삭제되었습니다.",
     saveFailed: "거래를 저장하지 못했습니다. 다시 시도해 주세요.",
     deleteFailed: "거래를 삭제하지 못했습니다.",
-    signInNeeded: "로그인하면 나만의 가계부에 저장할 수 있어요.",
+    signInNeeded: "로그인하면 나만의 가계부에 저장할 수 있습니다.",
     previewMode: "가계부를 다시 연결하는 동안 예시 데이터를 표시합니다.",
     empty: "아직 거래가 없습니다. 첫 거래를 추가해 보세요.",
     language: "언어",
@@ -744,13 +757,13 @@ const COPY = {
     menu: "내비게이션 열기",
     deleteLabel: "{merchant} 삭제",
     convertedTo: "{currency} 기준",
-    repeatTransaction: "이 거래 반복",
+    repeatTransaction: "이 거래를 반복",
     repeatHint: "앞으로의 거래를 달력에 자동으로 생성합니다.",
     repeatFrequency: "반복 주기",
     weekly: "매주",
     monthly: "매월",
     yearly: "매년",
-    repeatEnds: "종료일 (선택)",
+    repeatEnds: "종료일(선택)",
     recurringEntry: "반복 거래",
     recurringEditHint: "변경 내용은 이번 거래에만 적용됩니다.",
     stopRecurring: "향후 반복 중단",
@@ -771,45 +784,47 @@ const COPY = {
     deleteDistributedConfirm: "{merchant}의 분할 거래 {count}건을 모두 삭제할까요?",
   },
   ja: {
-    overview: "概要",
+    overview: "ダッシュボード",
+    monthOverview: "{month}の概要",
     transactions: "取引履歴",
     budgets: "予算",
     reports: "レポート",
     settings: "設定",
-    greeting: "おはようございます",
-    greetingFallback: "おはようございます",
+    greeting: "{name}さん、おかえりなさい。",
+    greetingFallback: "おかえりなさい。",
     subtitle: "すべての通貨を、ひと目で明確に。",
     transactionsSubtitle: "すべての取引履歴を一か所で確認。",
     baseCurrency: "基準通貨",
     currencySearch: "通貨を検索",
-    currencySearchPlaceholder: "通貨コード、名称、国名で検索",
+    currencySearchPlaceholder: "通貨コードまたは名称で検索",
     popularCurrencies: "よく使われる通貨",
     allCurrencies: "すべての通貨",
     currencyResults: "検索結果",
     noCurrencies: "該当する通貨が見つかりません。",
     sync: "取引ごとに為替レートを保存",
-    rateProvider: "Frankfurter参照レート",
+    rateProvider: "Frankfurterの参照レート",
     rateLatest: "利用可能な最新の参照レート",
-    valuationMode: "金額の基準",
-    historicalValue: "取引日基準",
-    currentValue: "現在価値",
+    valuationMode: "換算基準",
+    historicalValue: "取引日時点",
+    currentValue: "現在レート換算",
     historicalUnavailable: "一部の取引日レートを取得できませんでした",
     transactionRateLoading: "取引日のレートを取得中…",
     transactionRateError: "取引日のレートを取得できません。しばらくしてから再試行してください。",
     rateUpdating: "参照レートを更新中…",
-    rateStale: "{date}時点の最新レートを使用中",
-    rateError: "接続に失敗しました · 予備レートを使用中",
+    rateStale: "{date}時点で取得可能な最新レートを使用中",
+    rateError: "接続に失敗しました · 代替レートを使用中",
     rateDate: "レート基準日",
     fetchedAt: "取得日時",
-    fallbackRate: "予備レート",
-    identityRate: "USD固定レート",
+    fallbackRate: "代替レート",
+    identityRate: "USD基準レート",
+    sameCurrencyRate: "換算なし",
     syncing: "家計簿を同期中",
     synced: "家計簿を同期しました",
     addExpense: "取引を追加",
     spent: "今月の支出",
-    across: "{count}通貨の合計",
+    across: "{count}の合計",
     budgetLeft: "残り予算",
-    ofBudget: "月間予算に対して",
+    ofBudget: "消化済み",
     setBudget: "月間予算を設定",
     netFlow: "純収支",
     incomeMinusSpend: "収入から支出を差し引いた額",
@@ -818,24 +833,26 @@ const COPY = {
     spendingBreakdown: "支出の内訳",
     byCategory: "カテゴリー別 · {currency}換算",
     currencyMix: "通貨の構成",
-    originalSpend: "元通貨取引の割合",
+    originalSpend: "取引時の通貨別支出割合",
     recent: "最近の取引",
     recentHint: "元の金額と{currency}換算額",
     allActivity: "すべての履歴",
     searchTransactions: "取引を検索",
-    searchTransactionPlaceholder: "店舗、メモ、カテゴリー、通貨を検索",
+    searchTransactionPlaceholder: "取引先・説明、メモ、カテゴリー、通貨を検索",
     allTypes: "すべての種類",
     allCategories: "すべてのカテゴリー",
     clearFilters: "フィルターを解除",
     filterResults: "{count}件",
     noFilterResults: "条件に一致する取引はありません。",
-    merchant: "店舗名または説明",
+    merchant: "取引先または内容",
+    merchantPlaceholderExpense: "例：近所のカフェ",
+    merchantPlaceholderIncome: "例：業務委託料",
     category: "カテゴリー",
     chooseCategory: "カテゴリーを選択",
     categoryHint: "この取引に最も合う項目を選んでください。",
-    subcategory: "詳細カテゴリー（任意）",
+    subcategory: "サブカテゴリー（任意）",
     subcategoryHint: "必要な場合のみ、より具体的な項目を選択してください。",
-    noSubcategory: "指定なし",
+    noSubcategory: "未指定",
     date: "日付",
     amount: "金額",
     currency: "通貨",
@@ -848,7 +865,7 @@ const COPY = {
     expense: "支出",
     income: "収入",
     drawerTitle: "取引を追加",
-    drawerSubtitle: "元の金額と当時のUSDレートを保存し、履歴を安定して維持します。",
+    drawerSubtitle: "元の金額と取引時のUSD換算レートを保存し、履歴を正確に維持します。",
     amountError: "0より大きい金額を入力してください。",
     dateError: "有効な取引日を選択してください。",
     requiredError: "店舗名または説明を入力してください。",
@@ -868,45 +885,46 @@ const COPY = {
     menu: "ナビゲーションを開く",
     deleteLabel: "{merchant}を削除",
     convertedTo: "{currency}換算",
-    repeatTransaction: "この取引を繰り返す",
+    repeatTransaction: "この取引を定期登録",
     repeatHint: "今後の取引をカレンダーに自動作成します。",
-    repeatFrequency: "繰り返し",
+    repeatFrequency: "繰り返し頻度",
     weekly: "毎週",
     monthly: "毎月",
     yearly: "毎年",
     repeatEnds: "終了日（任意）",
-    recurringEntry: "繰り返し取引",
+    recurringEntry: "定期取引",
     recurringEditHint: "変更は今回の取引にのみ適用されます。",
     stopRecurring: "今後の繰り返しを停止",
     stopRecurringConfirm: "この取引以降の繰り返しを停止しますか？過去の取引は残ります。",
     recurringStopped: "今後の繰り返しを停止しました。",
-    recurringStopFailed: "繰り返し取引を停止できませんでした。",
+    recurringStopFailed: "定期取引を停止できませんでした。",
     recurrenceDateError: "終了日は最初の取引日以降にしてください。",
-    distributeExpense: "日付ごとに分配",
-    distributeHint: "1つの合計金額を連続する日ごとの取引に分けます。",
+    distributeExpense: "日付ごとに分割",
+    distributeHint: "合計金額を連続する複数日の取引に分割します。",
     distributionCount: "日数",
-    distributionPreview: "分配プレビュー",
+    distributionPreview: "分割プレビュー",
     distributionRange: "{count}日 · {start}〜{end}",
     distributionEach: "1日約{amount} · 合計{total}を維持",
     distributionError: "2〜365日を選び、1日分を通貨の最小単位以上にしてください。",
-    distributionSaved: "選択した日付に支出を分配しました。",
-    distributedEntry: "分配支出 {part}/{count}",
-    distributionEditHint: "変更はこの日付にのみ適用されます。削除すると分配全体が削除されます。",
-    deleteDistributedConfirm: "{merchant}の分配取引{count}件をすべて削除しますか？",
+    distributionSaved: "選択した日付に支出を分割しました。",
+    distributedEntry: "分割支出 {part}/{count}",
+    distributionEditHint: "変更はこの日付にのみ適用されます。削除すると分割取引全体が削除されます。",
+    deleteDistributedConfirm: "{merchant}の分割取引{count}件をすべて削除しますか？",
   },
   ru: {
     overview: "Обзор",
+    monthOverview: "Обзор за {month}",
     transactions: "Операции",
     budgets: "Бюджеты",
     reports: "Отчёты",
     settings: "Настройки",
-    greeting: "Доброе утро",
-    greetingFallback: "Доброе утро",
-    subtitle: "Все валюты в одной ясной картине.",
+    greeting: "С возвращением, {name}.",
+    greetingFallback: "С возвращением.",
+    subtitle: "Все валюты — в одной понятной картине.",
     transactionsSubtitle: "Полная история операций в одном месте.",
     baseCurrency: "Основная валюта",
     currencySearch: "Поиск валют",
-    currencySearchPlaceholder: "Код, название валюты или страна",
+    currencySearchPlaceholder: "Код или название валюты",
     popularCurrencies: "Популярные валюты",
     allCurrencies: "Все валюты",
     currencyResults: "Результаты поиска",
@@ -914,26 +932,27 @@ const COPY = {
     sync: "Курс сохраняется для каждой операции",
     rateProvider: "Справочные курсы Frankfurter",
     rateLatest: "Последние доступные справочные курсы",
-    valuationMode: "Основа оценки",
-    historicalValue: "На дату операции",
-    currentValue: "Текущая стоимость",
+    valuationMode: "Курс для пересчёта",
+    historicalValue: "Курс на дату операции",
+    currentValue: "Текущий курс",
     historicalUnavailable: "Некоторые курсы на дату операции недоступны",
     transactionRateLoading: "Загружаем курс на дату операции…",
     transactionRateError: "Курс на дату операции недоступен. Повторите попытку позже.",
     rateUpdating: "Обновляем справочные курсы…",
-    rateStale: "Используется последний курс на {date}",
+    rateStale: "Используется последний доступный курс от {date}",
     rateError: "Нет соединения · используется резервный курс",
     rateDate: "Дата курса",
     fetchedAt: "Получено",
     fallbackRate: "Резервный курс",
-    identityRate: "Фиксированный курс USD",
-    syncing: "Синхронизация бюджета",
-    synced: "Бюджет синхронизирован",
+    identityRate: "Опорный курс USD",
+    sameCurrencyRate: "Без конвертации",
+    syncing: "Синхронизация данных учёта",
+    synced: "Данные учёта синхронизированы",
     addExpense: "Добавить операцию",
     spent: "Расходы за месяц",
-    across: "Всего в {count} валютах",
+    across: "Всего: {count}",
     budgetLeft: "Остаток бюджета",
-    ofBudget: "от месячного бюджета",
+    ofBudget: "использовано",
     setBudget: "Задать месячный бюджет",
     netFlow: "Чистый денежный поток",
     incomeMinusSpend: "Доходы за вычетом расходов",
@@ -942,18 +961,20 @@ const COPY = {
     spendingBreakdown: "Структура расходов",
     byCategory: "По категориям · в {currency}",
     currencyMix: "Состав валют",
-    originalSpend: "Доля операций в исходной валюте",
+    originalSpend: "Доля расходов по валютам операций",
     recent: "Недавние операции",
-    recentHint: "Исходная сумма и значение в {currency}",
-    allActivity: "Вся активность",
+    recentHint: "Исходная сумма и эквивалент в {currency}",
+    allActivity: "Все операции",
     searchTransactions: "Поиск операций",
-    searchTransactionPlaceholder: "Магазин, заметка, категория или валюта",
+    searchTransactionPlaceholder: "Контрагент, описание, примечание, категория или валюта",
     allTypes: "Все типы",
     allCategories: "Все категории",
     clearFilters: "Сбросить фильтры",
     filterResults: "Результатов: {count}",
     noFilterResults: "Нет операций, соответствующих фильтрам.",
-    merchant: "Продавец или описание",
+    merchant: "Контрагент или описание",
+    merchantPlaceholderExpense: "Например, местное кафе",
+    merchantPlaceholderIncome: "Например, оплата проекта",
     category: "Категория",
     chooseCategory: "Выберите категорию",
     categoryHint: "Выберите наиболее подходящую категорию операции.",
@@ -980,11 +1001,11 @@ const COPY = {
     deleted: "Операция удалена.",
     saveFailed: "Не удалось сохранить операцию. Попробуйте ещё раз.",
     deleteFailed: "Не удалось удалить операцию.",
-    signInNeeded: "Войдите, чтобы сохранить личный бюджет.",
+    signInNeeded: "Войдите, чтобы сохранить личный учёт финансов.",
     previewMode: "Показываем пример данных, пока восстанавливается соединение.",
     empty: "Операций пока нет. Добавьте первую.",
     language: "Язык",
-    privateLedger: "Ваш личный глобальный бюджет",
+    privateLedger: "Ваш личный глобальный учёт финансов",
     logout: "Выйти",
     helpTitle: "Для жизни без границ",
     helpBody: "Исходные суммы сохраняются, а основная валюта помогает честно вести бюджет.",
@@ -994,7 +1015,7 @@ const COPY = {
     convertedTo: "в {currency}",
     repeatTransaction: "Повторять эту операцию",
     repeatHint: "Автоматически создавать будущие операции в календаре.",
-    repeatFrequency: "Повтор",
+    repeatFrequency: "Периодичность",
     weekly: "Каждую неделю",
     monthly: "Каждый месяц",
     yearly: "Каждый год",
@@ -1012,7 +1033,7 @@ const COPY = {
     distributionPreview: "Предпросмотр распределения",
     distributionRange: "{count} дн. · {start}–{end}",
     distributionEach: "Около {amount} в день · итог {total} сохранится",
-    distributionError: "Выберите от 2 до 365 дней; на день должна приходиться минимум одна денежная единица.",
+    distributionError: "Выберите от 2 до 365 дней; сумма за день должна быть не меньше минимальной разменной единицы выбранной валюты.",
     distributionSaved: "Расход распределён по выбранным датам.",
     distributedEntry: "Распределённый расход {part}/{count}",
     distributionEditHint: "Изменения относятся только к этой дате. Удаление удалит всё распределение.",
@@ -1044,17 +1065,17 @@ const RECURRING_FLOW_COPY = {
     saved: "반복 거래가 추가되었습니다.",
   },
   ja: {
-    add: "繰り返し取引を追加",
-    manage: "繰り返し取引の管理",
+    add: "定期取引を追加",
+    manage: "定期取引の管理",
     buttonHint: "定期的な支出または収入を設定",
-    drawerTitle: "繰り返し取引を追加",
+    drawerTitle: "定期取引を追加",
     drawerSubtitle: "最初の取引と周期を設定すると、今後の取引が自動で表示されます。",
-    scheduleTitle: "繰り返しスケジュール",
-    save: "繰り返し取引を保存",
-    saved: "繰り返し取引を追加しました。",
+    scheduleTitle: "定期取引のスケジュール",
+    save: "定期取引を保存",
+    saved: "定期取引を追加しました。",
   },
   ru: {
-    add: "Добавить регулярную",
+    add: "Добавить регулярную операцию",
     manage: "Регулярные операции",
     buttonHint: "Запланировать расход или регулярный доход",
     drawerTitle: "Добавить регулярную операцию",
@@ -1075,17 +1096,17 @@ const CALENDAR_COPY = {
     today: "Today",
     selectedDay: "Selected day",
     transactionCount: "{count} transactions",
-    addOnDate: "Add on {date}",
+    addOnDate: "Add transaction on {date}",
     noTransactions: "No transactions on this day.",
     moreTransactions: "+{count} more",
     edit: "Edit",
     editLabel: "Edit {merchant}",
     editTransaction: "Edit transaction",
-    editSubtitle: "Update the entry while keeping its historical exchange-rate snapshot.",
+    editSubtitle: "Update the entry while keeping its saved transaction-date exchange rate.",
     update: "Save changes",
     updating: "Saving changes…",
     updated: "Transaction updated.",
-    historicalRate: "Saved historical rate",
+    historicalRate: "Saved transaction-date rate",
     changedConflict: "This entry changed elsewhere. Reopen it and try again.",
     confirmDelete: "Delete {merchant}? This cannot be undone.",
     expenseTotal: "Expense",
@@ -1093,10 +1114,10 @@ const CALENDAR_COPY = {
     note: "Note",
     notePlaceholder: "Optional details",
     openDate: "Open {date}",
-    daySummary: "{count} entries, {expense} expense, {income} income",
+    daySummary: "{count}: {expense} expenses, {income} income",
   },
   ko: {
-    calendar: "월별 달력",
+    calendar: "월간 달력",
     calendarHint: "날짜를 선택해 거래를 확인하고 추가하거나 수정하세요.",
     previousMonth: "이전 달",
     nextMonth: "다음 달",
@@ -1110,19 +1131,19 @@ const CALENDAR_COPY = {
     edit: "수정",
     editLabel: "{merchant} 수정",
     editTransaction: "거래 수정",
-    editSubtitle: "과거 환율 기록은 유지하면서 거래 내용을 변경합니다.",
+    editSubtitle: "저장된 거래일 환율은 유지하면서 거래 내용을 변경합니다.",
     update: "변경사항 저장",
     updating: "변경사항 저장 중…",
     updated: "거래가 수정되었습니다.",
-    historicalRate: "저장된 과거 환율",
+    historicalRate: "저장된 거래일 환율",
     changedConflict: "다른 곳에서 변경된 거래입니다. 다시 열어 수정해 주세요.",
     confirmDelete: "{merchant} 거래를 삭제할까요? 이 작업은 되돌릴 수 없습니다.",
     expenseTotal: "지출",
     incomeTotal: "수입",
     note: "메모",
     notePlaceholder: "선택 사항",
-    openDate: "{date} 열기",
-    daySummary: "거래 {count}건, 지출 {expense}, 수입 {income}",
+    openDate: "{date} 상세 보기",
+    daySummary: "{count} · 지출 {expense}, 수입 {income}",
   },
   ja: {
     calendar: "月間カレンダー",
@@ -1139,19 +1160,19 @@ const CALENDAR_COPY = {
     edit: "編集",
     editLabel: "{merchant}を編集",
     editTransaction: "取引を編集",
-    editSubtitle: "保存済みの過去レートを維持したまま取引を更新します。",
+    editSubtitle: "保存済みの取引時レートを維持したまま取引を更新します。",
     update: "変更を保存",
     updating: "変更を保存中…",
     updated: "取引を更新しました。",
-    historicalRate: "保存済みの過去レート",
-    changedConflict: "別の場所で変更された取引です。開き直してもう一度お試しください。",
+    historicalRate: "保存済みの取引時レート",
+    changedConflict: "この取引は別の画面または端末ですでに変更されています。開き直してもう一度お試しください。",
     confirmDelete: "{merchant}を削除しますか？この操作は元に戻せません。",
     expenseTotal: "支出",
     incomeTotal: "収入",
     note: "メモ",
-    notePlaceholder: "任意の詳細",
+    notePlaceholder: "補足（任意）",
     openDate: "{date}を開く",
-    daySummary: "{count}件、支出{expense}、収入{income}",
+    daySummary: "{count}、支出{expense}、収入{income}",
   },
   ru: {
     calendar: "Календарь на месяц",
@@ -1162,25 +1183,25 @@ const CALENDAR_COPY = {
     today: "Сегодня",
     selectedDay: "Выбранный день",
     transactionCount: "Операций: {count}",
-    addOnDate: "Добавить на {date}",
+    addOnDate: "Добавить операцию на {date}",
     noTransactions: "В этот день операций нет.",
     moreTransactions: "Ещё {count}",
     edit: "Изменить",
     editLabel: "Изменить {merchant}",
     editTransaction: "Изменить операцию",
-    editSubtitle: "Обновите запись, сохранив зафиксированный исторический курс.",
+    editSubtitle: "Обновите запись, сохранив курс, зафиксированный на дату операции.",
     update: "Сохранить изменения",
     updating: "Сохранение изменений…",
     updated: "Операция обновлена.",
-    historicalRate: "Сохранённый исторический курс",
+    historicalRate: "Сохранённый курс на дату операции",
     changedConflict: "Эта запись была изменена в другом месте. Откройте её заново.",
     confirmDelete: "Удалить {merchant}? Это действие нельзя отменить.",
     expenseTotal: "Расход",
     incomeTotal: "Доход",
-    note: "Заметка",
+    note: "Примечание",
     notePlaceholder: "Дополнительные сведения",
     openDate: "Открыть {date}",
-    daySummary: "Операций: {count}, расходы: {expense}, доходы: {income}",
+    daySummary: "{count}: расходы {expense}, доходы {income}",
   },
 } as const;
 
@@ -1373,13 +1394,17 @@ export function ExpenseTracker({
   firstName,
   today,
   view = "dashboard",
+  initialLanguage = DEFAULT_LANGUAGE,
 }: {
   firstName: string | null;
   today: string;
   view?: "dashboard" | "transactions";
+  initialLanguage?: Language;
 }) {
+  const router = useRouter();
   const isTransactionsView = view === "transactions";
-  const [language, setLanguage] = useState<Language>("en");
+  const [language, setLanguage] = useState<Language>(initialLanguage);
+  const [languageReady, setLanguageReady] = useState(false);
   const [baseCurrency, setBaseCurrency] = useState<CurrencyCode>("USD");
   const [currencyCatalog, setCurrencyCatalog] = useState<CurrencyMetadata[]>(
     FALLBACK_CURRENCY_CATALOG,
@@ -1491,10 +1516,9 @@ export function ExpenseTracker({
     const frame = window.requestAnimationFrame(() => {
       const localToday = localIsoDate();
       setCurrentDate(localToday);
-      const storedLanguage = window.localStorage.getItem("globeledger-language");
-      if (isLanguage(storedLanguage)) {
-        setLanguage(storedLanguage);
-      }
+      const storedLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+      if (isLanguage(storedLanguage)) setLanguage(storedLanguage);
+      setLanguageReady(true);
       const storedValuationMode = window.localStorage.getItem(
         "globeledger-valuation-mode",
       );
@@ -1509,20 +1533,20 @@ export function ExpenseTracker({
         setIsSyncing(true);
       }
     });
-
     return () => window.cancelAnimationFrame(frame);
   }, [today]);
 
   useEffect(() => {
     document.documentElement.lang = language;
-    window.localStorage.setItem("globeledger-language", language);
-  }, [language]);
+    if (languageReady) persistLanguagePreference(language);
+  }, [language, languageReady]);
 
   useEffect(() => {
     window.localStorage.setItem("globeledger-valuation-mode", valuationMode);
   }, [valuationMode]);
 
   useEffect(() => {
+    if (!languageReady) return;
     const controller = new AbortController();
     async function loadPreferences() {
       try {
@@ -1552,7 +1576,7 @@ export function ExpenseTracker({
     }
     void loadPreferences();
     return () => controller.abort();
-  }, []);
+  }, [languageReady]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -2251,8 +2275,10 @@ export function ExpenseTracker({
   }
 
   function chooseLanguage(nextLanguage: Language) {
+    persistLanguagePreference(nextLanguage);
     setLanguage(nextLanguage);
     void saveCurrencyPreference({ language: nextLanguage });
+    router.refresh();
   }
 
   function openAddDrawer(date = selectedDate) {
@@ -2690,6 +2716,14 @@ export function ExpenseTracker({
         timeZone: "UTC",
       }).format(new Date(`${rateMeta.asOf}T00:00:00Z`))
     : null;
+  const selectedRateDateLabel = selectedRateDate
+    ? new Intl.DateTimeFormat(locale, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        timeZone: "UTC",
+      }).format(new Date(`${selectedRateDate}T00:00:00Z`))
+    : null;
   const fetchedAtLabel = rateMeta.fetchedAt
     ? new Intl.DateTimeFormat(locale, {
         year: "numeric",
@@ -2717,7 +2751,7 @@ export function ExpenseTracker({
             <span className="brand-name">GlobeLedger</span>
           </div>
           <div className="page-title">
-            <p>{firstName ? `${copy.greeting}, ${firstName}.` : `${copy.greetingFallback}.`}</p>
+            <p>{firstName ? template(copy.greeting, { name: firstName }) : copy.greetingFallback}</p>
             <h1>{isTransactionsView ? copy.transactionsSubtitle : copy.subtitle}</h1>
           </div>
           <div className="topbar-actions">
@@ -2888,7 +2922,7 @@ export function ExpenseTracker({
                                 data-calendar-date={calendarDate.iso}
                                 className={calendarDate.iso === selectedDate ? "calendar-day selected" : "calendar-day"}
                                 aria-current={calendarDate.iso === currentDate ? "date" : undefined}
-                                aria-label={`${template(calendarCopy.openDate, { date: dayLabel })}. ${template(calendarCopy.daySummary, { count: dayEntries.length, expense, income })}`}
+                                aria-label={`${template(calendarCopy.openDate, { date: dayLabel })}. ${template(calendarCopy.daySummary, { count: formatLocalizedCount(dayEntries.length, language, "entry"), expense, income })}`}
                                 aria-pressed={calendarDate.iso === selectedDate}
                                 tabIndex={calendarDate.iso === selectedDate ? 0 : -1}
                                 ref={(node) => {
@@ -2948,7 +2982,7 @@ export function ExpenseTracker({
               <div>
                 <span className="eyebrow">{calendarCopy.selectedDay}</span>
                 <h2 id="selected-day-title">{selectedDateLabel}</h2>
-                <p>{template(calendarCopy.transactionCount, { count: selectedTransactions.length })}</p>
+                <p>{formatLocalizedCount(selectedTransactions.length, language, "transaction")}</p>
               </div>
               <button type="button" className="day-add-button" onClick={() => openAddDrawer(selectedDate)} aria-label={template(calendarCopy.addOnDate, { date: selectedDateLabel })}>+</button>
             </div>
@@ -3012,11 +3046,11 @@ export function ExpenseTracker({
           </aside>
         </section>
 
-        <section className="metric-grid" aria-label={`${monthLabel} overview`}>
+        <section className="metric-grid" aria-label={template(copy.monthOverview, { month: monthLabel })}>
           <article className="metric-card metric-featured">
             <div className="metric-label"><span>{copy.spent}</span><span className="metric-icon">↗</span></div>
             <strong>{formatCurrency(totals.expenseBaseAmount, baseCurrency, language)}</strong>
-            <p>{template(copy.across, { count: totals.currencies.size })}</p>
+            <p>{template(copy.across, { count: formatLocalizedCount(totals.currencies.size, language, "currency") })}</p>
             <div className="micro-bars" aria-hidden="true">
               {[34, 58, 46, 72, 64, 88, 78, 100, 84, 94, 76, 90].map((height, index) => (
                 <i key={index} style={{ height: `${height}%` }} />
@@ -3119,7 +3153,7 @@ export function ExpenseTracker({
           <div className="panel-heading transactions-heading">
             <div><h2>{isTransactionsView ? copy.transactions : copy.recent}</h2><p>{template(copy.recentHint, { currency: baseCurrency })}</p></div>
             {isTransactionsView ? (
-              <span className="transaction-result-count">{template(copy.filterResults, { count: filteredTransactions.length })}</span>
+              <span className="transaction-result-count">{formatLocalizedCount(filteredTransactions.length, language, "result")}</span>
             ) : (
               <a className="transactions-view-all" href="/transactions">{copy.allActivity} →</a>
             )}
@@ -3262,7 +3296,7 @@ export function ExpenseTracker({
               </div>
               <label className="field">
                 <span>{copy.merchant}</span>
-                <input ref={descriptionRef} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={80} placeholder={kind === "expense" ? "COEX Coffee" : "Acme Studio"} />
+                <input ref={descriptionRef} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={80} placeholder={kind === "expense" ? copy.merchantPlaceholderExpense : copy.merchantPlaceholderIncome} />
               </label>
               <div className="field-row amount-row">
                 <label className="field">
@@ -3288,8 +3322,8 @@ export function ExpenseTracker({
                       : copy.transactionRateError
                     : <>
                         1 {currency} = {conversionRate < 0.01 ? conversionRate.toFixed(6) : conversionRate.toFixed(4)} {baseCurrency}
-                        {" · "}{usesStoredRate ? calendarCopy.historicalRate : currency === "USD" ? copy.identityRate : hasFrankfurterRate ? copy.rateProvider : copy.fallbackRate}
-                        {selectedRateDate ? ` · ${copy.rateDate}: ${selectedRateDate}` : ""}
+                        {" · "}{usesStoredRate ? calendarCopy.historicalRate : currency === baseCurrency ? copy.sameCurrencyRate : currency === "USD" ? copy.identityRate : hasFrankfurterRate ? copy.rateProvider : copy.fallbackRate}
+                        {selectedRateDateLabel ? ` · ${copy.rateDate}: ${selectedRateDateLabel}` : ""}
                         {" · "}{copy.savedRate}
                       </>}
                 </p>

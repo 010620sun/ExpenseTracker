@@ -8,7 +8,10 @@ import {
   type RecurringSeries,
 } from "@/db/schema";
 import { memberFromRequest } from "@/lib/auth";
-import { isSubcategoryForCategory } from "@/lib/categories";
+import {
+  isCategoryForKind,
+  isSubcategoryForCategory,
+} from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -354,7 +357,11 @@ export async function PATCH(request: Request) {
       if (!description || description.length > 120) {
         return errorResponse("INVALID_DESCRIPTION", 400, "description");
       }
-      if (!category || category.length > 40) {
+      if (
+        !category ||
+        category.length > 40 ||
+        !isCategoryForKind(category, series.kind)
+      ) {
         return errorResponse("INVALID_CATEGORY", 400, "category");
       }
       if (

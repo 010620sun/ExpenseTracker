@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
+import ts from "typescript";
 
 const templateRoot = new URL("../", import.meta.url);
 
@@ -9,11 +10,11 @@ test("provides login and registration", async () => {
     readFile(new URL("../app/auth/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/auth/auth-screen.tsx", import.meta.url), "utf8"),
   ]);
-  assert.ok(page.includes("<AuthScreen returnTo={returnTo}"));
+  assert.match(page, /<AuthScreen initialLanguage=\{initialLanguage\} returnTo=\{returnTo\}/u);
   assert.match(screen, /Your money, kept private/u);
   assert.match(screen, /Log in/u);
   assert.match(screen, /Create account/u);
-  assert.match(screen, /Member-isolated by design/u);
+  assert.match(screen, /Private by design/u);
   assert.match(screen, /나만의 가계부를 안전하게/u);
   assert.match(screen, /自分だけの家計簿を安全に/u);
   assert.match(screen, /Ваши финансы под надёжной защитой/u);
@@ -108,6 +109,157 @@ test("provides grouped expense and income category pickers", async () => {
   assert.match(styles, /\.report-subcategory-list/u);
 });
 
+test("keeps every locale complete, grammatical, and durable", async () => {
+  const localizedFiles = [
+    "app/auth/auth-screen.tsx",
+    "components/ledger-navigation.tsx",
+    "app/expense-tracker.tsx",
+    "app/recurring/recurring-manager.tsx",
+    "app/budgets/budget-manager.tsx",
+    "app/reports/report-manager.tsx",
+  ];
+  const sources = await Promise.all(
+    localizedFiles.map((file) =>
+      readFile(new URL(`../${file}`, import.meta.url), "utf8"),
+    ),
+  );
+
+  for (const [index, source] of sources.entries()) {
+    const file = localizedFiles[index];
+    const sourceFile = ts.createSourceFile(
+      file,
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    );
+    let localizedObjectCount = 0;
+
+    function unwrap(expression) {
+      if (
+        ts.isAsExpression(expression) ||
+        ts.isSatisfiesExpression(expression) ||
+        ts.isParenthesizedExpression(expression)
+      ) {
+        return unwrap(expression.expression);
+      }
+      return expression;
+    }
+
+    function propertyName(property) {
+      return property.name.getText(sourceFile).replace(/^["']|["']$/gu, "");
+    }
+
+    function visit(node) {
+      if (
+        ts.isVariableDeclaration(node) &&
+        node.name.getText(sourceFile).includes("COPY") &&
+        node.initializer
+      ) {
+        const root = unwrap(node.initializer);
+        if (ts.isObjectLiteralExpression(root)) {
+          const locales = {};
+          for (const property of root.properties) {
+            if (!ts.isPropertyAssignment(property)) continue;
+            const language = propertyName(property);
+            if (!["en", "ko", "ja", "ru"].includes(language)) continue;
+            const object = unwrap(property.initializer);
+            if (!ts.isObjectLiteralExpression(object)) continue;
+            locales[language] = new Map(
+              object.properties
+                .filter(ts.isPropertyAssignment)
+                .map((item) => [
+                  propertyName(item),
+                  item.initializer.getText(sourceFile),
+                ]),
+            );
+          }
+          if (locales.en) {
+            localizedObjectCount += 1;
+            const englishKeys = [...locales.en.keys()].sort();
+            for (const language of ["ko", "ja", "ru"]) {
+              assert.deepEqual(
+                [...(locales[language]?.keys() ?? [])].sort(),
+                englishKeys,
+                `${file} ${language} keys must match English`,
+              );
+              for (const key of englishKeys) {
+                const placeholders = (value) =>
+                  [...value.matchAll(/\{([a-zA-Z]+)\}/gu)]
+                    .map((match) => match[1])
+                    .sort();
+                assert.deepEqual(
+                  placeholders(locales[language].get(key)),
+                  placeholders(locales.en.get(key)),
+                  `${file} ${language}.${key} placeholders must match English`,
+                );
+              }
+            }
+          }
+        }
+      }
+      ts.forEachChild(node, visit);
+    }
+
+    visit(sourceFile);
+    assert.ok(localizedObjectCount > 0, `${file} must expose localized copy`);
+  }
+
+  const [
+    languageSource,
+    schema,
+    layout,
+    tracker,
+    auth,
+    navigation,
+    categories,
+    pageMetadata,
+  ] =
+    await Promise.all([
+      readFile(new URL("../lib/language.ts", import.meta.url), "utf8"),
+      readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/auth/auth-screen.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../components/ledger-navigation.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../lib/categories.ts", import.meta.url), "utf8"),
+      readFile(new URL("../lib/page-metadata.ts", import.meta.url), "utf8"),
+    ]);
+  const languageModule = await import(
+    `data:text/javascript;base64,${Buffer.from(
+      ts.transpileModule(languageSource, {
+        compilerOptions: {
+          module: ts.ModuleKind.ESNext,
+          target: ts.ScriptTarget.ES2022,
+        },
+      }).outputText,
+    ).toString("base64")}`
+  );
+
+  assert.equal(languageModule.DEFAULT_LANGUAGE, "en");
+  assert.equal(languageModule.formatLocalizedCount(1, "en", "transaction"), "1 transaction");
+  assert.equal(languageModule.formatLocalizedCount(2, "en", "transaction"), "2 transactions");
+  assert.equal(languageModule.formatLocalizedCount(1, "ru", "result"), "1 результат");
+  assert.equal(languageModule.formatLocalizedCount(2, "ru", "result"), "2 результата");
+  assert.equal(languageModule.formatLocalizedCount(5, "ru", "result"), "5 результатов");
+  assert.equal(languageModule.formatLocalizedCount(3, "ko", "result"), "결과 3건");
+  assert.equal(languageModule.formatLocalizedCount(2, "ja", "activeDay"), "2日（取引あり）");
+  assert.match(schema, /language: text\("language"[\s\S]*?\.default\("en"\)/u);
+  assert.match(layout, /const language = await requestLanguage\(\)/u);
+  assert.match(layout, /<html lang=\{language\}/u);
+  assert.match(layout, /METADATA_COPY/u);
+  assert.match(pageMetadata, /overview: "Overview"/u);
+  assert.match(pageMetadata, /recurring: "定期取引"/u);
+  assert.match(pageMetadata, /reports: "Отчёты"/u);
+  assert.doesNotMatch(sources.join("\n"), /document\.title/u);
+  assert.match(tracker, /persistLanguagePreference\(language\)/u);
+  assert.match(auth, /mode === "register" \|\| languageTouched/u);
+  assert.doesNotMatch(auth, /<span className="eyebrow">Multi-currency household ledger<\/span>/u);
+  assert.doesNotMatch(navigation, /firstName \?\? "Global citizen"/u);
+  assert.match(categories, /export function isCategoryForKind/u);
+  assert.match(categories, /CATEGORY_META\.other\.labels\[language\]/u);
+});
+
 test("discovers every current Frankfurter currency dynamically", async () => {
   const [ratesRoute, tracker, schema, currencyHelpers] = await Promise.all([
     readFile(new URL("../app/api/rates/route.ts", import.meta.url), "utf8"),
@@ -182,8 +334,8 @@ test("keeps currency and language choices as independent member settings", async
   assert.match(tracker, /<LanguagePicker/u);
   assert.match(navigation, /href: "\/recurring"/u);
   assert.match(recurring, /<LanguagePicker/u);
-  assert.match(languagePicker, /code: "ja"[^\n]+name: "日本語"/u);
-  assert.match(languagePicker, /code: "ru"[^\n]+name: "Русский"/u);
+  assert.match(languagePicker, /code: "ja"[\s\S]*?name: "日本語"/u);
+  assert.match(languagePicker, /code: "ru"[\s\S]*?name: "Русский"/u);
   assert.match(languagePicker, /aria-haspopup="listbox"/u);
   assert.match(languagePicker, /aria-selected=\{option\.code === value\}/u);
   assert.doesNotMatch(tracker, /globeledger-base-currency/u);
@@ -271,7 +423,7 @@ test("uses one shared reliable ledger navigation", async () => {
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
 
-  assert.match(layout, /<LedgerNavigation>\{children\}<\/LedgerNavigation>/u);
+  assert.match(layout, /<LedgerNavigation initialLanguage=\{language\}>\{children\}<\/LedgerNavigation>/u);
   assert.match(navigation, /usePathname\(\)/u);
   assert.doesNotMatch(navigation, /import Link from "next\/link"/u);
   assert.match(navigation, /<a href=\{item\.href\}/u);
@@ -442,7 +594,7 @@ test("distributes one expense exactly across consecutive calendar dates", async 
   assert.match(tracker, /savedTransactions\.map/u);
   assert.match(tracker, /deleteDistributedConfirm/u);
   assert.match(tracker, /날짜별로 분배/u);
-  assert.match(tracker, /日付ごとに分配/u);
+  assert.match(tracker, /日付ごとに分割/u);
   assert.match(tracker, /Распределить по датам/u);
   assert.match(styles, /\.distribution-card/u);
 });

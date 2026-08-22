@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { LanguagePicker } from "@/components/language-picker";
@@ -14,8 +15,11 @@ import {
   subcategoryLabel,
 } from "@/lib/categories";
 import {
+  DEFAULT_LANGUAGE,
   isLanguage,
   LANGUAGE_LOCALES,
+  LANGUAGE_STORAGE_KEY,
+  persistLanguagePreference,
   type Language,
 } from "@/lib/language";
 
@@ -70,6 +74,7 @@ const COPY = {
     expense: "Expected expenses",
     income: "Expected income",
     monthEstimate: "Estimated for this month in USD",
+    scheduleCountHint: "Number of schedules",
     all: "All",
     activeFilter: "Active",
     pausedFilter: "Paused",
@@ -93,15 +98,15 @@ const COPY = {
     amount: "Amount",
     frequency: "Frequency",
     category: "Category",
-    subcategory: "Details (optional)",
-    noSubcategory: "No detail",
+    subcategory: "Subcategory (optional)",
+    noSubcategory: "None",
     endDate: "End date (optional)",
     note: "Note",
     save: "Save changes",
     cancel: "Cancel",
     loading: "Loading recurring schedules…",
     loadFailed: "We couldn’t load recurring schedules.",
-    actionFailed: "We couldn’t update that schedule.",
+    actionFailed: "We couldn’t complete that action.",
     saved: "Recurring schedule updated.",
     deleted: "Recurring schedule deleted.",
     pausedToast: "Recurring schedule paused.",
@@ -117,13 +122,14 @@ const COPY = {
     back: "대시보드",
     budgets: "예산 관리",
     title: "반복 거래 관리",
-    subtitle: "반복 지출과 정기 수입을 통화별로 한곳에서 관리하세요.",
+    subtitle: "여러 통화의 반복 지출과 정기 수입을 한곳에서 관리하세요.",
     add: "반복 거래 추가",
     active: "활성 일정",
     paused: "일시정지",
     expense: "예상 지출",
     income: "예상 수입",
-    monthEstimate: "이번 달 USD 기준 예상 금액",
+    monthEstimate: "이번 달 USD 환산 예상액",
+    scheduleCountHint: "반복 일정 수",
     all: "전체",
     activeFilter: "활성",
     pausedFilter: "일시정지",
@@ -149,13 +155,13 @@ const COPY = {
     category: "카테고리",
     subcategory: "세부 카테고리(선택)",
     noSubcategory: "선택 안 함",
-    endDate: "종료일 (선택)",
+    endDate: "종료일(선택)",
     note: "메모",
     save: "변경사항 저장",
     cancel: "취소",
     loading: "반복 일정을 불러오는 중…",
     loadFailed: "반복 일정을 불러오지 못했습니다.",
-    actionFailed: "반복 일정을 변경하지 못했습니다.",
+    actionFailed: "요청을 처리하지 못했습니다.",
     saved: "반복 일정이 수정되었습니다.",
     deleted: "반복 일정이 삭제되었습니다.",
     pausedToast: "반복 일정을 일시정지했습니다.",
@@ -168,21 +174,22 @@ const COPY = {
     logout: "로그아웃",
   },
   ja: {
-    back: "概要",
+    back: "ダッシュボード",
     budgets: "予算管理",
-    title: "繰り返し取引",
-    subtitle: "通貨をまたぐ定期支出と収入を見通しよく管理します。",
-    add: "繰り返し取引を追加",
-    active: "有効なスケジュール",
+    title: "定期取引",
+    subtitle: "複数通貨の定期支出・定期収入を見通しよく管理します。",
+    add: "定期取引を追加",
+    active: "有効な定期取引",
     paused: "一時停止",
-    expense: "予想支出",
-    income: "予想収入",
-    monthEstimate: "今月のUSD換算予想額",
+    expense: "支出見込み",
+    income: "収入見込み",
+    monthEstimate: "今月の予測額（USD換算）",
+    scheduleCountHint: "定期取引の件数",
     all: "すべて",
     activeFilter: "有効",
     pausedFilter: "一時停止",
     endedFilter: "終了",
-    empty: "該当する繰り返しスケジュールはありません。",
+    empty: "該当する定期取引はありません。",
     next: "次回",
     noNext: "今後の予定なし",
     started: "開始日",
@@ -195,25 +202,25 @@ const COPY = {
     pause: "一時停止",
     resume: "再開",
     delete: "削除",
-    deleteConfirm: "この繰り返しスケジュールと関連するすべての取引を削除しますか？",
-    editTitle: "繰り返しスケジュールを編集",
+    deleteConfirm: "この定期取引と関連するすべての取引を削除しますか？",
+    editTitle: "定期取引を編集",
     description: "説明",
     amount: "金額",
-    frequency: "周期",
+    frequency: "繰り返し頻度",
     category: "カテゴリー",
-    subcategory: "詳細カテゴリー（任意）",
-    noSubcategory: "指定なし",
+    subcategory: "サブカテゴリー（任意）",
+    noSubcategory: "未指定",
     endDate: "終了日（任意）",
     note: "メモ",
     save: "変更を保存",
     cancel: "キャンセル",
-    loading: "繰り返しスケジュールを読み込み中…",
-    loadFailed: "繰り返しスケジュールを読み込めませんでした。",
-    actionFailed: "スケジュールを更新できませんでした。",
-    saved: "繰り返しスケジュールを更新しました。",
-    deleted: "繰り返しスケジュールを削除しました。",
-    pausedToast: "繰り返しスケジュールを一時停止しました。",
-    resumedToast: "繰り返しスケジュールを再開しました。",
+    loading: "定期取引を読み込み中…",
+    loadFailed: "定期取引を読み込めませんでした。",
+    actionFailed: "定期取引を更新できませんでした。",
+    saved: "定期取引を更新しました。",
+    deleted: "定期取引を削除しました。",
+    pausedToast: "定期取引を一時停止しました。",
+    resumedToast: "定期取引を再開しました。",
     language: "言語",
     activeStatus: "有効",
     pausedStatus: "一時停止",
@@ -226,18 +233,19 @@ const COPY = {
     budgets: "Бюджеты",
     title: "Регулярные операции",
     subtitle: "Планируйте регулярные расходы и доходы в разных валютах.",
-    add: "Добавить регулярную",
+    add: "Добавить регулярную операцию",
     active: "Активные расписания",
     paused: "Приостановлено",
     expense: "Ожидаемые расходы",
     income: "Ожидаемые доходы",
     monthEstimate: "Оценка на этот месяц в USD",
+    scheduleCountHint: "Количество регулярных операций",
     all: "Все",
     activeFilter: "Активные",
     pausedFilter: "На паузе",
     endedFilter: "Завершённые",
     empty: "В этом разделе нет регулярных расписаний.",
-    next: "Следующая",
+    next: "Следующая операция",
     noNext: "Нет предстоящих записей",
     started: "Начало",
     ends: "Окончание",
@@ -258,7 +266,7 @@ const COPY = {
     subcategory: "Подкатегория (необязательно)",
     noSubcategory: "Без уточнения",
     endDate: "Дата окончания (необязательно)",
-    note: "Заметка",
+    note: "Примечание",
     save: "Сохранить изменения",
     cancel: "Отмена",
     loading: "Загрузка регулярных расписаний…",
@@ -272,7 +280,7 @@ const COPY = {
     activeStatus: "Активно",
     pausedStatus: "Приостановлено",
     endedStatus: "Завершено",
-    privateLedger: "Ваш личный глобальный бюджет",
+    privateLedger: "Ваш личный глобальный учёт финансов",
     logout: "Выйти",
   },
 } as const;
@@ -293,8 +301,16 @@ function dateLabel(value: string, language: Language) {
   }).format(new Date(`${value}T00:00:00Z`));
 }
 
-export function RecurringManager({ today }: { today: string }) {
-  const [language, setLanguage] = useState<Language>("en");
+export function RecurringManager({
+  today,
+  initialLanguage = DEFAULT_LANGUAGE,
+}: {
+  today: string;
+  initialLanguage?: Language;
+}) {
+  const router = useRouter();
+  const [language, setLanguage] = useState<Language>(initialLanguage);
+  const [languageReady, setLanguageReady] = useState(false);
   const [items, setItems] = useState<RecurringItem[]>([]);
   const [summary, setSummary] = useState<RecurringResponse["summary"]>();
   const [filter, setFilter] = useState<"all" | SeriesStatus>("all");
@@ -335,9 +351,11 @@ export function RecurringManager({ today }: { today: string }) {
   useEffect(() => {
     const controller = new AbortController();
     const frame = window.requestAnimationFrame(() => {
-      const stored = window.localStorage.getItem("globeledger-language");
+      const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
       if (isLanguage(stored)) setLanguage(stored);
+      setLanguageReady(true);
       void loadItems();
+      void loadLanguage();
     });
     async function loadLanguage() {
       try {
@@ -354,7 +372,6 @@ export function RecurringManager({ today }: { today: string }) {
         if (error instanceof DOMException && error.name === "AbortError") return;
       }
     }
-    void loadLanguage();
     return () => {
       controller.abort();
       window.cancelAnimationFrame(frame);
@@ -365,8 +382,8 @@ export function RecurringManager({ today }: { today: string }) {
 
   useEffect(() => {
     document.documentElement.lang = language;
-    window.localStorage.setItem("globeledger-language", language);
-  }, [language]);
+    if (languageReady) persistLanguagePreference(language);
+  }, [language, languageReady]);
 
   useEffect(() => {
     if (!toast) return;
@@ -472,12 +489,14 @@ export function RecurringManager({ today }: { today: string }) {
         : copy.endedStatus;
 
   function chooseLanguage(nextLanguage: Language) {
+    persistLanguagePreference(nextLanguage);
     setLanguage(nextLanguage);
     void fetch("/api/preferences", {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ language: nextLanguage }),
     }).catch(() => undefined);
+    router.refresh();
   }
 
   return (
@@ -496,8 +515,8 @@ export function RecurringManager({ today }: { today: string }) {
         </header>
 
         <section className="recurring-summary-grid" aria-label={copy.monthEstimate}>
-          <article><span>{copy.active}</span><strong>{summary?.active ?? 0}</strong><small>{copy.monthEstimate}</small></article>
-          <article><span>{copy.paused}</span><strong>{summary?.paused ?? 0}</strong><small>{copy.monthEstimate}</small></article>
+          <article><span>{copy.active}</span><strong>{summary?.active ?? 0}</strong><small>{copy.scheduleCountHint}</small></article>
+          <article><span>{copy.paused}</span><strong>{summary?.paused ?? 0}</strong><small>{copy.scheduleCountHint}</small></article>
           <article className="expense"><span>{copy.expense}</span><strong>{money(summary?.expectedExpenseMinor ?? 0, "USD", language)}</strong><small>{copy.monthEstimate}</small></article>
           <article className="income"><span>{copy.income}</span><strong>{money(summary?.expectedIncomeMinor ?? 0, "USD", language)}</strong><small>{copy.monthEstimate}</small></article>
         </section>

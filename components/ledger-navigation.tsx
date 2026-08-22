@@ -5,7 +5,12 @@
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
 
-import { isLanguage, type Language } from "@/lib/language";
+import {
+  DEFAULT_LANGUAGE,
+  isLanguage,
+  LANGUAGE_STORAGE_KEY,
+  type Language,
+} from "@/lib/language";
 
 const COPY = {
   en: {
@@ -19,6 +24,7 @@ const COPY = {
     comingSoon: "Coming soon",
     unavailable: "This section is being prepared.",
     privateLedger: "Your private global ledger",
+    guestName: "Global citizen",
     logout: "Log out",
     helpTitle: "Built for borderless lives",
     helpBody: "Original amounts stay intact while one base view keeps your plan clear.",
@@ -34,14 +40,15 @@ const COPY = {
     comingSoon: "준비 중",
     unavailable: "아직 준비 중인 메뉴입니다.",
     privateLedger: "나만의 글로벌 가계부",
+    guestName: "글로벌 사용자",
     logout: "로그아웃",
     helpTitle: "국경 없는 일상을 위해",
     helpBody: "원 결제 금액은 그대로 유지하고 기준 통화로 계획을 명확하게 관리하세요.",
   },
   ja: {
     navigation: "メインナビゲーション",
-    overview: "概要",
-    recurring: "繰り返し取引",
+    overview: "ダッシュボード",
+    recurring: "定期取引",
     transactions: "取引履歴",
     budgets: "予算管理",
     reports: "レポート",
@@ -49,6 +56,7 @@ const COPY = {
     comingSoon: "準備中",
     unavailable: "このメニューは現在準備中です。",
     privateLedger: "自分だけのグローバル家計簿",
+    guestName: "グローバルユーザー",
     logout: "ログアウト",
     helpTitle: "国境を越える暮らしのために",
     helpBody: "元の金額を保ちながら、基準通貨で計画を明確に管理できます。",
@@ -63,7 +71,8 @@ const COPY = {
     settings: "Настройки",
     comingSoon: "Скоро",
     unavailable: "Этот раздел ещё готовится.",
-    privateLedger: "Ваш личный глобальный бюджет",
+    privateLedger: "Ваш личный глобальный учёт финансов",
+    guestName: "Пользователь GlobeLedger",
     logout: "Выйти",
     helpTitle: "Для жизни без границ",
     helpBody: "Исходные суммы сохраняются, а основная валюта делает план понятным.",
@@ -74,10 +83,16 @@ type MemberResponse = {
   data?: { displayName?: string; email?: string };
 };
 
-export function LedgerNavigation({ children }: { children: ReactNode }) {
+export function LedgerNavigation({
+  children,
+  initialLanguage = DEFAULT_LANGUAGE,
+}: {
+  children: ReactNode;
+  initialLanguage?: Language;
+}) {
   const pathname = usePathname();
   const isLedgerRoute = pathname === "/" || pathname === "/transactions" || pathname === "/recurring" || pathname === "/budgets" || pathname === "/reports";
-  const [language, setLanguage] = useState<Language>("en");
+  const [language, setLanguage] = useState<Language>(initialLanguage);
   const [firstName, setFirstName] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const copy = COPY[language];
@@ -85,7 +100,7 @@ export function LedgerNavigation({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isLedgerRoute) return;
     const frame = window.requestAnimationFrame(() => {
-      const stored = window.localStorage.getItem("globeledger-language");
+      const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
       if (isLanguage(stored)) setLanguage(stored);
     });
     const syncLanguage = () => {
@@ -174,7 +189,7 @@ export function LedgerNavigation({ children }: { children: ReactNode }) {
         </div>
         <div className="account-chip">
           <span className="avatar">{firstName?.[0]?.toUpperCase() ?? "G"}</span>
-          <span><strong>{firstName ?? "Global citizen"}</strong><small>{copy.privateLedger}</small></span>
+          <span><strong>{firstName ?? copy.guestName}</strong><small>{copy.privateLedger}</small></span>
           <button type="button" className="account-logout" onClick={() => void logout()}>{copy.logout}</button>
         </div>
       </aside>

@@ -8,12 +8,32 @@ const LANGUAGE_OPTIONS: Array<{
   code: Language;
   short: string;
   name: string;
-  detail: string;
+  details: Record<Language, string>;
 }> = [
-  { code: "en", short: "EN", name: "English", detail: "English" },
-  { code: "ko", short: "KO", name: "한국어", detail: "Korean" },
-  { code: "ja", short: "JA", name: "日本語", detail: "Japanese" },
-  { code: "ru", short: "RU", name: "Русский", detail: "Russian" },
+  {
+    code: "en",
+    short: "EN",
+    name: "English",
+    details: { en: "English", ko: "영어", ja: "英語", ru: "Английский" },
+  },
+  {
+    code: "ko",
+    short: "KO",
+    name: "한국어",
+    details: { en: "Korean", ko: "한국어", ja: "韓国語", ru: "Корейский" },
+  },
+  {
+    code: "ja",
+    short: "JA",
+    name: "日本語",
+    details: { en: "Japanese", ko: "일본어", ja: "日本語", ru: "Японский" },
+  },
+  {
+    code: "ru",
+    short: "RU",
+    name: "Русский",
+    details: { en: "Russian", ko: "러시아어", ja: "ロシア語", ru: "Русский" },
+  },
 ];
 
 export function LanguagePicker({
@@ -103,7 +123,7 @@ export function LanguagePicker({
               <span className="language-option-code">{option.short}</span>
               <span>
                 <strong>{option.name}</strong>
-                <small>{option.detail}</small>
+                <small>{option.details[value]}</small>
               </span>
               <i aria-hidden="true">{option.code === value ? "✓" : ""}</i>
             </button>

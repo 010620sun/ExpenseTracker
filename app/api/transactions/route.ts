@@ -24,7 +24,10 @@ import {
 } from "@/db/schema";
 import { currencyExponent } from "@/lib/currency";
 import { memberFromRequest } from "@/lib/auth";
-import { isSubcategoryForCategory } from "@/lib/categories";
+import {
+  isCategoryForKind,
+  isSubcategoryForCategory,
+} from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -838,8 +841,11 @@ async function buildNewTransaction(
       : toBaseMinor(originalMinor, exponent, rate);
 
   const category = normalizeText(body.category, "category", 40, {
-    fallback: "other",
+    fallback: kind === "income" ? "other_income" : "other",
   });
+  if (!isCategoryForKind(category, kind)) {
+    throw new ApiValidationError("INVALID_CATEGORY", 400, "category");
+  }
   const normalizedSubcategory = normalizeText(
     body.subcategory,
     "subcategory",

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { LanguagePicker } from "@/components/language-picker";
@@ -12,8 +13,12 @@ import {
 } from "@/lib/categories";
 import { currencyExponent } from "@/lib/currency";
 import {
+  DEFAULT_LANGUAGE,
+  formatLocalizedCount,
   isLanguage,
   LANGUAGE_LOCALES,
+  LANGUAGE_STORAGE_KEY,
+  persistLanguagePreference,
   type Language,
 } from "@/lib/language";
 
@@ -102,9 +107,9 @@ const COPY = {
     next: "Next month",
     current: "This month",
     baseNote: "Shown in your base currency",
-    valuationMode: "Value basis",
-    historicalValue: "Transaction date",
-    currentValue: "Current value",
+    valuationMode: "Exchange-rate basis",
+    historicalValue: "Transaction-date rate",
+    currentValue: "Current rate",
     income: "Income",
     expenses: "Expenses",
     net: "Net cash flow",
@@ -112,32 +117,32 @@ const COPY = {
     transactions: "transactions",
     activeDays: "active days",
     comparedWith: "vs. previous month",
-    noComparison: "No previous-month baseline",
+    noComparison: "No data from the previous month",
     dailyFlow: "Daily cash flow",
     dailyHint: "Income and expenses by calendar day",
     expenseLegend: "Expense",
     incomeLegend: "Income",
     categoryBreakdown: "Spending by category",
     categoryHint: "Share of this month’s total expenses",
-    subcategoryBreakdown: "Spending details",
-    subcategoryHint: "Optional subcategories used this month",
+    subcategoryBreakdown: "Spending by subcategory",
+    subcategoryHint: "Subcategories recorded this month",
     noSubcategories: "No detailed categories recorded this month.",
     currencyBreakdown: "Spending by currency",
-    currencyHint: "Original totals and base-currency value",
+    currencyHint: "Original amounts and base-currency equivalents",
     topMerchants: "Top spending destinations",
     topMerchantsHint: "Grouped by transaction description",
-    ofExpenses: "of expenses",
+    ofExpenses: "{share}% of total expenses",
     entries: "entries",
     emptyTitle: "No activity for this month",
     emptyBody: "Add a transaction or choose another month to generate a report.",
     loadFailed: "We couldn’t load this report. Try again.",
     retry: "Retry",
     loading: "Building your report…",
-    more: "more",
-    less: "less",
+    more: "{percent}% more than previous month",
+    less: "{percent}% less than previous month",
     unchanged: "No change",
-    topCategory: "Top category",
-    averageDay: "Average per active day",
+    topCategory: "Highest-spending category",
+    averageDay: "Average spending per active day",
     noExpenses: "No expenses recorded this month.",
   },
   ko: {
@@ -147,43 +152,43 @@ const COPY = {
     previous: "이전 달",
     next: "다음 달",
     current: "이번 달",
-    baseNote: "기본 통화 기준으로 표시",
-    valuationMode: "금액 기준",
-    historicalValue: "거래일 기준",
-    currentValue: "현재 가치",
+    baseNote: "기준 통화로 표시",
+    valuationMode: "환산 기준",
+    historicalValue: "거래일 환율 기준",
+    currentValue: "현재 환율 기준",
     income: "수입",
     expenses: "지출",
-    net: "순현금흐름",
+    net: "순 현금 흐름",
     savingsRate: "저축률",
     transactions: "건의 거래",
     activeDays: "일 사용",
     comparedWith: "지난달 대비",
-    noComparison: "지난달 비교 기준 없음",
-    dailyFlow: "일별 현금흐름",
+    noComparison: "비교할 지난달 데이터가 없습니다",
+    dailyFlow: "일별 현금 흐름",
     dailyHint: "날짜별 수입과 지출",
     expenseLegend: "지출",
     incomeLegend: "수입",
     categoryBreakdown: "카테고리별 지출",
     categoryHint: "이번 달 총지출에서 차지하는 비중",
-    subcategoryBreakdown: "세부 지출 분석",
-    subcategoryHint: "이번 달에 사용한 선택형 세부 카테고리",
+    subcategoryBreakdown: "세부 카테고리별 지출",
+    subcategoryHint: "이번 달에 기록한 세부 카테고리별 지출",
     noSubcategories: "이번 달에는 세부 카테고리가 기록되지 않았습니다.",
     currencyBreakdown: "통화별 지출",
-    currencyHint: "원 통화 합계와 기본 통화 환산액",
+    currencyHint: "거래 통화별 원금액과 기준 통화 환산액",
     topMerchants: "주요 사용처",
     topMerchantsHint: "거래 설명을 기준으로 합산",
-    ofExpenses: "지출 비중",
+    ofExpenses: "총지출의 {share}%",
     entries: "건",
     emptyTitle: "이번 달 거래가 없습니다",
     emptyBody: "거래를 추가하거나 다른 달을 선택하면 리포트가 생성됩니다.",
     loadFailed: "리포트를 불러오지 못했습니다. 다시 시도해 주세요.",
     retry: "다시 시도",
     loading: "리포트 생성 중…",
-    more: "증가",
-    less: "감소",
+    more: "지난달보다 {percent}% 증가",
+    less: "지난달보다 {percent}% 감소",
     unchanged: "변화 없음",
-    topCategory: "최다 지출 카테고리",
-    averageDay: "사용일 평균 지출",
+    topCategory: "지출액 상위 카테고리",
+    averageDay: "거래일 평균 지출",
     noExpenses: "이번 달에 기록된 지출이 없습니다.",
   },
   ja: {
@@ -194,9 +199,9 @@ const COPY = {
     next: "次の月",
     current: "今月",
     baseNote: "基本通貨で表示",
-    valuationMode: "金額の基準",
-    historicalValue: "取引日基準",
-    currentValue: "現在価値",
+    valuationMode: "換算レートの基準",
+    historicalValue: "取引日のレート",
+    currentValue: "現在のレート",
     income: "収入",
     expenses: "支出",
     net: "純キャッシュフロー",
@@ -204,32 +209,32 @@ const COPY = {
     transactions: "件の取引",
     activeDays: "日利用",
     comparedWith: "前月比",
-    noComparison: "前月の比較基準なし",
+    noComparison: "前月のデータがありません",
     dailyFlow: "日別キャッシュフロー",
     dailyHint: "日付ごとの収入と支出",
     expenseLegend: "支出",
     incomeLegend: "収入",
     categoryBreakdown: "カテゴリー別支出",
     categoryHint: "今月の総支出に占める割合",
-    subcategoryBreakdown: "支出の詳細",
-    subcategoryHint: "今月使用した任意の詳細カテゴリー",
-    noSubcategories: "今月は詳細カテゴリーが記録されていません。",
+    subcategoryBreakdown: "サブカテゴリー別支出",
+    subcategoryHint: "今月記録されたサブカテゴリー",
+    noSubcategories: "今月はサブカテゴリーが記録されていません。",
     currencyBreakdown: "通貨別支出",
-    currencyHint: "元通貨の合計と基本通貨換算額",
+    currencyHint: "取引時の通貨別合計と基本通貨換算額",
     topMerchants: "主な利用先",
     topMerchantsHint: "取引の説明ごとに集計",
-    ofExpenses: "支出の割合",
+    ofExpenses: "総支出の{share}%",
     entries: "件",
     emptyTitle: "今月の取引はありません",
     emptyBody: "取引を追加するか、別の月を選ぶとレポートが作成されます。",
     loadFailed: "レポートを読み込めませんでした。もう一度お試しください。",
     retry: "再試行",
     loading: "レポートを作成中…",
-    more: "増加",
-    less: "減少",
+    more: "前月より{percent}%増加",
+    less: "前月より{percent}%減少",
     unchanged: "変化なし",
-    topCategory: "最大支出カテゴリー",
-    averageDay: "利用日あたりの平均",
+    topCategory: "支出額トップのカテゴリー",
+    averageDay: "取引があった日の日平均支出",
     noExpenses: "今月の支出は記録されていません。",
   },
   ru: {
@@ -240,9 +245,9 @@ const COPY = {
     next: "Следующий месяц",
     current: "Текущий месяц",
     baseNote: "Суммы в основной валюте",
-    valuationMode: "Основа оценки",
-    historicalValue: "На дату операции",
-    currentValue: "Текущая стоимость",
+    valuationMode: "Курс для пересчёта",
+    historicalValue: "Курс на дату операции",
+    currentValue: "Текущий курс",
     income: "Доходы",
     expenses: "Расходы",
     net: "Чистый денежный поток",
@@ -250,31 +255,31 @@ const COPY = {
     transactions: "операций",
     activeDays: "активных дней",
     comparedWith: "к прошлому месяцу",
-    noComparison: "Нет базы за прошлый месяц",
+    noComparison: "Нет данных за прошлый месяц для сравнения",
     dailyFlow: "Денежный поток по дням",
     dailyHint: "Доходы и расходы по датам",
     expenseLegend: "Расход",
     incomeLegend: "Доход",
     categoryBreakdown: "Расходы по категориям",
     categoryHint: "Доля в общих расходах месяца",
-    subcategoryBreakdown: "Детализация расходов",
-    subcategoryHint: "Дополнительные категории за этот месяц",
+    subcategoryBreakdown: "Расходы по подкатегориям",
+    subcategoryHint: "Подкатегории, использованные в этом месяце",
     noSubcategories: "В этом месяце подкатегории не использовались.",
     currencyBreakdown: "Расходы по валютам",
-    currencyHint: "Исходная сумма и эквивалент в основной валюте",
+    currencyHint: "Исходные суммы и эквиваленты в основной валюте",
     topMerchants: "Основные места расходов",
     topMerchantsHint: "Сгруппировано по описанию операции",
-    ofExpenses: "от расходов",
+    ofExpenses: "{share}% от общих расходов",
     entries: "операций",
     emptyTitle: "В этом месяце операций нет",
     emptyBody: "Добавьте операцию или выберите другой месяц, чтобы создать отчёт.",
     loadFailed: "Не удалось загрузить отчёт. Попробуйте снова.",
     retry: "Повторить",
     loading: "Формируем отчёт…",
-    more: "больше",
-    less: "меньше",
+    more: "На {percent}% больше, чем в прошлом месяце",
+    less: "На {percent}% меньше, чем в прошлом месяце",
     unchanged: "Без изменений",
-    topCategory: "Главная категория",
+    topCategory: "Категория с наибольшими расходами",
     averageDay: "Среднее за активный день",
     noExpenses: "В этом месяце расходов не зафиксировано.",
   },
@@ -320,8 +325,16 @@ function changePercent(current: number, previous: number) {
   return Math.round(((current - previous) / previous) * 100);
 }
 
-export function ReportManager({ today }: { today: string }) {
-  const [language, setLanguage] = useState<Language>("en");
+export function ReportManager({
+  today,
+  initialLanguage = DEFAULT_LANGUAGE,
+}: {
+  today: string;
+  initialLanguage?: Language;
+}) {
+  const router = useRouter();
+  const [language, setLanguage] = useState<Language>(initialLanguage);
+  const [languageReady, setLanguageReady] = useState(false);
   const [baseCurrency, setBaseCurrency] = useState("USD");
   const [ratesToUsd, setRatesToUsd] = useState<Record<string, number>>({ USD: 1 });
   const [month, setMonth] = useState(today.slice(0, 7));
@@ -343,14 +356,16 @@ export function ReportManager({ today }: { today: string }) {
   useEffect(() => {
     const controller = new AbortController();
     const frame = window.requestAnimationFrame(() => {
-      const stored = window.localStorage.getItem("globeledger-language");
+      const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
       if (isLanguage(stored)) setLanguage(stored);
+      setLanguageReady(true);
       const storedValuationMode = window.localStorage.getItem(
         "globeledger-valuation-mode",
       );
       if (storedValuationMode === "historical" || storedValuationMode === "current") {
         setValuationMode(storedValuationMode);
       }
+      void bootstrap();
     });
     async function bootstrap() {
       try {
@@ -380,7 +395,6 @@ export function ReportManager({ today }: { today: string }) {
         if (!controller.signal.aborted) setReady(true);
       }
     }
-    void bootstrap();
     return () => {
       controller.abort();
       window.cancelAnimationFrame(frame);
@@ -389,8 +403,8 @@ export function ReportManager({ today }: { today: string }) {
 
   useEffect(() => {
     document.documentElement.lang = language;
-    window.localStorage.setItem("globeledger-language", language);
-  }, [language]);
+    if (languageReady) persistLanguagePreference(language);
+  }, [language, languageReady]);
 
   useEffect(() => {
     window.localStorage.setItem("globeledger-valuation-mode", valuationMode);
@@ -677,18 +691,23 @@ export function ReportManager({ today }: { today: string }) {
   }
 
   function chooseLanguage(nextLanguage: Language) {
+    persistLanguagePreference(nextLanguage);
     setLanguage(nextLanguage);
     void fetch("/api/preferences", {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ language: nextLanguage }),
     }).catch(() => undefined);
+    router.refresh();
   }
 
   function comparisonLabel(value: number | null) {
     if (value === null) return copy.noComparison;
     if (value === 0) return copy.unchanged;
-    return `${Math.abs(value)}% ${value > 0 ? copy.more : copy.less} · ${copy.comparedWith}`;
+    return (value > 0 ? copy.more : copy.less).replace(
+      "{percent}",
+      String(Math.abs(value)),
+    );
   }
 
   return (
@@ -757,7 +776,7 @@ export function ReportManager({ today }: { today: string }) {
               <article className="income">
                 <span>{copy.income}</span>
                 <strong>{formatMoney(toBase(valuedReport.summary.incomeUsdMinor), baseCurrency, language)}</strong>
-                <small>{valuedReport.summary.incomeCount} {copy.transactions}</small>
+                <small>{formatLocalizedCount(valuedReport.summary.incomeCount, language, "transaction")}</small>
               </article>
               <article className="expense">
                 <span>{copy.expenses}</span>
@@ -767,7 +786,7 @@ export function ReportManager({ today }: { today: string }) {
               <article className={valuedReport.summary.netUsdMinor >= 0 ? "net positive" : "net negative"}>
                 <span>{copy.net}</span>
                 <strong>{formatMoney(toBase(valuedReport.summary.netUsdMinor), baseCurrency, language)}</strong>
-                <small>{valuedReport.summary.activeDays} {copy.activeDays}</small>
+                <small>{formatLocalizedCount(valuedReport.summary.activeDays, language, "activeDay")}</small>
               </article>
               <article className="savings">
                 <span>{copy.savingsRate}</span>
@@ -816,8 +835,8 @@ export function ReportManager({ today }: { today: string }) {
                     return (
                       <div className="report-category-row" key={item.category}>
                         <span className="report-category-glyph" style={{ backgroundColor: `${color}18`, color }} aria-hidden="true">{categoryGlyph(item.category)}</span>
-                        <div><strong>{categoryName(item.category)}</strong><span>{item.transactionCount} {copy.entries}</span><div className="report-progress"><i style={{ backgroundColor: color, width: `${share}%` }} /></div></div>
-                        <p><strong>{formatMoney(toBase(item.expenseUsdMinor), baseCurrency, language)}</strong><span>{share}% {copy.ofExpenses}</span></p>
+                        <div><strong>{categoryName(item.category)}</strong><span>{formatLocalizedCount(item.transactionCount, language, "entry")}</span><div className="report-progress"><i style={{ backgroundColor: color, width: `${share}%` }} /></div></div>
+                        <p><strong>{formatMoney(toBase(item.expenseUsdMinor), baseCurrency, language)}</strong><span>{copy.ofExpenses.replace("{share}", String(share))}</span></p>
                       </div>
                     );
                   })}
@@ -832,7 +851,7 @@ export function ReportManager({ today }: { today: string }) {
                   {valuedReport.currencies.length === 0 ? <p className="report-panel-empty">{copy.noExpenses}</p> : valuedReport.currencies.map((item) => (
                     <div className="report-currency-row" key={item.currency}>
                       <span>{item.currency.slice(0, 1)}</span>
-                      <div><strong>{item.currency}</strong><small>{item.transactionCount} {copy.entries}</small></div>
+                      <div><strong>{item.currency}</strong><small>{formatLocalizedCount(item.transactionCount, language, "entry")}</small></div>
                       <p><strong>{formatMoney(item.originalAmountMinor / 10 ** item.currencyExponent, item.currency, language)}</strong><small>{formatMoney(toBase(item.expenseUsdMinor), baseCurrency, language)}</small></p>
                     </div>
                   ))}
@@ -845,7 +864,7 @@ export function ReportManager({ today }: { today: string }) {
                   {valuedReport.merchants.length === 0 ? <li className="report-panel-empty">{copy.noExpenses}</li> : valuedReport.merchants.map((item, index) => (
                     <li key={`${item.description}:${item.category}:${item.subcategory ?? ""}`}>
                       <span>{index + 1}</span>
-                      <div><strong>{item.description}</strong><small>{categoryPathLabel(item.category, item.subcategory, language)} · {item.transactionCount} {copy.entries}</small></div>
+                      <div><strong>{item.description}</strong><small>{categoryPathLabel(item.category, item.subcategory, language)} · {formatLocalizedCount(item.transactionCount, language, "entry")}</small></div>
                       <b>{formatMoney(toBase(item.expenseUsdMinor), baseCurrency, language)}</b>
                     </li>
                   ))}
@@ -867,8 +886,8 @@ export function ReportManager({ today }: { today: string }) {
                     return (
                       <div className="report-subcategory-row" key={`${item.category}:${item.subcategory}`}>
                         <span style={{ backgroundColor: `${color}18`, color }} aria-hidden="true">{categoryGlyph(item.category)}</span>
-                        <div><strong>{subcategoryLabel(item.subcategory, language)}</strong><small>{categoryName(item.category)} · {item.transactionCount} {copy.entries}</small></div>
-                        <p><strong>{formatMoney(toBase(item.expenseUsdMinor), baseCurrency, language)}</strong><small>{share}% {copy.ofExpenses}</small></p>
+                        <div><strong>{subcategoryLabel(item.subcategory, language)}</strong><small>{categoryName(item.category)} · {formatLocalizedCount(item.transactionCount, language, "entry")}</small></div>
+                        <p><strong>{formatMoney(toBase(item.expenseUsdMinor), baseCurrency, language)}</strong><small>{copy.ofExpenses.replace("{share}", String(share))}</small></p>
                       </div>
                     );
                   })}

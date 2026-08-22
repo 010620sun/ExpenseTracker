@@ -1,9 +1,16 @@
 import { redirect } from "next/navigation";
 
+import { pageMetadata } from "@/lib/page-metadata";
+import { requestLanguage } from "@/lib/request-language";
+
 import { getCurrentMember } from "../member-auth";
 import { AuthScreen } from "./auth-screen";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata() {
+  return pageMetadata("auth", await requestLanguage());
+}
 
 export default async function AuthPage({
   searchParams,
@@ -12,8 +19,12 @@ export default async function AuthPage({
 }) {
   const params = await searchParams;
   const returnTo = safeReturnTo(params.return_to);
-  if (await getCurrentMember()) redirect(returnTo);
-  return <AuthScreen returnTo={returnTo} />;
+  const [member, initialLanguage] = await Promise.all([
+    getCurrentMember(),
+    requestLanguage(),
+  ]);
+  if (member) redirect(returnTo);
+  return <AuthScreen initialLanguage={initialLanguage} returnTo={returnTo} />;
 }
 
 function safeReturnTo(value: string | undefined) {
