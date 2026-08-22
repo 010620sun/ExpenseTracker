@@ -531,7 +531,7 @@ test("supports transaction-date and current exchange-rate valuations", async () 
   assert.match(tracker, /globeledger-valuation-mode/u);
   assert.match(
     tracker,
-    /fetch\(\s*`\/api\/rates\?date=\$\{encodeURIComponent\(occurredOn\)\}`/u,
+    /fetch\(\s*rateEndpoint/u,
   );
   assert.match(tracker, /valuationMode === "current"/u);
   assert.match(tracker, /historicalBaseRates\[transaction\.occurredOn\]/u);
@@ -597,4 +597,28 @@ test("distributes one expense exactly across consecutive calendar dates", async 
   assert.match(tracker, /日付ごとに分割/u);
   assert.match(tracker, /Распределить по датам/u);
   assert.match(styles, /\.distribution-card/u);
+});
+
+test("allows future transactions and locks the latest available rate", async () => {
+  const tracker = await readFile(
+    new URL("../app/expense-tracker.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    tracker,
+    /<input type="date" value=\{occurredOn\} min="1900-01-01"/u,
+  );
+  assert.doesNotMatch(
+    tracker,
+    /!isIsoDate\(occurredOn\) \|\| occurredOn > currentDate/u,
+  );
+  assert.match(
+    tracker,
+    /const rateEndpoint = occurredOn > currentDate[\s\S]*?\? "\/api\/rates"[\s\S]*?: `\/api\/rates\?date=/u,
+  );
+  assert.match(
+    tracker,
+    /isFutureTransaction && hasFrankfurterRate[\s\S]*?copy\.futureRateNotice/u,
+  );
 });

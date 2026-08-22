@@ -554,6 +554,7 @@ const COPY = {
     historicalUnavailable: "Some transaction-date rates are unavailable",
     transactionRateLoading: "Loading the transaction-date rate…",
     transactionRateError: "The transaction-date rate is unavailable. Try again shortly.",
+    futureRateNotice: "Future transaction: the latest available rate will be saved.",
     rateUpdating: "Updating reference rates…",
     rateStale: "Using last available rate dated {date}",
     rateError: "Connection failed · using fallback rates",
@@ -682,6 +683,7 @@ const COPY = {
     historicalUnavailable: "일부 거래일 환율을 불러오지 못했습니다",
     transactionRateLoading: "거래일 기준 환율을 불러오는 중…",
     transactionRateError: "거래일 기준 환율을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    futureRateNotice: "미래 거래에는 현재 이용 가능한 최신 환율을 저장합니다.",
     rateUpdating: "기준 환율 업데이트 중…",
     rateStale: "{date} 기준 마지막 가용 환율 사용 중",
     rateError: "연결 실패 · 예비 환율 사용 중",
@@ -810,6 +812,7 @@ const COPY = {
     historicalUnavailable: "一部の取引日レートを取得できませんでした",
     transactionRateLoading: "取引日のレートを取得中…",
     transactionRateError: "取引日のレートを取得できません。しばらくしてから再試行してください。",
+    futureRateNotice: "未来の取引には、現時点で取得可能な最新レートを保存します。",
     rateUpdating: "参照レートを更新中…",
     rateStale: "{date}時点で取得可能な最新レートを使用中",
     rateError: "接続に失敗しました · 代替レートを使用中",
@@ -938,6 +941,7 @@ const COPY = {
     historicalUnavailable: "Некоторые курсы на дату операции недоступны",
     transactionRateLoading: "Загружаем курс на дату операции…",
     transactionRateError: "Курс на дату операции недоступен. Повторите попытку позже.",
+    futureRateNotice: "Для будущей операции сохраняется последний доступный курс.",
     rateUpdating: "Обновляем справочные курсы…",
     rateStale: "Используется последний доступный курс от {date}",
     rateError: "Нет соединения · используется резервный курс",
@@ -1792,8 +1796,11 @@ export function ExpenseTracker({
         asOf: null,
       });
       try {
+        const rateEndpoint = occurredOn > currentDate
+          ? "/api/rates"
+          : `/api/rates?date=${encodeURIComponent(occurredOn)}`;
         const response = await fetch(
-          `/api/rates?date=${encodeURIComponent(occurredOn)}`,
+          rateEndpoint,
           { signal: controller.signal, cache: "no-store" },
         );
         const responseBody = (await response.json()) as RatesApiResponse;
@@ -1850,7 +1857,7 @@ export function ExpenseTracker({
       controller.abort();
       window.cancelAnimationFrame(frame);
     };
-  }, [isDrawerOpen, occurredOn]);
+  }, [currentDate, isDrawerOpen, occurredOn]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -2232,6 +2239,7 @@ export function ExpenseTracker({
   const requiresTransactionDateRate = currency !== "USD" && !usesStoredRate;
   const transactionDateRateReady =
     !requiresTransactionDateRate || hasTransactionDateRates;
+  const isFutureTransaction = occurredOn > currentDate;
   const parsedDistributionCount = Number(distributionCount);
   const distributionPreviewEnd =
     isIsoDate(occurredOn) &&
@@ -2468,7 +2476,7 @@ export function ExpenseTracker({
       setFormError(copy.amountError);
       return;
     }
-    if (!isIsoDate(occurredOn) || occurredOn > currentDate) {
+    if (!isIsoDate(occurredOn)) {
       setFormError(copy.dateError);
       return;
     }
@@ -3324,6 +3332,7 @@ export function ExpenseTracker({
                         1 {currency} = {conversionRate < 0.01 ? conversionRate.toFixed(6) : conversionRate.toFixed(4)} {baseCurrency}
                         {" · "}{usesStoredRate ? calendarCopy.historicalRate : currency === baseCurrency ? copy.sameCurrencyRate : currency === "USD" ? copy.identityRate : hasFrankfurterRate ? copy.rateProvider : copy.fallbackRate}
                         {selectedRateDateLabel ? ` · ${copy.rateDate}: ${selectedRateDateLabel}` : ""}
+                        {isFutureTransaction && hasFrankfurterRate ? ` · ${copy.futureRateNotice}` : ""}
                         {" · "}{copy.savedRate}
                       </>}
                 </p>
@@ -3435,7 +3444,7 @@ export function ExpenseTracker({
               )}
               <label className="field">
                 <span>{copy.date}</span>
-                <input type="date" value={occurredOn} max={currentDate} onChange={(event) => setOccurredOn(event.target.value)} required />
+                <input type="date" value={occurredOn} min="1900-01-01" onChange={(event) => setOccurredOn(event.target.value)} required />
               </label>
               {!editingTransaction && kind === "expense" && !isRecurring && (
                 <div className={isDistributed ? "distribution-card active" : "distribution-card"}>
