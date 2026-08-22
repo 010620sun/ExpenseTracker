@@ -24,6 +24,7 @@ import {
 } from "@/db/schema";
 import { currencyExponent } from "@/lib/currency";
 import { memberFromRequest } from "@/lib/auth";
+import { isSubcategoryForCategory } from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -527,6 +528,7 @@ function serializeTransaction(transaction: Transaction) {
     baseCurrency: transaction.baseCurrency,
     baseCurrencyExponent: transaction.baseCurrencyExponent,
     category: transaction.category,
+    subcategory: transaction.subcategory,
     description: transaction.description,
     note: transaction.note,
     recurringSeriesId: transaction.recurringSeriesId,
@@ -580,6 +582,7 @@ function recurringSeriesFromTransaction(
     fallbackFxRateDate:
       transaction.fxSource === "frankfurter" ? transaction.fxRateDate : null,
     category: transaction.category,
+    subcategory: transaction.subcategory,
     description: transaction.description,
     note: transaction.note,
     createdAtMs: transaction.createdAtMs,
@@ -684,6 +687,7 @@ async function materializeRecurringTransactions(
         baseCurrency: BASE_CURRENCY,
         baseCurrencyExponent: BASE_CURRENCY_EXPONENT,
         category: series.category,
+        subcategory: series.subcategory,
         description: series.description,
         note: series.note,
         recurringSeriesId: series.id,
@@ -836,6 +840,23 @@ async function buildNewTransaction(
   const category = normalizeText(body.category, "category", 40, {
     fallback: "other",
   });
+  const normalizedSubcategory = normalizeText(
+    body.subcategory,
+    "subcategory",
+    64,
+    { fallback: "" },
+  );
+  if (
+    normalizedSubcategory &&
+    !isSubcategoryForCategory(category, normalizedSubcategory)
+  ) {
+    throw new ApiValidationError(
+      "INVALID_SUBCATEGORY",
+      400,
+      "subcategory",
+    );
+  }
+  const subcategory = normalizedSubcategory || null;
   const description = normalizeText(
     firstDefined(body, ["description", "merchant"]),
     "description",
@@ -877,6 +898,7 @@ async function buildNewTransaction(
     baseCurrency: BASE_CURRENCY,
     baseCurrencyExponent: BASE_CURRENCY_EXPONENT,
     category,
+    subcategory,
     description,
     note,
     recurringSeriesId: null,
@@ -963,6 +985,7 @@ function sameDistribution(
         row.baseCurrency === proposed.baseCurrency &&
         row.baseCurrencyExponent === proposed.baseCurrencyExponent &&
         row.category === proposed.category &&
+        row.subcategory === proposed.subcategory &&
         row.description === proposed.description &&
         row.note === proposed.note
     ) &&
@@ -987,6 +1010,7 @@ function sameMutation(existing: Transaction, proposed: NewTransaction) {
     existing.baseCurrency === proposed.baseCurrency &&
     existing.baseCurrencyExponent === proposed.baseCurrencyExponent &&
     existing.category === proposed.category &&
+    existing.subcategory === proposed.subcategory &&
     existing.description === proposed.description &&
     existing.note === proposed.note
   );
@@ -1417,6 +1441,7 @@ export async function PATCH(request: Request) {
         baseCurrency: proposed.baseCurrency,
         baseCurrencyExponent: proposed.baseCurrencyExponent,
         category: proposed.category,
+        subcategory: proposed.subcategory,
         description: proposed.description,
         note: proposed.note,
         updatedAtMs,

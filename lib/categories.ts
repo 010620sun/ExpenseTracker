@@ -61,6 +61,8 @@ type CategoryDefinition = {
   labels: Labels;
 };
 
+type SubcategoryDefinition = { labels: Labels };
+
 export const CATEGORY_GROUP_LABELS: Record<CategoryGroupId, Labels> = {
   home: { en: "Home & bills", ko: "주거·생활", ja: "住居・生活", ru: "Дом и счета" },
   food: { en: "Food", ko: "식생활", ja: "食生活", ru: "Питание" },
@@ -103,6 +105,122 @@ export const CATEGORY_META: Record<LedgerCategoryId, CategoryDefinition> = {
   income: { kind: "income", group: "income", color: "#278369", glyph: "+", labels: { en: "Income", ko: "수입", ja: "収入", ru: "Доход" } },
 };
 
+export const SUBCATEGORY_META = {
+  rent_mortgage: { labels: { en: "Rent & mortgage", ko: "월세·주택대출", ja: "家賃・住宅ローン", ru: "Аренда и ипотека" } },
+  home_maintenance: { labels: { en: "Repairs & maintenance", ko: "수리·유지보수", ja: "修理・メンテナンス", ru: "Ремонт и обслуживание" } },
+  furniture: { labels: { en: "Furniture", ko: "가구", ja: "家具", ru: "Мебель" } },
+  electricity_gas: { labels: { en: "Electricity & gas", ko: "전기·가스", ja: "電気・ガス", ru: "Электричество и газ" } },
+  water: { labels: { en: "Water", ko: "수도", ja: "水道", ru: "Вода" } },
+  waste_management: { labels: { en: "Waste management", ko: "폐기물 처리", ja: "廃棄物処理", ru: "Вывоз отходов" } },
+  mobile_phone: { labels: { en: "Mobile phone", ko: "휴대전화", ja: "携帯電話", ru: "Мобильная связь" } },
+  internet: { labels: { en: "Internet", ko: "인터넷", ja: "インターネット", ru: "Интернет" } },
+  postal_services: { labels: { en: "Post & delivery", ko: "우편·배송", ja: "郵便・配送", ru: "Почта и доставка" } },
+  supermarket: { labels: { en: "Supermarket", ko: "마트", ja: "スーパーマーケット", ru: "Супермаркет" } },
+  convenience_store: { labels: { en: "Convenience store", ko: "편의점", ja: "コンビニ", ru: "Магазин у дома" } },
+  household_supplies: { labels: { en: "Household supplies", ko: "생활용품", ja: "日用品", ru: "Товары для дома" } },
+  restaurant: { labels: { en: "Restaurant", ko: "식당", ja: "レストラン", ru: "Ресторан" } },
+  cafe: { labels: { en: "Cafe", ko: "카페", ja: "カフェ", ru: "Кафе" } },
+  delivery_takeout: { labels: { en: "Delivery & takeout", ko: "배달·포장", ja: "デリバリー・持ち帰り", ru: "Доставка и еда навынос" } },
+  bus_subway: { labels: { en: "Bus & subway", ko: "버스·지하철", ja: "バス・地下鉄", ru: "Автобус и метро" } },
+  taxi_rideshare: { labels: { en: "Taxi & rideshare", ko: "택시·공유차량", ja: "タクシー・配車", ru: "Такси и каршеринг" } },
+  rail: { labels: { en: "Rail", ko: "철도", ja: "鉄道", ru: "Железная дорога" } },
+  fuel: { labels: { en: "Fuel", ko: "주유", ja: "燃料", ru: "Топливо" } },
+  parking_tolls: { labels: { en: "Parking & tolls", ko: "주차·통행료", ja: "駐車場・通行料", ru: "Парковка и платные дороги" } },
+  vehicle_maintenance: { labels: { en: "Maintenance", ko: "차량 정비", ja: "車両整備", ru: "Обслуживание автомобиля" } },
+  flights: { labels: { en: "Flights", ko: "항공", ja: "航空券", ru: "Авиабилеты" } },
+  accommodation: { labels: { en: "Accommodation", ko: "숙박", ja: "宿泊", ru: "Проживание" } },
+  travel_transport: { labels: { en: "Local transport", ko: "현지 교통", ja: "現地交通", ru: "Местный транспорт" } },
+  travel_activities: { labels: { en: "Activities", ko: "관광·체험", ja: "観光・アクティビティ", ru: "Экскурсии и развлечения" } },
+  visa_fees: { labels: { en: "Visa & entry fees", ko: "비자·입국 비용", ja: "ビザ・入国費用", ru: "Виза и сборы за въезд" } },
+  clinic_hospital: { labels: { en: "Clinic & hospital", ko: "병원", ja: "病院・クリニック", ru: "Клиника и больница" } },
+  pharmacy: { labels: { en: "Pharmacy", ko: "약국", ja: "薬局", ru: "Аптека" } },
+  dental: { labels: { en: "Dental", ko: "치과", ja: "歯科", ru: "Стоматология" } },
+  vision: { labels: { en: "Vision", ko: "안과·안경", ja: "眼科・眼鏡", ru: "Зрение" } },
+  fitness: { labels: { en: "Fitness & sports", ko: "운동·스포츠", ja: "フィットネス・スポーツ", ru: "Фитнес и спорт" } },
+  hair_beauty: { labels: { en: "Hair & beauty", ko: "헤어·미용", ja: "ヘア・美容", ru: "Парикмахерская и красота" } },
+  skincare: { labels: { en: "Skincare", ko: "스킨케어", ja: "スキンケア", ru: "Уход за кожей" } },
+  spa_wellness: { labels: { en: "Spa & wellness", ko: "스파·웰니스", ja: "スパ・ウェルネス", ru: "Спа и велнес" } },
+  tuition: { labels: { en: "Tuition", ko: "학비", ja: "授業料", ru: "Обучение" } },
+  books_supplies: { labels: { en: "Books & supplies", ko: "도서·학용품", ja: "書籍・学用品", ru: "Книги и материалы" } },
+  online_courses: { labels: { en: "Online courses", ko: "온라인 강의", ja: "オンライン講座", ru: "Онлайн-курсы" } },
+  clothing: { labels: { en: "Clothing", ko: "의류", ja: "衣類", ru: "Одежда" } },
+  electronics: { labels: { en: "Electronics", ko: "전자제품", ja: "電子機器", ru: "Электроника" } },
+  home_goods: { labels: { en: "Home goods", ko: "가정용품", ja: "家庭用品", ru: "Товары для дома" } },
+  movies_events: { labels: { en: "Movies & events", ko: "영화·공연", ja: "映画・イベント", ru: "Кино и мероприятия" } },
+  games: { labels: { en: "Games", ko: "게임", ja: "ゲーム", ru: "Игры" } },
+  hobbies: { labels: { en: "Hobbies", ko: "취미", ja: "趣味", ru: "Хобби" } },
+  media_streaming: { labels: { en: "Media streaming", ko: "영상·음악", ja: "動画・音楽配信", ru: "Стриминг" } },
+  software: { labels: { en: "Software", ko: "소프트웨어", ja: "ソフトウェア", ru: "Программы" } },
+  memberships: { labels: { en: "Memberships", ko: "멤버십", ja: "メンバーシップ", ru: "Членство" } },
+  childcare: { labels: { en: "Childcare", ko: "육아", ja: "育児", ru: "Уход за детьми" } },
+  school_support: { labels: { en: "School support", ko: "자녀 교육 지원", ja: "子どもの教育支援", ru: "Школьные расходы" } },
+  eldercare: { labels: { en: "Eldercare", ko: "부모님·간병", ja: "高齢者ケア", ru: "Уход за пожилыми" } },
+  pet_food: { labels: { en: "Pet food", ko: "반려동물 사료", ja: "ペットフード", ru: "Корм" } },
+  veterinary: { labels: { en: "Veterinary", ko: "동물병원", ja: "動物病院", ru: "Ветеринар" } },
+  pet_grooming: { labels: { en: "Grooming", ko: "미용·관리", ja: "トリミング", ru: "Груминг" } },
+  gifts_given: { labels: { en: "Gifts", ko: "선물", ja: "贈り物", ru: "Подарки" } },
+  donations: { labels: { en: "Donations", ko: "기부", ja: "寄付", ru: "Пожертвования" } },
+  celebrations: { labels: { en: "Celebrations", ko: "경조사", ja: "冠婚葬祭", ru: "Праздники и события" } },
+  health_insurance: { labels: { en: "Health insurance", ko: "건강보험", ja: "健康保険", ru: "Медицинская страховка" } },
+  life_insurance: { labels: { en: "Life insurance", ko: "생명보험", ja: "生命保険", ru: "Страхование жизни" } },
+  property_insurance: { labels: { en: "Property insurance", ko: "재산보험", ja: "損害保険", ru: "Страхование имущества" } },
+  income_tax: { labels: { en: "Income tax", ko: "소득세", ja: "所得税", ru: "Подоходный налог" } },
+  property_tax: { labels: { en: "Property tax", ko: "재산세", ja: "固定資産税", ru: "Налог на имущество" } },
+  government_fees: { labels: { en: "Government fees", ko: "공공 수수료", ja: "行政手数料", ru: "Государственные сборы" } },
+  bank_fees: { labels: { en: "Bank fees", ko: "은행 수수료", ja: "銀行手数料", ru: "Банковские комиссии" } },
+  card_fees: { labels: { en: "Card fees", ko: "카드 수수료", ja: "カード手数料", ru: "Комиссии по карте" } },
+  loan_interest: { labels: { en: "Loan interest", ko: "대출이자", ja: "ローン利息", ru: "Проценты по кредиту" } },
+  base_salary: { labels: { en: "Base salary", ko: "기본급", ja: "基本給", ru: "Оклад" } },
+  bonus: { labels: { en: "Bonus", ko: "보너스", ja: "ボーナス", ru: "Премия" } },
+  allowance: { labels: { en: "Allowance", ko: "수당", ja: "手当", ru: "Надбавка" } },
+  client_work: { labels: { en: "Client work", ko: "고객 프로젝트", ja: "クライアント業務", ru: "Работа с клиентами" } },
+  business_sales: { labels: { en: "Business sales", ko: "사업 매출", ja: "事業売上", ru: "Продажи бизнеса" } },
+  consulting: { labels: { en: "Consulting", ko: "컨설팅", ja: "コンサルティング", ru: "Консалтинг" } },
+  interest_income: { labels: { en: "Interest", ko: "이자", ja: "利息", ru: "Проценты" } },
+  dividends: { labels: { en: "Dividends", ko: "배당", ja: "配当", ru: "Дивиденды" } },
+  capital_gains: { labels: { en: "Capital gains", ko: "투자 수익", ja: "売却益", ru: "Доход от капитала" } },
+  purchase_refund: { labels: { en: "Purchase refund", ko: "구매 환불", ja: "購入返金", ru: "Возврат покупки" } },
+  tax_refund: { labels: { en: "Tax refund", ko: "세금 환급", ja: "税金還付", ru: "Возврат налога" } },
+  reimbursement: { labels: { en: "Reimbursement", ko: "비용 정산", ja: "経費精算", ru: "Компенсация расходов" } },
+  cash_gift: { labels: { en: "Cash gift", ko: "현금 선물", ja: "現金の贈り物", ru: "Денежный подарок" } },
+  family_support: { labels: { en: "Family support", ko: "가족 지원금", ja: "家族からの支援", ru: "Поддержка семьи" } },
+  prizes: { labels: { en: "Prizes", ko: "상금", ja: "賞金", ru: "Призы" } },
+  grants: { labels: { en: "Grants", ko: "지원금", ja: "助成金", ru: "Гранты" } },
+} as const satisfies Record<string, SubcategoryDefinition>;
+
+export type SubcategoryId = keyof typeof SUBCATEGORY_META;
+
+export const SUBCATEGORY_IDS_BY_CATEGORY: Partial<
+  Record<LedgerCategoryId, readonly SubcategoryId[]>
+> = {
+  housing: ["rent_mortgage", "home_maintenance", "furniture"],
+  utilities: ["electricity_gas", "water", "waste_management"],
+  communication: ["mobile_phone", "internet", "postal_services"],
+  groceries: ["supermarket", "convenience_store", "household_supplies"],
+  dining: ["restaurant", "cafe", "delivery_takeout"],
+  transport: ["bus_subway", "taxi_rideshare", "rail"],
+  vehicle: ["fuel", "parking_tolls", "vehicle_maintenance"],
+  travel: ["flights", "accommodation", "travel_transport", "travel_activities", "visa_fees"],
+  health: ["clinic_hospital", "pharmacy", "dental", "vision", "fitness"],
+  personal_care: ["hair_beauty", "skincare", "spa_wellness"],
+  education: ["tuition", "books_supplies", "online_courses"],
+  shopping: ["clothing", "electronics", "home_goods"],
+  entertainment: ["movies_events", "games", "hobbies"],
+  subscriptions: ["media_streaming", "software", "memberships"],
+  family: ["childcare", "school_support", "eldercare"],
+  pets: ["pet_food", "veterinary", "pet_grooming"],
+  gifts: ["gifts_given", "donations", "celebrations"],
+  insurance: ["health_insurance", "life_insurance", "property_insurance"],
+  taxes: ["income_tax", "property_tax", "government_fees"],
+  financial: ["bank_fees", "card_fees", "loan_interest"],
+  salary: ["base_salary", "bonus", "allowance"],
+  freelance: ["client_work", "business_sales", "consulting"],
+  investment_income: ["interest_income", "dividends", "capital_gains"],
+  refund: ["purchase_refund", "tax_refund", "reimbursement"],
+  gift_income: ["cash_gift", "family_support"],
+  other_income: ["prizes", "grants"],
+};
+
 const EXPENSE_SET = new Set<string>(EXPENSE_CATEGORY_IDS);
 const INCOME_SET = new Set<string>(INCOME_CATEGORY_IDS);
 
@@ -140,4 +258,27 @@ export function categoryGroupsForKind(kind: CategoryKind) {
     const categories = categoryIds.filter((category) => CATEGORY_META[category].group === group);
     return categories.length > 0 ? [{ group, categories }] : [];
   });
+}
+
+export function subcategoryIdsForCategory(category: string): readonly SubcategoryId[] {
+  return SUBCATEGORY_IDS_BY_CATEGORY[category as LedgerCategoryId] ?? [];
+}
+
+export function isSubcategoryForCategory(category: string, subcategory: string) {
+  return subcategoryIdsForCategory(category).some((item) => item === subcategory);
+}
+
+export function subcategoryLabel(subcategory: string, language: Language) {
+  return SUBCATEGORY_META[subcategory as SubcategoryId]?.labels[language] ?? subcategory;
+}
+
+export function categoryPathLabel(
+  category: string,
+  subcategory: string | null | undefined,
+  language: Language,
+) {
+  const parent = categoryLabel(category, language);
+  return subcategory
+    ? `${parent} · ${subcategoryLabel(subcategory, language)}`
+    : parent;
 }

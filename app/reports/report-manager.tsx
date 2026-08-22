@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { LanguagePicker } from "@/components/language-picker";
-import { categoryColor, categoryGlyph, categoryLabel } from "@/lib/categories";
+import {
+  categoryColor,
+  categoryGlyph,
+  categoryLabel,
+  categoryPathLabel,
+  subcategoryLabel,
+} from "@/lib/categories";
 import { currencyExponent } from "@/lib/currency";
 import {
   isLanguage,
@@ -18,6 +24,12 @@ type ReportData = {
   previous: ReportSummary & { month: string };
   categories: Array<{
     category: string;
+    expenseUsdMinor: number;
+    transactionCount: number;
+  }>;
+  subcategories: Array<{
+    category: string;
+    subcategory: string;
     expenseUsdMinor: number;
     transactionCount: number;
   }>;
@@ -37,6 +49,7 @@ type ReportData = {
   merchants: Array<{
     description: string;
     category: string;
+    subcategory: string | null;
     expenseUsdMinor: number;
     transactionCount: number;
   }>;
@@ -47,6 +60,7 @@ type ReportData = {
     currencyExponent: number;
     fxRate: string;
     category: string;
+    subcategory: string | null;
     description: string;
     originalAmountMinor: number;
     baseAmountMinor: number;
@@ -105,6 +119,9 @@ const COPY = {
     incomeLegend: "Income",
     categoryBreakdown: "Spending by category",
     categoryHint: "Share of this month’s total expenses",
+    subcategoryBreakdown: "Spending details",
+    subcategoryHint: "Optional subcategories used this month",
+    noSubcategories: "No detailed categories recorded this month.",
     currencyBreakdown: "Spending by currency",
     currencyHint: "Original totals and base-currency value",
     topMerchants: "Top spending destinations",
@@ -148,6 +165,9 @@ const COPY = {
     incomeLegend: "수입",
     categoryBreakdown: "카테고리별 지출",
     categoryHint: "이번 달 총지출에서 차지하는 비중",
+    subcategoryBreakdown: "세부 지출 분석",
+    subcategoryHint: "이번 달에 사용한 선택형 세부 카테고리",
+    noSubcategories: "이번 달에는 세부 카테고리가 기록되지 않았습니다.",
     currencyBreakdown: "통화별 지출",
     currencyHint: "원 통화 합계와 기본 통화 환산액",
     topMerchants: "주요 사용처",
@@ -191,6 +211,9 @@ const COPY = {
     incomeLegend: "収入",
     categoryBreakdown: "カテゴリー別支出",
     categoryHint: "今月の総支出に占める割合",
+    subcategoryBreakdown: "支出の詳細",
+    subcategoryHint: "今月使用した任意の詳細カテゴリー",
+    noSubcategories: "今月は詳細カテゴリーが記録されていません。",
     currencyBreakdown: "通貨別支出",
     currencyHint: "元通貨の合計と基本通貨換算額",
     topMerchants: "主な利用先",
@@ -234,6 +257,9 @@ const COPY = {
     incomeLegend: "Доход",
     categoryBreakdown: "Расходы по категориям",
     categoryHint: "Доля в общих расходах месяца",
+    subcategoryBreakdown: "Детализация расходов",
+    subcategoryHint: "Дополнительные категории за этот месяц",
+    noSubcategories: "В этом месяце подкатегории не использовались.",
     currencyBreakdown: "Расходы по валютам",
     currencyHint: "Исходная сумма и эквивалент в основной валюте",
     topMerchants: "Основные места расходов",
@@ -471,6 +497,12 @@ export function ReportManager({ today }: { today: string }) {
     const currentDays = new Set<string>();
     const previousDays = new Set<string>();
     const categories = new Map<string, { amount: number; count: number }>();
+    const subcategories = new Map<string, {
+      category: string;
+      subcategory: string;
+      amount: number;
+      count: number;
+    }>();
     const daily = new Map<string, { income: number; expense: number; count: number }>();
     const currencies = new Map<string, {
       exponent: number;
@@ -481,6 +513,7 @@ export function ReportManager({ today }: { today: string }) {
     const merchants = new Map<string, {
       description: string;
       category: string;
+      subcategory: string | null;
       amount: number;
       count: number;
     }>();
@@ -513,6 +546,19 @@ export function ReportManager({ today }: { today: string }) {
       category.count += bucket.transactionCount;
       categories.set(bucket.category, category);
 
+      if (bucket.subcategory) {
+        const subcategoryKey = `${bucket.category}\u0000${bucket.subcategory}`;
+        const detail = subcategories.get(subcategoryKey) ?? {
+          category: bucket.category,
+          subcategory: bucket.subcategory,
+          amount: 0,
+          count: 0,
+        };
+        detail.amount += pseudoUsdMinor;
+        detail.count += bucket.transactionCount;
+        subcategories.set(subcategoryKey, detail);
+      }
+
       const currency = currencies.get(bucket.currency) ?? {
         exponent: bucket.currencyExponent,
         originalMinor: 0,
@@ -524,10 +570,11 @@ export function ReportManager({ today }: { today: string }) {
       currency.count += bucket.transactionCount;
       currencies.set(bucket.currency, currency);
 
-      const merchantKey = `${bucket.description}\u0000${bucket.category}`;
+      const merchantKey = `${bucket.description}\u0000${bucket.category}\u0000${bucket.subcategory ?? ""}`;
       const merchant = merchants.get(merchantKey) ?? {
         description: bucket.description,
         category: bucket.category,
+        subcategory: bucket.subcategory,
         amount: 0,
         count: 0,
       };
@@ -554,6 +601,14 @@ export function ReportManager({ today }: { today: string }) {
           transactionCount: item.count,
         }))
         .sort((left, right) => right.expenseUsdMinor - left.expenseUsdMinor),
+      subcategories: [...subcategories.values()]
+        .map((item) => ({
+          category: item.category,
+          subcategory: item.subcategory,
+          expenseUsdMinor: item.amount,
+          transactionCount: item.count,
+        }))
+        .sort((left, right) => right.expenseUsdMinor - left.expenseUsdMinor),
       daily: [...daily.entries()]
         .map(([occurredOn, item]) => ({
           occurredOn,
@@ -575,6 +630,7 @@ export function ReportManager({ today }: { today: string }) {
         .map((item) => ({
           description: item.description,
           category: item.category,
+          subcategory: item.subcategory,
           expenseUsdMinor: item.amount,
           transactionCount: item.count,
         }))
@@ -787,13 +843,36 @@ export function ReportManager({ today }: { today: string }) {
                 <div className="report-panel-heading"><div><h2>{copy.topMerchants}</h2><p>{copy.topMerchantsHint}</p></div></div>
                 <ol className="report-merchant-list">
                   {valuedReport.merchants.length === 0 ? <li className="report-panel-empty">{copy.noExpenses}</li> : valuedReport.merchants.map((item, index) => (
-                    <li key={`${item.description}:${item.category}`}>
+                    <li key={`${item.description}:${item.category}:${item.subcategory ?? ""}`}>
                       <span>{index + 1}</span>
-                      <div><strong>{item.description}</strong><small>{categoryName(item.category)} · {item.transactionCount} {copy.entries}</small></div>
+                      <div><strong>{item.description}</strong><small>{categoryPathLabel(item.category, item.subcategory, language)} · {item.transactionCount} {copy.entries}</small></div>
                       <b>{formatMoney(toBase(item.expenseUsdMinor), baseCurrency, language)}</b>
                     </li>
                   ))}
                 </ol>
+              </article>
+            </section>
+
+            <section className="report-grid-detail">
+              <article className="report-panel subcategory-report-panel">
+                <div className="report-panel-heading"><div><h2>{copy.subcategoryBreakdown}</h2><p>{copy.subcategoryHint}</p></div></div>
+                <div className="report-subcategory-list">
+                  {valuedReport.subcategories.length === 0 ? (
+                    <p className="report-panel-empty">{copy.noSubcategories}</p>
+                  ) : valuedReport.subcategories.slice(0, 10).map((item) => {
+                    const share = valuedReport.summary.expenseUsdMinor > 0
+                      ? Math.round((item.expenseUsdMinor / valuedReport.summary.expenseUsdMinor) * 100)
+                      : 0;
+                    const color = categoryColor(item.category);
+                    return (
+                      <div className="report-subcategory-row" key={`${item.category}:${item.subcategory}`}>
+                        <span style={{ backgroundColor: `${color}18`, color }} aria-hidden="true">{categoryGlyph(item.category)}</span>
+                        <div><strong>{subcategoryLabel(item.subcategory, language)}</strong><small>{categoryName(item.category)} · {item.transactionCount} {copy.entries}</small></div>
+                        <p><strong>{formatMoney(toBase(item.expenseUsdMinor), baseCurrency, language)}</strong><small>{share}% {copy.ofExpenses}</small></p>
+                      </div>
+                    );
+                  })}
+                </div>
               </article>
             </section>
           </div>

@@ -300,6 +300,7 @@ export const recurringSeries = sqliteTable(
     }).notNull(),
     fallbackFxRateDate: text("fallback_fx_rate_date"),
     category: text("category").notNull().default("other"),
+    subcategory: text("subcategory"),
     description: text("description").notNull(),
     note: text("note").notNull().default(""),
     createdAtMs: integer("created_at_ms").notNull(),
@@ -410,6 +411,7 @@ export const transactions = sqliteTable(
       .default(2),
 
     category: text("category").notNull().default("other"),
+    subcategory: text("subcategory"),
     description: text("description").notNull(),
     note: text("note").notNull().default(""),
     recurringSeriesId: text("recurring_series_id").references(

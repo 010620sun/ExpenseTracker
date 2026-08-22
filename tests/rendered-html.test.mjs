@@ -52,13 +52,17 @@ test("pins direct Cloudflare Workers and D1 metadata", async () => {
 });
 
 test("provides grouped expense and income category pickers", async () => {
-  const [source, recurring, budgets, reports, categoriesSource, styles] = await Promise.all([
+  const [source, recurring, budgets, reports, categoriesSource, styles, schema, transactionsRoute, recurringRoute, migration] = await Promise.all([
     readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/recurring/recurring-manager.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/budgets/budget-manager.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/reports/report-manager.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/categories.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/transactions/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/recurring/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../drizzle/0010_optional_subcategories.sql", import.meta.url), "utf8"),
   ]);
   const expenseBlock = categoriesSource.match(
     /export const EXPENSE_CATEGORY_IDS = \[([\s\S]*?)\] as const;/u,
@@ -90,6 +94,18 @@ test("provides grouped expense and income category pickers", async () => {
   assert.match(source, /role="listbox"/u);
   assert.match(styles, /\.category-option-groups/u);
   assert.match(styles, /\.category-option-grid/u);
+  assert.match(categoriesSource, /export const SUBCATEGORY_META/u);
+  assert.match(categoriesSource, /export function subcategoryIdsForCategory/u);
+  assert.match(categoriesSource, /export function categoryPathLabel/u);
+  assert.match(source, /className="subcategory-options"/u);
+  assert.match(recurring, /className="subcategory-options"/u);
+  assert.match(transactionsRoute, /isSubcategoryForCategory/u);
+  assert.match(recurringRoute, /isSubcategoryForCategory/u);
+  assert.equal([...schema.matchAll(/subcategory: text\("subcategory"\)/gu)].length, 2);
+  assert.match(migration, /ALTER TABLE `transactions` ADD `subcategory` text/u);
+  assert.match(migration, /ALTER TABLE `recurring_series` ADD `subcategory` text/u);
+  assert.match(reports, /className="report-subcategory-list"/u);
+  assert.match(styles, /\.report-subcategory-list/u);
 });
 
 test("discovers every current Frankfurter currency dynamically", async () => {

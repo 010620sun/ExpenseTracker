@@ -9,6 +9,9 @@ import {
   categoryGroupLabel,
   categoryGroupsForKind,
   categoryLabel,
+  categoryPathLabel,
+  subcategoryIdsForCategory,
+  subcategoryLabel,
 } from "@/lib/categories";
 import {
   isLanguage,
@@ -24,6 +27,7 @@ type RecurringItem = {
   kind: "expense" | "income";
   description: string;
   category: string;
+  subcategory: string | null;
   note: string;
   amount: string;
   originalAmountMinor: number;
@@ -89,6 +93,8 @@ const COPY = {
     amount: "Amount",
     frequency: "Frequency",
     category: "Category",
+    subcategory: "Details (optional)",
+    noSubcategory: "No detail",
     endDate: "End date (optional)",
     note: "Note",
     save: "Save changes",
@@ -141,6 +147,8 @@ const COPY = {
     amount: "금액",
     frequency: "반복 주기",
     category: "카테고리",
+    subcategory: "세부 카테고리(선택)",
+    noSubcategory: "선택 안 함",
     endDate: "종료일 (선택)",
     note: "메모",
     save: "변경사항 저장",
@@ -193,6 +201,8 @@ const COPY = {
     amount: "金額",
     frequency: "周期",
     category: "カテゴリー",
+    subcategory: "詳細カテゴリー（任意）",
+    noSubcategory: "指定なし",
     endDate: "終了日（任意）",
     note: "メモ",
     save: "変更を保存",
@@ -245,6 +255,8 @@ const COPY = {
     amount: "Сумма",
     frequency: "Периодичность",
     category: "Категория",
+    subcategory: "Подкатегория (необязательно)",
+    noSubcategory: "Без уточнения",
     endDate: "Дата окончания (необязательно)",
     note: "Заметка",
     save: "Сохранить изменения",
@@ -295,6 +307,7 @@ export function RecurringManager({ today }: { today: string }) {
   const [amount, setAmount] = useState("");
   const [frequency, setFrequency] = useState<Frequency>("monthly");
   const [category, setCategory] = useState("other");
+  const [subcategory, setSubcategory] = useState("");
   const [isCategoryPickerOpen, setIsCategoryPickerOpen] = useState(false);
   const [endsOn, setEndsOn] = useState("");
   const [note, setNote] = useState("");
@@ -372,6 +385,7 @@ export function RecurringManager({ today }: { today: string }) {
     setAmount(item.amount);
     setFrequency(item.frequency);
     setCategory(item.category);
+    setSubcategory(item.subcategory ?? "");
     setIsCategoryPickerOpen(false);
     setEndsOn(item.endsOn ?? "");
     setNote(item.note);
@@ -433,6 +447,7 @@ export function RecurringManager({ today }: { today: string }) {
         amount,
         frequency,
         category,
+        subcategory: subcategory || null,
         endsOn: endsOn || null,
         note,
       });
@@ -447,6 +462,7 @@ export function RecurringManager({ today }: { today: string }) {
   }
 
   const categoryGroups = categoryGroupsForKind(editing?.kind ?? "expense");
+  const subcategoryOptions = subcategoryIdsForCategory(category);
 
   const statusText = (status: SeriesStatus) =>
     status === "active"
@@ -513,7 +529,7 @@ export function RecurringManager({ today }: { today: string }) {
                       <strong>{item.description}</strong>
                       <span className={`series-status ${item.status}`}>{statusText(item.status)}</span>
                     </div>
-                    <span>{categoryLabel(item.category, language)} · {copy[item.frequency]}</span>
+                    <span>{categoryPathLabel(item.category, item.subcategory, language)} · {copy[item.frequency]}</span>
                     <div className="series-dates">
                       <span><b>{copy.next}</b> {item.nextOccurrence ? dateLabel(item.nextOccurrence, language) : copy.noNext}</span>
                       <span><b>{copy.started}</b> {dateLabel(item.startOn, language)}</span>
@@ -578,6 +594,7 @@ export function RecurringManager({ today }: { today: string }) {
                               key={key}
                               onClick={() => {
                                 setCategory(key);
+                                setSubcategory("");
                                 setIsCategoryPickerOpen(false);
                               }}
                             >
@@ -593,6 +610,17 @@ export function RecurringManager({ today }: { today: string }) {
                 </div>
                 <label className="field"><span>{copy.endDate}</span><input type="date" min={editing.startOn} value={endsOn} onChange={(event) => setEndsOn(event.target.value)} /></label>
               </div>
+              {subcategoryOptions.length > 0 && (
+                <div className="field recurring-subcategory-field">
+                  <span>{copy.subcategory}</span>
+                  <div className="subcategory-options" role="group" aria-label={copy.subcategory}>
+                    <button type="button" className={!subcategory ? "selected" : ""} aria-pressed={!subcategory} onClick={() => setSubcategory("")}>{copy.noSubcategory}</button>
+                    {subcategoryOptions.map((item) => (
+                      <button type="button" className={subcategory === item ? "selected" : ""} aria-pressed={subcategory === item} key={item} onClick={() => setSubcategory(item)}>{subcategoryLabel(item, language)}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <label className="field"><span>{copy.note}</span><textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} /></label>
               {error && <p className="form-error" role="alert">{error}</p>}
               <div className="drawer-actions"><button type="button" className="secondary-button" onClick={() => { setEditing(null); setIsCategoryPickerOpen(false); }} disabled={saving}>{copy.cancel}</button><button className="primary-button" aria-disabled={saving}>{copy.save}</button></div>

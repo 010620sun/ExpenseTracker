@@ -8,6 +8,7 @@ import {
   type RecurringSeries,
 } from "@/db/schema";
 import { memberFromRequest } from "@/lib/auth";
+import { isSubcategoryForCategory } from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -189,6 +190,7 @@ function serializeSeries(
     kind: series.kind,
     description: series.description,
     category: series.category,
+    subcategory: series.subcategory,
     note: series.note,
     amount: formatMinor(
       series.originalAmountMinor,
@@ -344,12 +346,22 @@ export async function PATCH(request: Request) {
       if (amountMinor === null) return errorResponse("INVALID_AMOUNT", 400, "amount");
       const description = typeof body.description === "string" ? body.description.trim() : "";
       const category = typeof body.category === "string" ? body.category.trim() : "";
+      const subcategory =
+        typeof body.subcategory === "string" && body.subcategory.trim()
+          ? body.subcategory.trim()
+          : null;
       const note = typeof body.note === "string" ? body.note.trim() : "";
       if (!description || description.length > 120) {
         return errorResponse("INVALID_DESCRIPTION", 400, "description");
       }
       if (!category || category.length > 40) {
         return errorResponse("INVALID_CATEGORY", 400, "category");
+      }
+      if (
+        subcategory &&
+        (subcategory.length > 64 || !isSubcategoryForCategory(category, subcategory))
+      ) {
+        return errorResponse("INVALID_SUBCATEGORY", 400, "subcategory");
       }
       if (note.length > 500) return errorResponse("INVALID_NOTE", 400, "note");
       const today = new Date().toISOString().slice(0, 10);
@@ -362,6 +374,7 @@ export async function PATCH(request: Request) {
             originalAmountMinor: amountMinor,
             description,
             category,
+            subcategory,
             note,
             updatedAtMs: now,
           })

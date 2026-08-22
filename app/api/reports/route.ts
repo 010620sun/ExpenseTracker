@@ -120,6 +120,7 @@ export async function GET(request: Request) {
           .select({
             description: transactions.description,
             category: transactions.category,
+            subcategory: transactions.subcategory,
             expenseUsdMinor: sql<number>`sum(${transactions.baseAmountMinor})`,
             transactionCount: sql<number>`count(*)`,
           })
@@ -132,7 +133,11 @@ export async function GET(request: Request) {
               lt(transactions.occurredOn, end),
             ),
           )
-          .groupBy(transactions.description, transactions.category)
+          .groupBy(
+            transactions.description,
+            transactions.category,
+            transactions.subcategory,
+          )
           .orderBy(desc(sql`sum(${transactions.baseAmountMinor})`))
           .limit(5),
         db
@@ -143,6 +148,7 @@ export async function GET(request: Request) {
             currencyExponent: transactions.originalCurrencyExponent,
             fxRate: transactions.fxRate,
             category: transactions.category,
+            subcategory: transactions.subcategory,
             description: transactions.description,
             originalAmountMinor: sql<number>`sum(${transactions.originalAmountMinor})`,
             baseAmountMinor: sql<number>`sum(${transactions.baseAmountMinor})`,
@@ -163,6 +169,7 @@ export async function GET(request: Request) {
             transactions.originalCurrencyExponent,
             transactions.fxRate,
             transactions.category,
+            transactions.subcategory,
             transactions.description,
           ),
       ]);
@@ -196,6 +203,7 @@ export async function GET(request: Request) {
             expenseUsdMinor: Number(row.expenseUsdMinor) || 0,
             transactionCount: Number(row.transactionCount) || 0,
           })),
+          subcategories: [],
           daily: dailyRows.map((row) => ({
             ...row,
             incomeUsdMinor: Number(row.incomeUsdMinor) || 0,

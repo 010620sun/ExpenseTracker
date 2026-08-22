@@ -71,6 +71,13 @@
       "when": 1786893915392,
       "tag": "0009_steep_maverick",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1787360400000,
+      "tag": "0010_optional_subcategories",
+      "breakpoints": true
     }
   ]
 }

@@ -21,8 +21,11 @@ import {
   categoryGroupsForKind,
   categoryIdsForKind,
   categoryLabel,
+  categoryPathLabel,
   isExpenseCategory,
   isIncomeCategory,
+  subcategoryIdsForCategory,
+  subcategoryLabel,
 } from "@/lib/categories";
 import {
   isLanguage,
@@ -56,6 +59,7 @@ type LedgerTransaction = {
   baseAmountMinor: number;
   baseCurrency: "USD";
   category: string;
+  subcategory?: string | null;
   description: string;
   note?: string | null;
   recurringSeriesId?: string | null;
@@ -581,6 +585,9 @@ const COPY = {
     category: "Category",
     chooseCategory: "Choose a category",
     categoryHint: "Choose the closest match for this transaction.",
+    subcategory: "Details (optional)",
+    subcategoryHint: "Add a more precise label, or leave it unset.",
+    noSubcategory: "No detail",
     date: "Date",
     amount: "Amount",
     currency: "Currency",
@@ -702,6 +709,9 @@ const COPY = {
     category: "카테고리",
     chooseCategory: "카테고리 선택",
     categoryHint: "이 거래에 가장 알맞은 항목을 선택하세요.",
+    subcategory: "세부 카테고리(선택)",
+    subcategoryHint: "필요한 경우에만 더 구체적인 항목을 선택하세요.",
+    noSubcategory: "선택 안 함",
     date: "날짜",
     amount: "금액",
     currency: "통화",
@@ -823,6 +833,9 @@ const COPY = {
     category: "カテゴリー",
     chooseCategory: "カテゴリーを選択",
     categoryHint: "この取引に最も合う項目を選んでください。",
+    subcategory: "詳細カテゴリー（任意）",
+    subcategoryHint: "必要な場合のみ、より具体的な項目を選択してください。",
+    noSubcategory: "指定なし",
     date: "日付",
     amount: "金額",
     currency: "通貨",
@@ -944,6 +957,9 @@ const COPY = {
     category: "Категория",
     chooseCategory: "Выберите категорию",
     categoryHint: "Выберите наиболее подходящую категорию операции.",
+    subcategory: "Подкатегория (необязательно)",
+    subcategoryHint: "При необходимости выберите более точный вариант.",
+    noSubcategory: "Без уточнения",
     date: "Дата",
     amount: "Сумма",
     currency: "Валюта",
@@ -1416,6 +1432,7 @@ export function ExpenseTracker({
   const [lastTransactionCurrency, setLastTransactionCurrency] =
     useState<CurrencyCode>("KRW");
   const [category, setCategory] = useState("dining");
+  const [subcategory, setSubcategory] = useState("");
   const [isCategoryPickerOpen, setIsCategoryPickerOpen] = useState(false);
   const [note, setNote] = useState("");
   const [occurredOn, setOccurredOn] = useState(today);
@@ -1454,6 +1471,7 @@ export function ExpenseTracker({
   const activeCategoryOptions = categoryIdsForKind(kind);
   const activeCategoryGroups = categoryGroupsForKind(kind);
   const hasSelectedCategory = activeCategoryOptions.some((item) => item === category);
+  const activeSubcategoryOptions = subcategoryIdsForCategory(category);
   const transactionCurrencyCatalog = useMemo(() => {
     if (currencyCatalog.some((item) => item.code === currency)) {
       return currencyCatalog;
@@ -1998,6 +2016,10 @@ export function ExpenseTracker({
         transaction.note ?? "",
         transaction.category,
         categoryLabel(transaction.category, language),
+        transaction.subcategory ?? "",
+        transaction.subcategory
+          ? subcategoryLabel(transaction.subcategory, language)
+          : "",
         transaction.originalCurrency,
       ].some((value) =>
         value.toLocaleLowerCase(languageLocale).includes(query),
@@ -2243,6 +2265,7 @@ export function ExpenseTracker({
     setAmount("");
     setCurrency(lastTransactionCurrency);
     setCategory("dining");
+    setSubcategory("");
     setNote("");
     setOccurredOn(date);
     setIsRecurring(false);
@@ -2286,6 +2309,7 @@ export function ExpenseTracker({
     setAmount(amountForInput(transaction));
     setCurrency(transaction.originalCurrency);
     setCategory(transaction.category);
+    setSubcategory(transaction.subcategory ?? "");
     setNote(transaction.note ?? "");
     setOccurredOn(transaction.occurredOn);
     setIsRecurring(false);
@@ -2299,6 +2323,7 @@ export function ExpenseTracker({
 
   function chooseCategory(nextCategory: string) {
     setCategory(nextCategory);
+    setSubcategory("");
     setIsCategoryPickerOpen(false);
     window.requestAnimationFrame(() => categoryTriggerRef.current?.focus());
   }
@@ -2472,6 +2497,7 @@ export function ExpenseTracker({
           rateSource: selectedRateSource,
           rateDate: selectedRateDate,
           category,
+          subcategory: subcategory || null,
           description: description.trim(),
           note: note.trim(),
           ...(!editingTransaction && isRecurring
@@ -2960,7 +2986,7 @@ export function ExpenseTracker({
                             : transaction.splitGroupId
                               ? `${(transaction.splitIndex ?? 0) + 1}/${transaction.splitCount} · `
                               : ""}
-                          {categoryLabel(transaction.category, language)} · {formatCurrency(originalMajor(transaction), transaction.originalCurrency, language)} {transaction.originalCurrency}
+                          {categoryPathLabel(transaction.category, transaction.subcategory, language)} · {formatCurrency(originalMajor(transaction), transaction.originalCurrency, language)} {transaction.originalCurrency}
                         </small>
                       </span>
                       <span className={transaction.kind === "income" ? "day-entry-value income" : "day-entry-value"}>
@@ -3154,7 +3180,7 @@ export function ExpenseTracker({
                         : transaction.splitGroupId
                           ? `${(transaction.splitIndex ?? 0) + 1}/${transaction.splitCount} · `
                           : ""}
-                      {categoryLabel(transaction.category, language)}
+                      {categoryPathLabel(transaction.category, transaction.subcategory, language)}
                     </span>
                   </div>
                   <time dateTime={transaction.occurredOn}>
@@ -3231,8 +3257,8 @@ export function ExpenseTracker({
             </div>
             <form onSubmit={handleSubmit}>
               <div className="kind-switch" aria-label={`${copy.expense} / ${copy.income}`}>
-                <button type="button" aria-pressed={kind === "expense"} className={kind === "expense" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("expense"); if (!isExpenseCategory(category)) setCategory("dining"); }}>{copy.expense}</button>
-                <button type="button" aria-pressed={kind === "income"} className={kind === "income" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("income"); if (!isIncomeCategory(category)) setCategory("salary"); setIsDistributed(false); }}>{copy.income}</button>
+                <button type="button" aria-pressed={kind === "expense"} className={kind === "expense" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("expense"); if (!isExpenseCategory(category)) { setCategory("dining"); setSubcategory(""); } }}>{copy.expense}</button>
+                <button type="button" aria-pressed={kind === "income"} className={kind === "income" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("income"); if (!isIncomeCategory(category)) { setCategory("salary"); setSubcategory(""); } setIsDistributed(false); }}>{copy.income}</button>
               </div>
               <label className="field">
                 <span>{copy.merchant}</span>
@@ -3346,6 +3372,33 @@ export function ExpenseTracker({
                     )}
                   </div>
                 </div>
+              {activeSubcategoryOptions.length > 0 && (
+                <div className="field subcategory-field">
+                  <span>{copy.subcategory}</span>
+                  <small>{copy.subcategoryHint}</small>
+                  <div className="subcategory-options" role="group" aria-label={copy.subcategory}>
+                    <button
+                      type="button"
+                      className={!subcategory ? "selected" : ""}
+                      aria-pressed={!subcategory}
+                      onClick={() => setSubcategory("")}
+                    >
+                      {copy.noSubcategory}
+                    </button>
+                    {activeSubcategoryOptions.map((item) => (
+                      <button
+                        type="button"
+                        className={subcategory === item ? "selected" : ""}
+                        aria-pressed={subcategory === item}
+                        key={item}
+                        onClick={() => setSubcategory(item)}
+                      >
+                        {subcategoryLabel(item, language)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <label className="field">
                 <span>{copy.date}</span>
                 <input type="date" value={occurredOn} max={currentDate} onChange={(event) => setOccurredOn(event.target.value)} required />
