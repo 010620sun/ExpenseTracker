@@ -109,6 +109,20 @@ test("provides grouped expense and income category pickers", async () => {
   assert.match(styles, /\.report-subcategory-list/u);
 });
 
+test("allows transactions without an optional subcategory", async () => {
+  const [tracker, transactionRoute] = await Promise.all([
+    readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/transactions/route.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(tracker, /subcategory: subcategory \|\| null/u);
+  assert.match(
+    transactionRoute,
+    /normalizeText\(\s*body\.subcategory \?\? undefined,\s*"subcategory",\s*64,\s*\{ fallback: "" \}/u,
+  );
+  assert.match(transactionRoute, /const subcategory = normalizedSubcategory \|\| null/u);
+});
+
 test("keeps every locale complete, grammatical, and durable", async () => {
   const localizedFiles = [
     "app/auth/auth-screen.tsx",

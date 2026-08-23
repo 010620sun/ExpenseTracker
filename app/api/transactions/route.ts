@@ -847,7 +847,7 @@ async function buildNewTransaction(
     throw new ApiValidationError("INVALID_CATEGORY", 400, "category");
   }
   const normalizedSubcategory = normalizeText(
-    body.subcategory,
+    body.subcategory ?? undefined,
     "subcategory",
     64,
     { fallback: "" },
