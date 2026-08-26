@@ -295,7 +295,7 @@ test("discovers every current Frankfurter currency dynamically", async () => {
 });
 
 test("uses Workers Web Crypto sessions and member-owned ledger APIs", async () => {
-  const [schema, auth, login, register, transactionsRoute, recurringRoute] =
+  const [schema, auth, login, register, transactionsRoute, recurringRoute, ratesRoute, historyRoute] =
     await Promise.all([
       readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
       readFile(new URL("../lib/auth.ts", import.meta.url), "utf8"),
@@ -303,6 +303,8 @@ test("uses Workers Web Crypto sessions and member-owned ledger APIs", async () =
       readFile(new URL("../app/api/auth/register/route.ts", import.meta.url), "utf8"),
       readFile(new URL("../app/api/transactions/route.ts", import.meta.url), "utf8"),
       readFile(new URL("../app/api/recurring/route.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/api/rates/route.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/api/rates/history/route.ts", import.meta.url), "utf8"),
     ]);
   assert.match(schema, /export const members/u);
   assert.match(schema, /export const authSessions/u);
@@ -310,10 +312,16 @@ test("uses Workers Web Crypto sessions and member-owned ledger APIs", async () =
   assert.match(auth, /PBKDF2/u);
   assert.match(auth, /HttpOnly; SameSite=Lax/u);
   assert.match(auth, /tokenHash: await sha256\(token\)/u);
+  assert.match(auth, /onConflictDoUpdate/u);
+  assert.match(auth, /authRateLimits\.attempts\} \+ 1/u);
   assert.match(login, /verifyPasswordOrDummy/u);
   assert.match(register, /hashNewPassword/u);
+  assert.match(register, /authRateLimitScopeKey/u);
+  assert.match(register, /recordAuthFailure\(registrationRateKey\)/u);
   assert.match(transactionsRoute, /memberFromRequest/u);
   assert.match(recurringRoute, /memberFromRequest/u);
+  assert.match(ratesRoute, /memberFromRequest/u);
+  assert.match(historyRoute, /memberFromRequest/u);
   assert.doesNotMatch(transactionsRoute, /seedSamplesOnce|Sample transaction/u);
   assert.doesNotMatch(transactionsRoute, /LOCAL_DEMO_OWNER_ID|getChatGPTUser/u);
   assert.doesNotMatch(recurringRoute, /LOCAL_DEMO_OWNER_ID|getChatGPTUser/u);
@@ -400,13 +408,14 @@ test("supports durable recurring transaction management", async () => {
 });
 
 test("supports member-owned monthly category budgets", async () => {
-  const [tracker, manager, navigation, route, schema, migration] = await Promise.all([
+  const [tracker, manager, navigation, route, schema, migration, categoryMigration] = await Promise.all([
     readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/budgets/budget-manager.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/ledger-navigation.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/budgets/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(new URL("../drizzle/0008_conscious_franklin_richards.sql", import.meta.url), "utf8"),
+    readFile(new URL("../drizzle/0012_expanded_budget_categories.sql", import.meta.url), "utf8"),
   ]);
 
   assert.match(schema, /export const monthlyBudgets/u);
@@ -419,6 +428,10 @@ test("supports member-owned monthly category budgets", async () => {
   assert.match(route, /export async function PUT/u);
   assert.match(manager, /EXPENSE_CATEGORY_IDS/u);
   assert.match(route, /EXPENSE_CATEGORY_IDS/u);
+  assert.match(route, /D1_BUDGET_INSERT_CHUNK_SIZE = 16/u);
+  assert.match(categoryMigration, /'communication'/u);
+  assert.match(categoryMigration, /'personal_care'/u);
+  assert.match(categoryMigration, /'financial'/u);
   assert.match(manager, /className="budget-category-row"/u);
   assert.match(manager, /copyPreviousMonth/u);
   assert.match(manager, /<LanguagePicker/u);
@@ -598,6 +611,8 @@ test("distributes one expense exactly across consecutive calendar dates", async 
   assert.match(schema, /idx_transactions_owner_split_group/u);
   assert.match(route, /function parseDistribution/u);
   assert.match(route, /function distributedTransactionsFromTransaction/u);
+  assert.match(route, /D1_TRANSACTION_INSERT_CHUNK_SIZE = 3/u);
+  assert.match(route, /MAX_DISTRIBUTION_COUNT = 120/u);
   assert.match(route, /originalEach \+ \(index < originalRemainder \? 1 : 0\)/u);
   assert.match(route, /baseEach \+ \(index < baseRemainder \? 1 : 0\)/u);
   assert.match(route, /shiftIsoDate\(transaction\.occurredOn, index\)/u);
@@ -649,6 +664,8 @@ test("creates exact monthly installment plans with month-end clamping", async ()
   assert.match(migration, /installment_total_original_minor/u);
   assert.match(route, /function parseInstallment/u);
   assert.match(route, /function installmentTransactionsFromTransaction/u);
+  assert.match(route, /INSTALLMENT_STRUCTURE_IMMUTABLE/u);
+  assert.match(tracker, /disabled=\{locksInstallmentStructure\}/u);
   assert.match(route, /shiftInstallmentDate\(transaction\.occurredOn, index\)/u);
   assert.match(
     route,
@@ -660,6 +677,29 @@ test("creates exact monthly installment plans with month-end clamping", async ()
   assert.match(tracker, /分割払い/u);
   assert.match(tracker, /Оплата в рассрочку/u);
   assert.match(styles, /\.installment-card/u);
+});
+
+test("materializes recurring entries only when their occurrence date arrives", async () => {
+  const route = await readFile(
+    new URL("../app/api/transactions/route.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(route, /const tomorrow = shiftIsoDate/u);
+  assert.match(route, /const materializationEnd = monthEnd < tomorrow/u);
+  assert.match(route, /recurringDatesForMonth\([\s\S]*?materializationEnd/u);
+});
+
+test("adds baseline security headers at the Worker boundary", async () => {
+  const worker = await readFile(
+    new URL("../worker/index.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(worker, /Content-Security-Policy/u);
+  assert.match(worker, /Strict-Transport-Security/u);
+  assert.match(worker, /X-Content-Type-Options/u);
+  assert.match(worker, /withSecurityHeaders\(await handler\.fetch/u);
 });
 
 test("allows future transactions and locks the latest available rate", async () => {

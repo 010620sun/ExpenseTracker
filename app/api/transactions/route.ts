@@ -41,6 +41,10 @@ const BASE_CURRENCY_EXPONENT = 2;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 const MAX_BODY_LENGTH = 16_384;
+// D1 accepts at most 100 bound parameters per prepared statement. A complete
+// transaction row binds roughly 30 values, so three rows is the safe ceiling.
+const D1_TRANSACTION_INSERT_CHUNK_SIZE = 3;
+const MAX_DISTRIBUTION_COUNT = 120;
 const BIGINT_ZERO = BigInt(0);
 const BIGINT_TWO = BigInt(2);
 const BIGINT_TEN = BigInt(10);
@@ -367,7 +371,11 @@ function parseDistribution(
     );
   }
   const count = raw.count;
-  if (!Number.isInteger(count) || Number(count) < 2 || Number(count) > 365) {
+  if (
+    !Number.isInteger(count) ||
+    Number(count) < 2 ||
+    Number(count) > MAX_DISTRIBUTION_COUNT
+  ) {
     throw new ApiValidationError(
       "INVALID_DISTRIBUTION_COUNT",
       400,
@@ -645,6 +653,12 @@ async function materializeRecurringTransactions(
   monthStart: string,
   monthEnd: string,
 ) {
+  // A recurring transaction becomes ledger data only when its date arrives.
+  // This prevents future rows from permanently capturing today's exchange
+  // rate; the due occurrence instead receives the latest available rate.
+  const tomorrow = shiftIsoDate(new Date().toISOString().slice(0, 10), 1);
+  const materializationEnd = monthEnd < tomorrow ? monthEnd : tomorrow;
+  if (monthStart >= materializationEnd) return;
   const seriesRows = await db
     .select()
     .from(recurringSeries)
@@ -652,7 +666,7 @@ async function materializeRecurringTransactions(
       and(
         eq(recurringSeries.ownerId, ownerId),
         isNull(recurringSeries.pausedAtMs),
-        lt(recurringSeries.startOn, monthEnd),
+        lt(recurringSeries.startOn, materializationEnd),
         or(
           isNull(recurringSeries.endsOn),
           gte(recurringSeries.endsOn, monthStart),
@@ -672,7 +686,7 @@ async function materializeRecurringTransactions(
         and(
           eq(recurringExceptions.ownerId, ownerId),
           gte(recurringExceptions.occurrenceOn, monthStart),
-          lt(recurringExceptions.occurrenceOn, monthEnd),
+          lt(recurringExceptions.occurrenceOn, materializationEnd),
         ),
       ),
     db.select().from(exchangeRateCache),
@@ -690,7 +704,7 @@ async function materializeRecurringTransactions(
     for (const occurrenceOn of recurringDatesForMonth(
       series,
       monthStart,
-      monthEnd,
+      materializationEnd,
     )) {
       if (exceptions.has(`${series.id}:${occurrenceOn}`)) continue;
 
@@ -751,10 +765,16 @@ async function materializeRecurringTransactions(
     }
   }
 
-  for (let index = 0; index < generated.length; index += 4) {
+  for (
+    let index = 0;
+    index < generated.length;
+    index += D1_TRANSACTION_INSERT_CHUNK_SIZE
+  ) {
     await db
       .insert(transactions)
-      .values(generated.slice(index, index + 4))
+      .values(
+        generated.slice(index, index + D1_TRANSACTION_INSERT_CHUNK_SIZE),
+      )
       .onConflictDoNothing();
   }
 }
@@ -1362,11 +1382,17 @@ export async function POST(request: Request) {
         installment,
       );
       const insertQueries = [];
-      for (let index = 0; index < planned.length; index += 4) {
+      for (
+        let index = 0;
+        index < planned.length;
+        index += D1_TRANSACTION_INSERT_CHUNK_SIZE
+      ) {
         insertQueries.push(
           db
             .insert(transactions)
-            .values(planned.slice(index, index + 4))
+            .values(
+              planned.slice(index, index + D1_TRANSACTION_INSERT_CHUNK_SIZE),
+            )
             .returning(),
         );
       }
@@ -1443,11 +1469,20 @@ export async function POST(request: Request) {
         distribution,
       );
       const insertQueries = [];
-      for (let index = 0; index < distributed.length; index += 4) {
+      for (
+        let index = 0;
+        index < distributed.length;
+        index += D1_TRANSACTION_INSERT_CHUNK_SIZE
+      ) {
         insertQueries.push(
           db
             .insert(transactions)
-            .values(distributed.slice(index, index + 4))
+            .values(
+              distributed.slice(
+                index,
+                index + D1_TRANSACTION_INSERT_CHUNK_SIZE,
+              ),
+            )
             .returning(),
         );
       }
@@ -1660,6 +1695,21 @@ export async function PATCH(request: Request) {
     }
 
     const proposed = await buildNewTransaction(ownerId, proposedBody, db);
+    if (
+      existing.installmentGroupId &&
+      (proposed.kind !== existing.kind ||
+        proposed.occurredOn !== existing.occurredOn ||
+        proposed.originalAmountMinor !== existing.originalAmountMinor ||
+        proposed.originalCurrency !== existing.originalCurrency ||
+        proposed.originalCurrencyExponent !== existing.originalCurrencyExponent ||
+        proposed.baseAmountMinor !== existing.baseAmountMinor)
+    ) {
+      throw new ApiValidationError(
+        "INSTALLMENT_STRUCTURE_IMMUTABLE",
+        409,
+        "installment",
+      );
+    }
     const updatedAtMs = Math.max(Date.now(), existing.updatedAtMs + 1);
     const updatedRows = await db
       .update(transactions)

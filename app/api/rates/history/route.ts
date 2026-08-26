@@ -1,4 +1,5 @@
 import { isCurrencyCode } from "@/lib/currency";
+import { memberFromRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,12 @@ function usdPerUnit(rate: number) {
 }
 
 export async function GET(request: Request) {
+  if (!(await memberFromRequest(request))) {
+    return Response.json(
+      { error: { code: "AUTH_REQUIRED" } },
+      { status: 401, headers: RESPONSE_HEADERS },
+    );
+  }
   const url = new URL(request.url);
   const quote = (url.searchParams.get("quote") ?? "").toUpperCase();
   const from = parseDate(url.searchParams.get("from"));

@@ -1,6 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 
 import { getDb, type AppDatabase } from "@/db";
+import { memberFromRequest } from "@/lib/auth";
 import {
   exchangeRateCache,
   exchangeRateSnapshots,
@@ -470,6 +471,12 @@ function unavailableResponse() {
 }
 
 export async function GET(request: Request) {
+  if (!(await memberFromRequest(request))) {
+    return Response.json(
+      { error: { code: "AUTH_REQUIRED" } },
+      { status: 401, headers: RESPONSE_HEADERS },
+    );
+  }
   const now = Date.now();
   const db = getDb();
   const requestedDate = new URL(request.url).searchParams.get("date");

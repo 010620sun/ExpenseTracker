@@ -18,6 +18,9 @@ import {
 export const dynamic = "force-dynamic";
 
 const MAX_AMOUNT_USD_MINOR = 9_000_000_000_000;
+// Six parameters are bound per budget row; 16 rows stay below D1's limit of
+// 100 parameters per statement.
+const D1_BUDGET_INSERT_CHUNK_SIZE = 16;
 type BudgetCategory = ExpenseCategoryId;
 const BUDGET_CATEGORY_SET = new Set<string>(EXPENSE_CATEGORY_IDS);
 
@@ -165,7 +168,19 @@ export async function PUT(request: Request) {
       ),
     );
     if (values.length > 0) {
-      await db.batch([clearMonth, db.insert(monthlyBudgets).values(values)]);
+      const inserts = [];
+      for (
+        let index = 0;
+        index < values.length;
+        index += D1_BUDGET_INSERT_CHUNK_SIZE
+      ) {
+        inserts.push(
+          db
+            .insert(monthlyBudgets)
+            .values(values.slice(index, index + D1_BUDGET_INSERT_CHUNK_SIZE)),
+        );
+      }
+      await db.batch([clearMonth, ...inserts]);
     } else {
       await clearMonth;
     }

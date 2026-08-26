@@ -1,4 +1,4 @@
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { authRateLimits, authSessions, members } from "@/db/schema";
@@ -10,6 +10,9 @@ const SESSION_MAX_AGE_SECONDS = SESSION_DAYS * 24 * 60 * 60;
 const PBKDF2_ITERATIONS = 100_000;
 const SESSION_COOKIE = "globeledger_session";
 const SECURE_SESSION_COOKIE = "__Host-globeledger_session";
+const AUTH_RATE_WINDOW_MS = 15 * 60 * 1_000;
+const AUTH_RATE_BLOCK_MS = 15 * 60 * 1_000;
+const AUTH_RATE_MAX_ATTEMPTS = 8;
 
 export type AuthMember = {
   id: string;
@@ -53,7 +56,12 @@ async function derivePassword(
     ["deriveBits"],
   );
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt, iterations },
+    {
+      name: "PBKDF2",
+      hash: "SHA-256",
+      salt: new Uint8Array(salt),
+      iterations,
+    },
     key,
     256,
   );
@@ -238,6 +246,11 @@ export async function authRateLimitKey(request: Request, email: string) {
   return sha256(`${ip}\n${email}`);
 }
 
+export async function authRateLimitScopeKey(request: Request, scope: string) {
+  const ip = request.headers.get("cf-connecting-ip") ?? "local";
+  return sha256(`${ip}\n@scope:${scope}`);
+}
+
 export async function isAuthRateLimited(keyHash: string) {
   const rows = await getDb()
     .select()
@@ -250,31 +263,22 @@ export async function isAuthRateLimited(keyHash: string) {
 export async function recordAuthFailure(keyHash: string) {
   const db = getDb();
   const now = Date.now();
-  const rows = await db
-    .select()
-    .from(authRateLimits)
-    .where(eq(authRateLimits.keyHash, keyHash))
-    .limit(1);
-  const existing = rows[0];
-  const withinWindow =
-    existing && now - existing.windowStartedAtMs < 15 * 60 * 1000;
-  const attempts = withinWindow ? existing.attempts + 1 : 1;
-  const windowStartedAtMs = withinWindow ? existing.windowStartedAtMs : now;
+  const windowCutoff = now - AUTH_RATE_WINDOW_MS;
   await db
     .insert(authRateLimits)
     .values({
       keyHash,
-      attempts,
-      windowStartedAtMs,
-      blockedUntilMs: attempts >= 8 ? now + 15 * 60 * 1000 : null,
+      attempts: 1,
+      windowStartedAtMs: now,
+      blockedUntilMs: null,
       updatedAtMs: now,
     })
     .onConflictDoUpdate({
       target: authRateLimits.keyHash,
       set: {
-        attempts,
-        windowStartedAtMs,
-        blockedUntilMs: attempts >= 8 ? now + 15 * 60 * 1000 : null,
+        attempts: sql`CASE WHEN ${authRateLimits.windowStartedAtMs} > ${windowCutoff} THEN ${authRateLimits.attempts} + 1 ELSE 1 END`,
+        windowStartedAtMs: sql`CASE WHEN ${authRateLimits.windowStartedAtMs} > ${windowCutoff} THEN ${authRateLimits.windowStartedAtMs} ELSE ${now} END`,
+        blockedUntilMs: sql`CASE WHEN ${authRateLimits.windowStartedAtMs} > ${windowCutoff} AND ${authRateLimits.attempts} + 1 >= ${AUTH_RATE_MAX_ATTEMPTS} THEN ${now + AUTH_RATE_BLOCK_MS} ELSE NULL END`,
         updatedAtMs: now,
       },
     });

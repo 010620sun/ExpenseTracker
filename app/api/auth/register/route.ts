@@ -4,6 +4,7 @@ import { getDb } from "@/db";
 import { members, userStates } from "@/db/schema";
 import {
   authRateLimitKey,
+  authRateLimitScopeKey,
   createSession,
   hashNewPassword,
   isAuthRateLimited,
@@ -35,7 +36,19 @@ export async function POST(request: Request) {
       return authError("WEAK_PASSWORD", 400, "password");
     }
     const rateKey = await authRateLimitKey(request, email);
-    if (await isAuthRateLimited(rateKey)) return authError("TOO_MANY_ATTEMPTS", 429);
+    const registrationRateKey = await authRateLimitScopeKey(
+      request,
+      "registration",
+    );
+    if (
+      (await isAuthRateLimited(rateKey)) ||
+      (await isAuthRateLimited(registrationRateKey))
+    ) {
+      return authError("TOO_MANY_ATTEMPTS", 429);
+    }
+    // Count every valid registration request by source address so rotating the
+    // submitted email cannot bypass the account-creation throttle.
+    await recordAuthFailure(registrationRateKey);
     const db = getDb();
     const existing = await db
       .select({ id: members.id })

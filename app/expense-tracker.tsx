@@ -44,6 +44,8 @@ import {
   type Language,
 } from "@/lib/language";
 
+const MAX_DISTRIBUTION_COUNT = 120;
+
 type CurrencyCode = string;
 type TransactionKind = "expense" | "income";
 type RecurrenceFrequency = "weekly" | "monthly" | "yearly";
@@ -230,6 +232,7 @@ function CurrencyPicker({
   label,
   pickerCopy,
   className = "",
+  disabled = false,
 }: {
   value: CurrencyCode;
   catalog: CurrencyMetadata[];
@@ -238,6 +241,7 @@ function CurrencyPicker({
   label: string;
   pickerCopy: CurrencyPickerCopy;
   className?: string;
+  disabled?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -398,6 +402,7 @@ function CurrencyPicker({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-controls={isOpen ? listboxId : undefined}
+        disabled={disabled}
         onClick={() => setIsOpen((open) => !open)}
       >
         <span className="currency-code">{selected?.metadata.code ?? value}</span>
@@ -661,7 +666,7 @@ const COPY = {
     distributionPreview: "Distribution preview",
     distributionRange: "{count} days · {start} to {end}",
     distributionEach: "About {amount} per day · total stays {total}",
-    distributionError: "Choose between 2 and 365 days, with at least one minor currency unit per day.",
+    distributionError: "Choose between 2 and 120 days, with at least one minor currency unit per day.",
     distributionSaved: "Expense distributed across the selected dates.",
     distributedEntry: "Distributed expense {part}/{count}",
     distributionEditHint: "Changes apply only to this date. Deleting removes the entire distribution.",
@@ -677,7 +682,7 @@ const COPY = {
     installmentSaved: "Installment plan added to the calendar.",
     installmentEntry: "Installment {part}/{count}",
     installmentRemaining: "{amount} remaining after this payment",
-    installmentEditHint: "Changes apply only to this payment. Deleting removes the entire installment plan.",
+    installmentEditHint: "You can edit the description, category, and note for this payment. Its amount, currency, date, and type stay fixed to preserve the installment plan. Deleting removes the entire plan.",
     deleteInstallmentConfirm: "Delete all {count} installments for {merchant}?",
   },
   ko: {
@@ -803,7 +808,7 @@ const COPY = {
     distributionPreview: "분배 미리보기",
     distributionRange: "{count}일 · {start}~{end}",
     distributionEach: "하루 약 {amount} · 총액 {total} 유지",
-    distributionError: "2~365일을 선택하고, 하루 금액이 통화 최소 단위 이상이 되게 해주세요.",
+    distributionError: "2~120일을 선택하고, 하루 금액이 통화 최소 단위 이상이 되게 해주세요.",
     distributionSaved: "선택한 날짜에 지출을 분배했습니다.",
     distributedEntry: "분할 지출 {part}/{count}",
     distributionEditHint: "변경은 이 날짜에만 적용됩니다. 삭제하면 전체 분할 거래가 삭제됩니다.",
@@ -819,7 +824,7 @@ const COPY = {
     installmentSaved: "할부 결제를 달력에 추가했습니다.",
     installmentEntry: "할부 {part}/{count}",
     installmentRemaining: "이 회차 결제 후 {amount} 남음",
-    installmentEditHint: "변경은 이 회차에만 적용됩니다. 삭제하면 전체 할부 내역이 삭제됩니다.",
+    installmentEditHint: "이 회차의 설명, 카테고리, 메모만 수정할 수 있습니다. 할부 구조를 보존하기 위해 금액, 통화, 날짜, 유형은 고정됩니다. 삭제하면 전체 할부 내역이 삭제됩니다.",
     deleteInstallmentConfirm: "{merchant}의 할부 {count}건을 모두 삭제할까요?",
   },
   ja: {
@@ -945,7 +950,7 @@ const COPY = {
     distributionPreview: "分割プレビュー",
     distributionRange: "{count}日 · {start}〜{end}",
     distributionEach: "1日約{amount} · 合計{total}を維持",
-    distributionError: "2〜365日を選び、1日分を通貨の最小単位以上にしてください。",
+    distributionError: "2〜120日を選び、1日分を通貨の最小単位以上にしてください。",
     distributionSaved: "選択した日付に支出を分割しました。",
     distributedEntry: "分割支出 {part}/{count}",
     distributionEditHint: "変更はこの日付にのみ適用されます。削除すると分割取引全体が削除されます。",
@@ -961,7 +966,7 @@ const COPY = {
     installmentSaved: "分割払いをカレンダーに追加しました。",
     installmentEntry: "分割払い {part}/{count}",
     installmentRemaining: "この支払い後の残額：{amount}",
-    installmentEditHint: "変更はこの支払いにのみ適用されます。削除すると分割払い全体が削除されます。",
+    installmentEditHint: "この支払いでは説明、カテゴリー、メモのみ編集できます。分割払いを保つため、金額、通貨、日付、種類は固定されます。削除すると分割払い全体が削除されます。",
     deleteInstallmentConfirm: "{merchant}の分割払い{count}件をすべて削除しますか？",
   },
   ru: {
@@ -1087,7 +1092,7 @@ const COPY = {
     distributionPreview: "Предпросмотр распределения",
     distributionRange: "{count} дн. · {start}–{end}",
     distributionEach: "Около {amount} в день · итог {total} сохранится",
-    distributionError: "Выберите от 2 до 365 дней; сумма за день должна быть не меньше минимальной разменной единицы выбранной валюты.",
+    distributionError: "Выберите от 2 до 120 дней; сумма за день должна быть не меньше минимальной разменной единицы выбранной валюты.",
     distributionSaved: "Расход распределён по выбранным датам.",
     distributedEntry: "Распределённый расход {part}/{count}",
     distributionEditHint: "Изменения относятся только к этой дате. Удаление удалит всё распределение.",
@@ -1103,7 +1108,7 @@ const COPY = {
     installmentSaved: "Рассрочка добавлена в календарь.",
     installmentEntry: "Платёж {part}/{count}",
     installmentRemaining: "После платежа останется {amount}",
-    installmentEditHint: "Изменения относятся только к этому платежу. Удаление удалит всю рассрочку.",
+    installmentEditHint: "Для этого платежа можно изменить только описание, категорию и заметку. Сумма, валюта, дата и тип зафиксированы для сохранения плана. Удаление удалит всю рассрочку.",
     deleteInstallmentConfirm: "Удалить все платежи рассрочки ({count}) для {merchant}?",
   },
 } as const;
@@ -2288,6 +2293,9 @@ export function ExpenseTracker({
       Number.isFinite(Number(editingTransaction.fxRate)) &&
       Number(editingTransaction.fxRate) > 0,
   );
+  const locksInstallmentStructure = Boolean(
+    editingTransaction?.installmentGroupId,
+  );
   const hasTransactionDateRates = Boolean(
     formRateSnapshot.status === "ready" &&
       formRateSnapshot.requestedDate === occurredOn,
@@ -2612,7 +2620,7 @@ export function ExpenseTracker({
       isDistributed &&
       (!Number.isInteger(parsedDistributionCount) ||
         parsedDistributionCount < 2 ||
-        parsedDistributionCount > 365 ||
+        parsedDistributionCount > MAX_DISTRIBUTION_COUNT ||
         amountMinorPreview < parsedDistributionCount)
     ) {
       setFormError(copy.distributionError);
@@ -3449,8 +3457,8 @@ export function ExpenseTracker({
             </div>
             <form onSubmit={handleSubmit}>
               <div className="kind-switch" aria-label={`${copy.expense} / ${copy.income}`}>
-                <button type="button" aria-pressed={kind === "expense"} className={kind === "expense" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("expense"); if (!isExpenseCategory(category)) { setCategory("dining"); setSubcategory(""); } }}>{copy.expense}</button>
-                <button type="button" aria-pressed={kind === "income"} className={kind === "income" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("income"); if (!isIncomeCategory(category)) { setCategory("salary"); setSubcategory(""); } setIsDistributed(false); }}>{copy.income}</button>
+                <button type="button" disabled={locksInstallmentStructure} aria-pressed={kind === "expense"} className={kind === "expense" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("expense"); if (!isExpenseCategory(category)) { setCategory("dining"); setSubcategory(""); } }}>{copy.expense}</button>
+                <button type="button" disabled={locksInstallmentStructure} aria-pressed={kind === "income"} className={kind === "income" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("income"); if (!isIncomeCategory(category)) { setCategory("salary"); setSubcategory(""); } setIsDistributed(false); }}>{copy.income}</button>
               </div>
               <label className="field">
                 <span>{copy.merchant}</span>
@@ -3459,7 +3467,7 @@ export function ExpenseTracker({
               <div className="field-row amount-row">
                 <label className="field">
                   <span>{copy.amount}</span>
-                  <input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" aria-describedby="conversion-preview" />
+                  <input inputMode="decimal" value={amount} disabled={locksInstallmentStructure} onChange={(event) => setAmount(event.target.value)} placeholder="0" aria-describedby="conversion-preview" />
                 </label>
                 <CurrencyPicker
                   className="field currency-field"
@@ -3469,6 +3477,7 @@ export function ExpenseTracker({
                   language={language}
                   label={copy.currency}
                   pickerCopy={currencyPickerCopy}
+                  disabled={locksInstallmentStructure}
                 />
               </div>
               <div className="conversion-preview" id="conversion-preview" aria-live="polite">
@@ -3528,7 +3537,9 @@ export function ExpenseTracker({
                               <strong>{categoryGroupLabel(group, language)}</strong>
                               <div className="category-option-grid">
                                 {categories.map((item) => {
-                                  const index = activeCategoryOptions.indexOf(item);
+                                  const index = activeCategoryOptions.findIndex(
+                                    (option) => option === item,
+                                  );
                                   const selected = item === category;
                                   const color = categoryColor(item);
                                   return (
@@ -3594,7 +3605,7 @@ export function ExpenseTracker({
               )}
               <label className="field">
                 <span>{copy.date}</span>
-                <input type="date" value={occurredOn} min="1900-01-01" onChange={(event) => setOccurredOn(event.target.value)} required />
+                <input type="date" value={occurredOn} min="1900-01-01" disabled={locksInstallmentStructure} onChange={(event) => setOccurredOn(event.target.value)} required />
               </label>
               {!editingTransaction && kind === "expense" && !isRecurring && (
                 <div className={isDistributed ? "distribution-card active" : "distribution-card"}>
@@ -3621,7 +3632,7 @@ export function ExpenseTracker({
                           type="number"
                           inputMode="numeric"
                           min="2"
-                          max="365"
+                          max={MAX_DISTRIBUTION_COUNT}
                           step="1"
                           value={distributionCount}
                           onChange={(event) => setDistributionCount(event.target.value)}

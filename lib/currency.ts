@@ -15,7 +15,12 @@ export function currencyExponent(currency: string) {
       style: "currency",
       currency,
     }).resolvedOptions().maximumFractionDigits;
-    if (Number.isInteger(resolved) && resolved >= 0 && resolved <= 4) {
+    if (
+      typeof resolved === "number" &&
+      Number.isInteger(resolved) &&
+      resolved >= 0 &&
+      resolved <= 4
+    ) {
       exponent = resolved;
     }
   } catch {
