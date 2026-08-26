@@ -2224,7 +2224,8 @@ a.nav-item {
   border-color: #b9d0c5;
 }
 
-.distribution-card {
+.distribution-card,
+.installment-card {
   background: #f7f9f6;
   border: 1px solid #dfe4df;
   border-radius: 14px;
@@ -2236,6 +2237,11 @@ a.nav-item {
   border-color: #edc7b7;
 }
 
+.installment-card.active {
+  background: #f1f5ff;
+  border-color: #bdcbee;
+}
+
 .distribution-toggle {
   align-items: center;
   cursor: pointer;
@@ -2245,19 +2251,22 @@ a.nav-item {
 }
 
 .distribution-toggle > span,
-.distribution-edit-card {
+.distribution-edit-card,
+.installment-edit-card {
   display: grid;
   gap: 4px;
 }
 
 .distribution-toggle strong,
-.distribution-edit-card strong {
+.distribution-edit-card strong,
+.installment-edit-card strong {
   color: var(--ink);
   font-size: 12px;
 }
 
 .distribution-toggle small,
-.distribution-edit-card small {
+.distribution-edit-card small,
+.installment-edit-card small {
   color: var(--muted);
   font-size: 10px;
   line-height: 1.4;
@@ -2341,6 +2350,22 @@ a.nav-item {
   border: 1px solid #edc7b7;
   border-radius: 14px;
   padding: 13px 14px;
+}
+
+.installment-edit-card {
+  background: #f1f5ff;
+  border: 1px solid #bdcbee;
+  border-radius: 14px;
+  display: grid;
+  gap: 4px;
+  padding: 13px 14px;
+}
+
+.installment-remaining {
+  color: #4d6fdd;
+  display: block;
+  font-size: 9px;
+  margin-top: 3px;
 }
 
 .recurrence-heading {

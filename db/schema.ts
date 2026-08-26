@@ -422,6 +422,12 @@ export const transactions = sqliteTable(
     splitGroupId: text("split_group_id"),
     splitIndex: integer("split_index"),
     splitCount: integer("split_count"),
+    installmentGroupId: text("installment_group_id"),
+    installmentIndex: integer("installment_index"),
+    installmentCount: integer("installment_count"),
+    installmentTotalOriginalMinor: integer(
+      "installment_total_original_minor",
+    ),
     clientRequestId: text("client_request_id"),
     createdAtMs: integer("created_at_ms").notNull(),
     updatedAtMs: integer("updated_at_ms").notNull(),
@@ -522,6 +528,10 @@ export const transactions = sqliteTable(
     index("idx_transactions_owner_split_group").on(
       table.ownerId,
       table.splitGroupId,
+    ),
+    index("idx_transactions_owner_installment_group").on(
+      table.ownerId,
+      table.installmentGroupId,
     ),
   ],
 );

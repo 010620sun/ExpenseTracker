@@ -14,6 +14,12 @@ import {
 } from "react";
 
 import { currencyExponent } from "@/lib/currency";
+import {
+  MAX_INSTALLMENT_COUNT,
+  installmentPaymentMinor,
+  installmentRemainingMinor,
+  shiftInstallmentDate,
+} from "@/lib/installments";
 import { LanguagePicker } from "@/components/language-picker";
 import {
   categoryColor,
@@ -74,6 +80,11 @@ type LedgerTransaction = {
   splitIndex?: number | null;
   splitCount?: number | null;
   isDistributed?: boolean;
+  installmentGroupId?: string | null;
+  installmentIndex?: number | null;
+  installmentCount?: number | null;
+  installmentTotalOriginalMinor?: number | null;
+  isInstallment?: boolean;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -655,6 +666,19 @@ const COPY = {
     distributedEntry: "Distributed expense {part}/{count}",
     distributionEditHint: "Changes apply only to this date. Deleting removes the entire distribution.",
     deleteDistributedConfirm: "Delete all {count} distributed entries for {merchant}?",
+    installmentExpense: "Pay in installments",
+    installmentHint: "Split the total into monthly charges, starting on this date.",
+    installmentCount: "Number of payments",
+    installmentPreview: "Installment preview",
+    installmentRange: "{count} payments · {start} to {end}",
+    installmentEach: "First payment {amount} · total stays {total}",
+    installmentRateHint: "All payments preserve the exchange rate captured for the purchase.",
+    installmentError: "Choose 2–120 payments, with at least one minor currency unit per payment.",
+    installmentSaved: "Installment plan added to the calendar.",
+    installmentEntry: "Installment {part}/{count}",
+    installmentRemaining: "{amount} remaining after this payment",
+    installmentEditHint: "Changes apply only to this payment. Deleting removes the entire installment plan.",
+    deleteInstallmentConfirm: "Delete all {count} installments for {merchant}?",
   },
   ko: {
     overview: "대시보드",
@@ -784,6 +808,19 @@ const COPY = {
     distributedEntry: "분할 지출 {part}/{count}",
     distributionEditHint: "변경은 이 날짜에만 적용됩니다. 삭제하면 전체 분할 거래가 삭제됩니다.",
     deleteDistributedConfirm: "{merchant}의 분할 거래 {count}건을 모두 삭제할까요?",
+    installmentExpense: "할부 결제",
+    installmentHint: "총 결제 금액을 이 날짜부터 매월 나누어 기록합니다.",
+    installmentCount: "할부 개월",
+    installmentPreview: "할부 미리보기",
+    installmentRange: "{count}개월 · {start}~{end}",
+    installmentEach: "첫 회차 {amount} · 총액 {total} 유지",
+    installmentRateHint: "모든 회차에는 구매 시점에 저장한 동일한 환율을 적용합니다.",
+    installmentError: "2~120개월을 선택하고, 회차별 금액이 통화 최소 단위 이상이 되게 해주세요.",
+    installmentSaved: "할부 결제를 달력에 추가했습니다.",
+    installmentEntry: "할부 {part}/{count}",
+    installmentRemaining: "이 회차 결제 후 {amount} 남음",
+    installmentEditHint: "변경은 이 회차에만 적용됩니다. 삭제하면 전체 할부 내역이 삭제됩니다.",
+    deleteInstallmentConfirm: "{merchant}의 할부 {count}건을 모두 삭제할까요?",
   },
   ja: {
     overview: "ダッシュボード",
@@ -913,6 +950,19 @@ const COPY = {
     distributedEntry: "分割支出 {part}/{count}",
     distributionEditHint: "変更はこの日付にのみ適用されます。削除すると分割取引全体が削除されます。",
     deleteDistributedConfirm: "{merchant}の分割取引{count}件をすべて削除しますか？",
+    installmentExpense: "分割払い",
+    installmentHint: "合計金額をこの日から毎月の支払いに分けて記録します。",
+    installmentCount: "支払回数",
+    installmentPreview: "分割払いプレビュー",
+    installmentRange: "{count}回 · {start}〜{end}",
+    installmentEach: "初回{amount} · 合計{total}を維持",
+    installmentRateHint: "すべての支払いに購入時に保存した同じ為替レートを使用します。",
+    installmentError: "2〜120回を選び、1回分を通貨の最小単位以上にしてください。",
+    installmentSaved: "分割払いをカレンダーに追加しました。",
+    installmentEntry: "分割払い {part}/{count}",
+    installmentRemaining: "この支払い後の残額：{amount}",
+    installmentEditHint: "変更はこの支払いにのみ適用されます。削除すると分割払い全体が削除されます。",
+    deleteInstallmentConfirm: "{merchant}の分割払い{count}件をすべて削除しますか？",
   },
   ru: {
     overview: "Обзор",
@@ -1042,6 +1092,19 @@ const COPY = {
     distributedEntry: "Распределённый расход {part}/{count}",
     distributionEditHint: "Изменения относятся только к этой дате. Удаление удалит всё распределение.",
     deleteDistributedConfirm: "Удалить все распределённые операции ({count}) для {merchant}?",
+    installmentExpense: "Оплата в рассрочку",
+    installmentHint: "Разделить общую сумму на ежемесячные платежи с этой даты.",
+    installmentCount: "Количество платежей",
+    installmentPreview: "Предпросмотр рассрочки",
+    installmentRange: "{count} платежей · {start}–{end}",
+    installmentEach: "Первый платёж {amount} · итог {total} сохранится",
+    installmentRateHint: "Для всех платежей используется курс, сохранённый на дату покупки.",
+    installmentError: "Выберите от 2 до 120 платежей; каждый должен быть не меньше минимальной разменной единицы валюты.",
+    installmentSaved: "Рассрочка добавлена в календарь.",
+    installmentEntry: "Платёж {part}/{count}",
+    installmentRemaining: "После платежа останется {amount}",
+    installmentEditHint: "Изменения относятся только к этому платежу. Удаление удалит всю рассрочку.",
+    deleteInstallmentConfirm: "Удалить все платежи рассрочки ({count}) для {merchant}?",
   },
 } as const;
 
@@ -1259,6 +1322,24 @@ function originalMajor(transaction: LedgerTransaction) {
   return transaction.originalAmountMinor / 10 ** transaction.originalExponent;
 }
 
+function installmentRemainingMajor(transaction: LedgerTransaction) {
+  if (
+    transaction.installmentTotalOriginalMinor == null ||
+    transaction.installmentCount == null ||
+    transaction.installmentIndex == null
+  ) {
+    return 0;
+  }
+  return (
+    installmentRemainingMinor(
+      transaction.installmentTotalOriginalMinor,
+      transaction.installmentCount,
+      transaction.installmentIndex,
+    ) /
+    10 ** transaction.originalExponent
+  );
+}
+
 function isIsoDate(value: unknown): value is string {
   if (typeof value !== "string") return false;
   const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(value);
@@ -1471,6 +1552,8 @@ export function ExpenseTracker({
   const [recurrenceEndsOn, setRecurrenceEndsOn] = useState("");
   const [isDistributed, setIsDistributed] = useState(false);
   const [distributionCount, setDistributionCount] = useState("3");
+  const [isInstallment, setIsInstallment] = useState(false);
+  const [installmentCount, setInstallmentCount] = useState("3");
   const [formError, setFormError] = useState("");
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const descriptionRef = useRef<HTMLInputElement>(null);
@@ -1906,6 +1989,7 @@ export function ExpenseTracker({
     setEditingTransaction(null);
     setIsRecurring(false);
     setIsDistributed(false);
+    setIsInstallment(false);
   }, []);
 
   useEffect(() => {
@@ -2251,6 +2335,24 @@ export function ExpenseTracker({
     Number.isFinite(Number(amount)) && parsedDistributionCount > 0
       ? Number(amount) / parsedDistributionCount
       : 0;
+  const parsedInstallmentCount = Number(installmentCount);
+  const installmentPreviewEnd =
+    isIsoDate(occurredOn) &&
+    Number.isInteger(parsedInstallmentCount) &&
+    parsedInstallmentCount >= 2
+      ? shiftInstallmentDate(occurredOn, parsedInstallmentCount - 1)
+      : occurredOn;
+  const installmentAmountMinor = Math.round(
+    (Number(amount) || 0) * 10 ** (currencyExponent(currency) ?? 2),
+  );
+  const firstInstallmentPreview =
+    parsedInstallmentCount > 0
+      ? installmentPaymentMinor(
+          installmentAmountMinor,
+          parsedInstallmentCount,
+          0,
+        ) / 10 ** (currencyExponent(currency) ?? 2)
+      : 0;
 
   function rememberDrawerTrigger() {
     drawerTriggerRef.current =
@@ -2307,6 +2409,8 @@ export function ExpenseTracker({
     setRecurrenceEndsOn("");
     setIsDistributed(false);
     setDistributionCount("3");
+    setIsInstallment(false);
+    setInstallmentCount("3");
     setIsDrawerOpen(true);
     setFormError("");
   }
@@ -2315,6 +2419,7 @@ export function ExpenseTracker({
     openAddDrawer(date);
     setIsRecurring(true);
     setIsDistributed(false);
+    setIsInstallment(false);
   }
 
   useEffect(() => {
@@ -2351,6 +2456,8 @@ export function ExpenseTracker({
     setRecurrenceEndsOn("");
     setIsDistributed(false);
     setDistributionCount("3");
+    setIsInstallment(false);
+    setInstallmentCount("3");
     setIsDrawerOpen(true);
     setFormError("");
   }
@@ -2511,6 +2618,17 @@ export function ExpenseTracker({
       setFormError(copy.distributionError);
       return;
     }
+    if (
+      !editingTransaction &&
+      isInstallment &&
+      (!Number.isInteger(parsedInstallmentCount) ||
+        parsedInstallmentCount < 2 ||
+        parsedInstallmentCount > MAX_INSTALLMENT_COUNT ||
+        amountMinorPreview < parsedInstallmentCount)
+    ) {
+      setFormError(copy.installmentError);
+      return;
+    }
 
     isSavingRef.current = true;
     setIsSaving(true);
@@ -2545,6 +2663,9 @@ export function ExpenseTracker({
           ...(!editingTransaction && isDistributed
             ? { distribution: { count: parsedDistributionCount } }
             : {}),
+          ...(!editingTransaction && isInstallment
+            ? { installment: { count: parsedInstallmentCount } }
+            : {}),
           ...(editingTransaction
             ? { expectedUpdatedAt: editingTransaction.updatedAt }
             : { clientRequestId: crypto.randomUUID() }),
@@ -2563,6 +2684,9 @@ export function ExpenseTracker({
       const savedTransaction = savedTransactions[0];
       if (savedTransaction) {
         const savedMonth = savedTransaction.occurredOn.slice(0, 7);
+        const savedMonthTransactions = savedTransactions.filter(
+          (transaction) => transaction.occurredOn.slice(0, 7) === savedMonth,
+        );
         drawerReturnDateRef.current = savedTransaction.occurredOn;
         setTransactions((current) => {
           const savedIds = new Set(savedTransactions.map((item) => item.id));
@@ -2570,8 +2694,8 @@ export function ExpenseTracker({
             (transaction) => !savedIds.has(transaction.id),
           );
           return savedMonth === viewMonth
-            ? [...savedTransactions, ...withoutSaved].sort(byNewestTransaction)
-            : savedTransactions;
+            ? [...savedMonthTransactions, ...withoutSaved].sort(byNewestTransaction)
+            : savedMonthTransactions;
         });
         setSelectedDate(savedTransaction.occurredOn);
         if (savedMonth !== viewMonth) {
@@ -2593,6 +2717,8 @@ export function ExpenseTracker({
             ? recurringFlowCopy.saved
             : isDistributed
               ? copy.distributionSaved
+              : isInstallment
+                ? copy.installmentSaved
               : copy.saved,
       );
       isSavingRef.current = false;
@@ -2621,7 +2747,12 @@ export function ExpenseTracker({
     }
     if (
       !window.confirm(
-        transaction.splitGroupId
+        transaction.installmentGroupId
+          ? template(copy.deleteInstallmentConfirm, {
+              merchant: transaction.description,
+              count: transaction.installmentCount ?? 0,
+            })
+          : transaction.splitGroupId
           ? template(copy.deleteDistributedConfirm, {
               merchant: transaction.description,
               count: transaction.splitCount ?? 0,
@@ -2636,7 +2767,9 @@ export function ExpenseTracker({
     const previous = transactions;
     setTransactions((current) =>
       current.filter((item) =>
-        transaction.splitGroupId
+        transaction.installmentGroupId
+          ? item.installmentGroupId !== transaction.installmentGroupId
+          : transaction.splitGroupId
           ? item.splitGroupId !== transaction.splitGroupId
           : item.id !== transaction.id,
       ),
@@ -2953,6 +3086,8 @@ export function ExpenseTracker({
                                       <i style={{ backgroundColor: categoryColor(transaction.category) }} />
                                       {transaction.isRecurring ? (
                                         <em>↻</em>
+                                      ) : transaction.installmentGroupId ? (
+                                        <em>ⓘ {(transaction.installmentIndex ?? 0) + 1}/{transaction.installmentCount}</em>
                                       ) : transaction.splitGroupId ? (
                                         <em>{(transaction.splitIndex ?? 0) + 1}/{transaction.splitCount}</em>
                                       ) : null}
@@ -3025,6 +3160,8 @@ export function ExpenseTracker({
                         <small>
                           {transaction.isRecurring
                             ? "↻ · "
+                            : transaction.installmentGroupId
+                              ? `ⓘ ${(transaction.installmentIndex ?? 0) + 1}/${transaction.installmentCount} · `
                             : transaction.splitGroupId
                               ? `${(transaction.splitIndex ?? 0) + 1}/${transaction.splitCount} · `
                               : ""}
@@ -3219,11 +3356,24 @@ export function ExpenseTracker({
                     <span>
                       {transaction.isRecurring
                         ? "↻ · "
+                        : transaction.installmentGroupId
+                          ? `ⓘ ${(transaction.installmentIndex ?? 0) + 1}/${transaction.installmentCount} · `
                         : transaction.splitGroupId
                           ? `${(transaction.splitIndex ?? 0) + 1}/${transaction.splitCount} · `
                           : ""}
                       {categoryPathLabel(transaction.category, transaction.subcategory, language)}
                     </span>
+                    {transaction.installmentGroupId && (
+                      <small className="installment-remaining">
+                        {template(copy.installmentRemaining, {
+                          amount: `${formatCurrency(
+                            installmentRemainingMajor(transaction),
+                            transaction.originalCurrency,
+                            language,
+                          )} ${transaction.originalCurrency}`,
+                        })}
+                      </small>
+                    )}
                   </div>
                   <time dateTime={transaction.occurredOn}>
                     {new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(
@@ -3457,7 +3607,10 @@ export function ExpenseTracker({
                       type="checkbox"
                       aria-label={copy.distributeExpense}
                       checked={isDistributed}
-                      onChange={(event) => setIsDistributed(event.target.checked)}
+                      onChange={(event) => {
+                        setIsDistributed(event.target.checked);
+                        if (event.target.checked) setIsInstallment(false);
+                      }}
                     />
                   </label>
                   {isDistributed && (
@@ -3491,6 +3644,60 @@ export function ExpenseTracker({
                             total: `${formatCurrency(Number(amount) || 0, currency, language)} ${currency}`,
                           })}
                         </small>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {!editingTransaction && kind === "expense" && !isRecurring && (
+                <div className={isInstallment ? "installment-card active" : "installment-card"}>
+                  <label className="distribution-toggle">
+                    <span>
+                      <strong>{copy.installmentExpense}</strong>
+                      <small>{copy.installmentHint}</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      aria-label={copy.installmentExpense}
+                      checked={isInstallment}
+                      onChange={(event) => {
+                        setIsInstallment(event.target.checked);
+                        if (event.target.checked) setIsDistributed(false);
+                      }}
+                    />
+                  </label>
+                  {isInstallment && (
+                    <div className="distribution-options">
+                      <label className="field distribution-count-field">
+                        <span>{copy.installmentCount}</span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min="2"
+                          max={MAX_INSTALLMENT_COUNT}
+                          step="1"
+                          value={installmentCount}
+                          onChange={(event) => setInstallmentCount(event.target.value)}
+                        />
+                      </label>
+                      <div className="distribution-preview" aria-live="polite">
+                        <span>{copy.installmentPreview}</span>
+                        <strong>
+                          {template(copy.installmentRange, {
+                            count: Number.isInteger(parsedInstallmentCount)
+                              ? parsedInstallmentCount
+                              : 0,
+                            start: occurredOn,
+                            end: installmentPreviewEnd,
+                          })}
+                        </strong>
+                        <small>
+                          {template(copy.installmentEach, {
+                            amount: `${formatCurrency(firstInstallmentPreview, currency, language)} ${currency}`,
+                            total: `${formatCurrency(Number(amount) || 0, currency, language)} ${currency}`,
+                          })}
+                        </small>
+                        <small>{copy.installmentRateHint}</small>
                       </div>
                     </div>
                   )}
@@ -3556,6 +3763,26 @@ export function ExpenseTracker({
                     })}
                   </strong>
                   <small>{copy.distributionEditHint}</small>
+                </div>
+              )}
+              {editingTransaction?.installmentGroupId && (
+                <div className="installment-edit-card">
+                  <strong>
+                    {template(copy.installmentEntry, {
+                      part: (editingTransaction.installmentIndex ?? 0) + 1,
+                      count: editingTransaction.installmentCount ?? 0,
+                    })}
+                  </strong>
+                  <small>
+                    {template(copy.installmentRemaining, {
+                      amount: `${formatCurrency(
+                        installmentRemainingMajor(editingTransaction),
+                        editingTransaction.originalCurrency,
+                        language,
+                      )} ${editingTransaction.originalCurrency}`,
+                    })}
+                  </small>
+                  <small>{copy.installmentEditHint}</small>
                 </div>
               )}
               <label className="field">

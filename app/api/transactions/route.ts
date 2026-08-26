@@ -25,6 +25,11 @@ import {
 import { currencyExponent } from "@/lib/currency";
 import { memberFromRequest } from "@/lib/auth";
 import {
+  MAX_INSTALLMENT_COUNT,
+  installmentPaymentMinor,
+  shiftInstallmentDate,
+} from "@/lib/installments";
+import {
   isCategoryForKind,
   isSubcategoryForCategory,
 } from "@/lib/categories";
@@ -78,6 +83,10 @@ type RecurrenceConfig = {
 };
 
 type DistributionConfig = {
+  count: number;
+};
+
+type InstallmentConfig = {
   count: number;
 };
 
@@ -368,6 +377,37 @@ function parseDistribution(
   return { count: Number(count) };
 }
 
+function parseInstallment(
+  body: JsonRecord,
+  kind: NewTransaction["kind"],
+): InstallmentConfig | null {
+  const raw = body.installment;
+  if (raw === undefined || raw === null || raw === false) return null;
+  if (!isPlainRecord(raw)) {
+    throw new ApiValidationError("INVALID_INSTALLMENT", 400, "installment");
+  }
+  if (kind !== "expense") {
+    throw new ApiValidationError(
+      "INSTALLMENT_REQUIRES_EXPENSE",
+      400,
+      "installment",
+    );
+  }
+  const count = raw.count;
+  if (
+    !Number.isInteger(count) ||
+    Number(count) < 2 ||
+    Number(count) > MAX_INSTALLMENT_COUNT
+  ) {
+    throw new ApiValidationError(
+      "INVALID_INSTALLMENT_COUNT",
+      400,
+      "installment.count",
+    );
+  }
+  return { count: Number(count) };
+}
+
 function shiftIsoDate(date: string, days: number) {
   const shifted = new Date(`${date}T00:00:00Z`);
   shifted.setUTCDate(shifted.getUTCDate() + days);
@@ -541,6 +581,12 @@ function serializeTransaction(transaction: Transaction) {
     splitIndex: transaction.splitIndex,
     splitCount: transaction.splitCount,
     isDistributed: transaction.splitGroupId !== null,
+    installmentGroupId: transaction.installmentGroupId,
+    installmentIndex: transaction.installmentIndex,
+    installmentCount: transaction.installmentCount,
+    installmentTotalOriginalMinor:
+      transaction.installmentTotalOriginalMinor,
+    isInstallment: transaction.installmentGroupId !== null,
     createdAt: new Date(transaction.createdAtMs).toISOString(),
     updatedAt: new Date(transaction.updatedAtMs).toISOString(),
   };
@@ -912,6 +958,10 @@ async function buildNewTransaction(
     splitGroupId: null,
     splitIndex: null,
     splitCount: null,
+    installmentGroupId: null,
+    installmentIndex: null,
+    installmentCount: null,
+    installmentTotalOriginalMinor: null,
     clientRequestId,
     createdAtMs: now,
     updatedAtMs: now,
@@ -994,6 +1044,99 @@ function sameDistribution(
         row.subcategory === proposed.subcategory &&
         row.description === proposed.description &&
         row.note === proposed.note
+    ) &&
+    ordered.reduce((sum, row) => sum + row.originalAmountMinor, 0) ===
+      proposed.originalAmountMinor &&
+    ordered.reduce((sum, row) => sum + row.baseAmountMinor, 0) ===
+      proposed.baseAmountMinor
+  );
+}
+
+function installmentTransactionsFromTransaction(
+  transaction: NewTransaction,
+  installment: InstallmentConfig,
+) {
+  const count = installment.count;
+  if (
+    transaction.originalAmountMinor < count ||
+    transaction.baseAmountMinor < count
+  ) {
+    throw new ApiValidationError(
+      "INSTALLMENT_AMOUNT_TOO_SMALL",
+      400,
+      "installment.count",
+    );
+  }
+
+  const groupId = crypto.randomUUID();
+  return Array.from({ length: count }, (_, index): NewTransaction => ({
+    ...transaction,
+    id: crypto.randomUUID(),
+    occurredOn: shiftInstallmentDate(transaction.occurredOn, index),
+    originalAmountMinor: installmentPaymentMinor(
+      transaction.originalAmountMinor,
+      count,
+      index,
+    ),
+    baseAmountMinor: installmentPaymentMinor(
+      transaction.baseAmountMinor,
+      count,
+      index,
+    ),
+    recurringSeriesId: null,
+    recurrenceDate: null,
+    splitGroupId: null,
+    splitIndex: null,
+    splitCount: null,
+    installmentGroupId: groupId,
+    installmentIndex: index,
+    installmentCount: count,
+    installmentTotalOriginalMinor: transaction.originalAmountMinor,
+    clientRequestId:
+      index === 0
+        ? transaction.clientRequestId
+        : `installment:${groupId}:${index}`,
+    createdAtMs: transaction.createdAtMs + index,
+    updatedAtMs: transaction.updatedAtMs + index,
+  }));
+}
+
+function sameInstallment(
+  existing: Transaction[],
+  proposed: NewTransaction,
+  count: number,
+) {
+  if (
+    existing.length !== count ||
+    existing.some(
+      (row) =>
+        row.installmentCount !== count ||
+        row.installmentGroupId !== existing[0]?.installmentGroupId ||
+        row.installmentTotalOriginalMinor !== proposed.originalAmountMinor,
+    )
+  ) {
+    return false;
+  }
+  const ordered = [...existing].sort(
+    (left, right) =>
+      (left.installmentIndex ?? 0) - (right.installmentIndex ?? 0),
+  );
+  return (
+    ordered.every(
+      (row, index) =>
+        row.occurredOn === shiftInstallmentDate(proposed.occurredOn, index) &&
+        row.kind === proposed.kind &&
+        row.originalCurrency === proposed.originalCurrency &&
+        row.originalCurrencyExponent === proposed.originalCurrencyExponent &&
+        row.fxRate === proposed.fxRate &&
+        row.fxSource === proposed.fxSource &&
+        row.fxRateDate === proposed.fxRateDate &&
+        row.baseCurrency === proposed.baseCurrency &&
+        row.baseCurrencyExponent === proposed.baseCurrencyExponent &&
+        row.category === proposed.category &&
+        row.subcategory === proposed.subcategory &&
+        row.description === proposed.description &&
+        row.note === proposed.note,
     ) &&
     ordered.reduce((sum, row) => sum + row.originalAmountMinor, 0) ===
       proposed.originalAmountMinor &&
@@ -1144,14 +1287,105 @@ export async function POST(request: Request) {
     const newTransaction = await buildNewTransaction(ownerId, body, db);
     const recurrence = parseRecurrence(body, newTransaction.occurredOn);
     const distribution = parseDistribution(body, newTransaction.kind);
-    if (recurrence && distribution) {
+    const installment = parseInstallment(body, newTransaction.kind);
+    if (
+      Number(Boolean(recurrence)) +
+        Number(Boolean(distribution)) +
+        Number(Boolean(installment)) >
+      1
+    ) {
       throw new ApiValidationError(
-        "RECURRENCE_DISTRIBUTION_CONFLICT",
+        "TRANSACTION_SCHEDULE_CONFLICT",
         400,
-        "distribution",
+        "installment",
       );
     }
     await ensureUserState(db, ownerId);
+
+    if (installment) {
+      if (newTransaction.clientRequestId) {
+        const firstRows = await db
+          .select()
+          .from(transactions)
+          .where(
+            and(
+              eq(transactions.ownerId, ownerId),
+              eq(
+                transactions.clientRequestId,
+                newTransaction.clientRequestId,
+              ),
+            ),
+          )
+          .limit(1);
+        const first = firstRows[0];
+        if (first) {
+          const existing = first.installmentGroupId
+            ? await db
+                .select()
+                .from(transactions)
+                .where(
+                  and(
+                    eq(transactions.ownerId, ownerId),
+                    eq(
+                      transactions.installmentGroupId,
+                      first.installmentGroupId,
+                    ),
+                  ),
+                )
+            : [first];
+          if (sameInstallment(existing, newTransaction, installment.count)) {
+            await rememberLastTransactionCurrency(
+              db,
+              ownerId,
+              first.originalCurrency,
+            );
+            return Response.json(
+              {
+                data: existing
+                  .sort(
+                    (left, right) =>
+                      (left.installmentIndex ?? 0) -
+                      (right.installmentIndex ?? 0),
+                  )
+                  .map(serializeTransaction),
+                idempotent: true,
+              },
+              { status: 200, headers: NO_STORE_HEADERS },
+            );
+          }
+          return errorResponse("IDEMPOTENCY_CONFLICT", 409, "clientRequestId");
+        }
+      }
+
+      const planned = installmentTransactionsFromTransaction(
+        newTransaction,
+        installment,
+      );
+      const insertQueries = [];
+      for (let index = 0; index < planned.length; index += 4) {
+        insertQueries.push(
+          db
+            .insert(transactions)
+            .values(planned.slice(index, index + 4))
+            .returning(),
+        );
+      }
+      const [firstInsert, ...remainingInserts] = insertQueries;
+      const insertedBatches = await db.batch([
+        firstInsert,
+        ...remainingInserts,
+      ]);
+      const inserted = insertedBatches.flat();
+      await rememberLastTransactionCurrency(
+        db,
+        ownerId,
+        inserted[0].originalCurrency,
+      );
+      return Response.json(
+        { data: inserted.map(serializeTransaction) },
+        { status: 201, headers: NO_STORE_HEADERS },
+      );
+    }
 
     if (distribution) {
       if (newTransaction.clientRequestId) {
@@ -1498,6 +1732,7 @@ export async function DELETE(request: Request) {
         recurringSeriesId: transactions.recurringSeriesId,
         recurrenceDate: transactions.recurrenceDate,
         splitGroupId: transactions.splitGroupId,
+        installmentGroupId: transactions.installmentGroupId,
       })
       .from(transactions)
       .where(and(eq(transactions.id, id), eq(transactions.ownerId, ownerId)))
@@ -1506,7 +1741,20 @@ export async function DELETE(request: Request) {
     if (!existing) return errorResponse("TRANSACTION_NOT_FOUND", 404);
 
     let deleted: Array<{ id: string }>;
-    if (existing.splitGroupId) {
+    if (existing.installmentGroupId) {
+      deleted = await db
+        .delete(transactions)
+        .where(
+          and(
+            eq(transactions.ownerId, ownerId),
+            eq(
+              transactions.installmentGroupId,
+              existing.installmentGroupId,
+            ),
+          ),
+        )
+        .returning({ id: transactions.id });
+    } else if (existing.splitGroupId) {
       deleted = await db
         .delete(transactions)
         .where(

@@ -613,6 +613,55 @@ test("distributes one expense exactly across consecutive calendar dates", async 
   assert.match(styles, /\.distribution-card/u);
 });
 
+test("creates exact monthly installment plans with month-end clamping", async () => {
+  const [tracker, route, schema, migration, styles, installmentSource] =
+    await Promise.all([
+      readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/api/transactions/route.ts", import.meta.url), "utf8"),
+      readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+      readFile(new URL("../drizzle/0011_monthly_installments.sql", import.meta.url), "utf8"),
+      readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+      readFile(new URL("../lib/installments.ts", import.meta.url), "utf8"),
+    ]);
+  const installmentModule = await import(
+    `data:text/javascript;base64,${Buffer.from(
+      ts.transpileModule(installmentSource, {
+        compilerOptions: {
+          module: ts.ModuleKind.ESNext,
+          target: ts.ScriptTarget.ES2022,
+        },
+      }).outputText,
+    ).toString("base64")}`
+  );
+
+  assert.equal(installmentModule.shiftInstallmentDate("2024-01-31", 1), "2024-02-29");
+  assert.equal(installmentModule.shiftInstallmentDate("2024-01-31", 2), "2024-03-31");
+  assert.deepEqual(
+    Array.from({ length: 3 }, (_, index) =>
+      installmentModule.installmentPaymentMinor(100, 3, index),
+    ),
+    [34, 33, 33],
+  );
+  assert.equal(installmentModule.installmentRemainingMinor(100, 3, 0), 66);
+  assert.equal(installmentModule.installmentRemainingMinor(100, 3, 2), 0);
+  assert.match(schema, /installmentGroupId: text\("installment_group_id"\)/u);
+  assert.match(schema, /idx_transactions_owner_installment_group/u);
+  assert.match(migration, /installment_total_original_minor/u);
+  assert.match(route, /function parseInstallment/u);
+  assert.match(route, /function installmentTransactionsFromTransaction/u);
+  assert.match(route, /shiftInstallmentDate\(transaction\.occurredOn, index\)/u);
+  assert.match(
+    route,
+    /eq\([\s\S]*?transactions\.installmentGroupId,[\s\S]*?first\.installmentGroupId/u,
+  );
+  assert.match(tracker, /installment: \{ count: parsedInstallmentCount \}/u);
+  assert.match(tracker, /copy\.installmentRemaining/u);
+  assert.match(tracker, /할부 결제/u);
+  assert.match(tracker, /分割払い/u);
+  assert.match(tracker, /Оплата в рассрочку/u);
+  assert.match(styles, /\.installment-card/u);
+});
+
 test("allows future transactions and locks the latest available rate", async () => {
   const tracker = await readFile(
     new URL("../app/expense-tracker.tsx", import.meta.url),
