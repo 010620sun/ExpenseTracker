@@ -5,8 +5,8 @@
   --surface: #ffffff;
   --surface-soft: #f7f9f7;
   --ink: #17231f;
-  --muted: #4f5e59;
-  --line: #d5ddd7;
+  --muted: #42514c;
+  --line: #cdd7d0;
   --sidebar: #123b34;
   --sidebar-soft: #245148;
   --accent: #e65f42;
@@ -37,7 +37,8 @@ body {
   color: var(--ink);
   font-family: var(--font-sans);
   font-feature-settings: "tnum" 1, "ss01" 1;
-  line-height: 1.45;
+  font-size: 15px;
+  line-height: 1.55;
   min-width: 320px;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -3604,7 +3605,7 @@ a.nav-item {
 .auth-benefits strong,
 .auth-card > p,
 .day-entry-value {
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .eyebrow,
@@ -3643,7 +3644,7 @@ a.nav-item {
 .report-topbar p,
 .recurring-create,
 .auth-tabs button {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .account-logout,
@@ -3688,7 +3689,7 @@ a.nav-item {
 .budget-save,
 .auth-benefits p,
 .auth-card .field small {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .nav-item.pending small,
@@ -3713,7 +3714,7 @@ a.nav-item {
 .report-category-row > p > span,
 .report-currency-row small,
 .ledger-mobile-nav a > small {
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .language-menu > button,
@@ -3727,7 +3728,7 @@ a.nav-item {
 .report-period-meta button,
 .report-state button,
 .auth-tabs button {
-  min-height: 40px;
+  min-height: 44px;
 }
 
 .language-menu strong,
@@ -3736,7 +3737,7 @@ a.nav-item {
 .report-category-row > div > strong,
 .report-currency-row strong,
 .report-merchant-list li > div strong {
-  line-height: 1.35;
+  line-height: 1.45;
 }
 
 .topbar-actions,
@@ -3747,13 +3748,13 @@ a.nav-item {
 }
 
 .transaction-row {
-  min-height: 62px;
+  min-height: 70px;
 }
 
 .report-category-row,
 .report-currency-row,
 .report-merchant-list li {
-  min-height: 58px;
+  min-height: 64px;
 }
 
 @media (max-width: 850px) {
@@ -3769,12 +3770,12 @@ a.nav-item {
 
 @media (max-width: 620px) {
   .report-topbar p {
-    font-size: 12px;
+    font-size: 14px;
   }
 
   .calendar-day-number,
   .calendar-entry-count {
-    font-size: 11px;
+    font-size: 13px;
   }
 
   .report-panel-heading h2 {
@@ -3795,4 +3796,246 @@ a.nav-item {
     min-height: 108px;
   }
 
+}
+
+/* Accessible type scale */
+.nav-item {
+  font-size: 15px;
+  line-height: 1.35;
+  min-height: 48px;
+}
+
+.nav-section-label {
+  font-size: 11px;
+  letter-spacing: 0.11em;
+}
+
+.account-chip strong {
+  font-size: 14px;
+}
+
+.account-chip small,
+.account-logout {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.page-title p {
+  font-size: 14px;
+}
+
+.page-title > span,
+.sync-state {
+  font-size: 13px;
+}
+
+.language-trigger,
+.currency-trigger,
+.primary-button,
+.secondary-button {
+  font-size: 14px;
+}
+
+.eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.11em;
+}
+
+.month-controls .month-today,
+.recurring-add-button,
+.valuation-switch button {
+  font-size: 13px;
+}
+
+.valuation-disclosure > summary > span {
+  font-size: 14px;
+}
+
+.valuation-disclosure > summary > small,
+.valuation-tools > p {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.rate-note-copy strong,
+.rate-note-copy > span {
+  font-size: 13px;
+}
+
+.rate-note-copy small {
+  font-size: 12px;
+}
+
+.calendar-panel-heading h2,
+.day-agenda-heading h2,
+.panel-heading h2 {
+  font-size: 20px;
+}
+
+.calendar-panel-heading p,
+.day-agenda-heading p,
+.panel-heading p {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.calendar-table th {
+  font-size: 12px;
+}
+
+.calendar-day-number {
+  font-size: 13px;
+}
+
+.calendar-day-number i,
+.calendar-entry-preview,
+.calendar-entry-preview em,
+.calendar-entry-previews small,
+.calendar-day-totals b {
+  font-size: 11px;
+}
+
+.day-summary-cards span,
+.income-pill,
+.small-code {
+  font-size: 13px;
+}
+
+.day-summary-cards strong,
+.day-entry-value {
+  font-size: 15px;
+}
+
+.day-entry-copy strong,
+.transaction-name strong {
+  font-size: 14px;
+}
+
+.day-entry-copy small,
+.transaction-name span,
+.transaction-row time,
+.original-value span,
+.base-value span {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.metric-label,
+.metric-card > p,
+.currency-legend strong,
+.currency-legend small {
+  font-size: 13px;
+}
+
+.metric-card > strong {
+  line-height: 1.15;
+}
+
+.transaction-search-field input,
+.transaction-filter-select select,
+.transaction-filter-clear {
+  font-size: 13px;
+}
+
+.drawer-header p {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.field > span,
+.subcategory-field > small,
+.category-trigger-copy small,
+.payment-options > summary small,
+.distribution-toggle small,
+.recurrence-heading small {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.field input,
+.field select,
+.field textarea,
+.currency-option-name strong {
+  font-size: 15px;
+}
+
+.category-trigger-copy strong,
+.category-option > span:last-of-type,
+.payment-options > summary strong,
+.distribution-toggle strong,
+.recurrence-heading strong {
+  font-size: 14px;
+}
+
+.conversion-preview span,
+.conversion-preview strong small,
+.conversion-details > summary,
+.conversion-preview p,
+.distribution-preview span,
+.distribution-preview small {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.recurring-topbar p,
+.budget-topbar p,
+.report-topbar p,
+.budget-plan-heading p,
+.report-panel-heading p,
+.report-empty-state p {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.recurring-summary-grid article > span,
+.budget-summary-grid article > span,
+.report-summary-grid article > span,
+.recurring-summary-grid small,
+.budget-summary-grid small,
+.report-summary-grid article > small,
+.series-dates,
+.series-value > span,
+.budget-category-copy > span,
+.report-currency-row small,
+.report-merchant-list li small {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.recurring-category-trigger > strong,
+.series-primary > strong,
+.budget-category-copy > strong,
+.report-category-row > div > strong,
+.report-currency-row strong,
+.report-merchant-list li > div strong {
+  font-size: 14px;
+}
+
+.recurring-filters button,
+.series-actions button,
+.budget-period-actions button,
+.budget-save,
+.report-period-meta button,
+.report-state button {
+  font-size: 13px;
+}
+
+@media (max-width: 620px) {
+  body {
+    font-size: 16px;
+  }
+
+  .page-title > span {
+    font-size: 13px;
+  }
+
+  .ledger-mobile-nav a > small {
+    font-size: 11px;
+  }
+
+  .calendar-panel-heading h2,
+  .day-agenda-heading h2,
+  .panel-heading h2 {
+    font-size: 19px;
+  }
 }
