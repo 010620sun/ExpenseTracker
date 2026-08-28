@@ -553,6 +553,11 @@ const COPY = {
     greeting: "Welcome back, {name}.",
     greetingFallback: "Welcome back.",
     subtitle: "Every currency, one clear picture.",
+    startTitle: "Start with the essentials",
+    startHint: "Record one transaction first. Budgets and recurring items can follow when you need them.",
+    startStepRecord: "Record money in or out",
+    startStepPlan: "Set a monthly spending limit",
+    startStepAutomate: "Schedule repeating payments",
     transactionsSubtitle: "Your complete transaction history.",
     baseCurrency: "Base currency",
     currencySearch: "Search currencies",
@@ -565,6 +570,8 @@ const COPY = {
     rateProvider: "Frankfurter reference rates",
     rateLatest: "Latest available reference rates",
     valuationMode: "Exchange-rate basis",
+    displayOptions: "Display options",
+    displayOptionsHint: "Currency valuation and rate source",
     historicalValue: "Transaction-date rate",
     currentValue: "Current rate",
     historicalUnavailable: "Some transaction-date rates are unavailable",
@@ -618,6 +625,7 @@ const COPY = {
     amount: "Amount",
     currency: "Currency",
     converted: "Converted amount",
+    rateDetails: "Rate details",
     savedRate: "The rate is saved with this transaction.",
     save: "Save transaction",
     saving: "Saving…",
@@ -672,6 +680,8 @@ const COPY = {
     distributionEditHint: "Changes apply only to this date. Deleting removes the entire distribution.",
     deleteDistributedConfirm: "Delete all {count} distributed entries for {merchant}?",
     installmentExpense: "Pay in installments",
+    paymentOptions: "Payment options",
+    paymentOptionsHint: "Split this expense across days or monthly payments.",
     installmentHint: "Split the total into monthly charges, starting on this date.",
     installmentCount: "Number of payments",
     installmentPreview: "Installment preview",
@@ -695,6 +705,11 @@ const COPY = {
     greeting: "{name}님, 다시 오신 것을 환영합니다.",
     greetingFallback: "다시 오신 것을 환영합니다.",
     subtitle: "모든 통화를 한눈에 명확하게.",
+    startTitle: "핵심 기능부터 시작하세요",
+    startHint: "먼저 거래 하나를 기록하세요. 필요할 때 예산과 반복 거래를 설정할 수 있습니다.",
+    startStepRecord: "수입 또는 지출 기록",
+    startStepPlan: "월 지출 한도 설정",
+    startStepAutomate: "반복 결제 일정 등록",
     transactionsSubtitle: "모든 거래 내역을 한곳에서 확인하세요.",
     baseCurrency: "기준 통화",
     currencySearch: "통화 검색",
@@ -707,6 +722,8 @@ const COPY = {
     rateProvider: "Frankfurter 기준 환율",
     rateLatest: "사용 가능한 최신 기준 환율",
     valuationMode: "환산 기준",
+    displayOptions: "표시 설정",
+    displayOptionsHint: "환율 기준 및 제공 정보",
     historicalValue: "거래일 환율 기준",
     currentValue: "현재 환율 기준",
     historicalUnavailable: "일부 거래일 환율을 불러오지 못했습니다",
@@ -760,6 +777,7 @@ const COPY = {
     amount: "금액",
     currency: "통화",
     converted: "환산 금액",
+    rateDetails: "환율 상세",
     savedRate: "이 환율은 거래와 함께 저장됩니다.",
     save: "거래 저장",
     saving: "저장 중…",
@@ -814,6 +832,8 @@ const COPY = {
     distributionEditHint: "변경은 이 날짜에만 적용됩니다. 삭제하면 전체 분할 거래가 삭제됩니다.",
     deleteDistributedConfirm: "{merchant}의 분할 거래 {count}건을 모두 삭제할까요?",
     installmentExpense: "할부 결제",
+    paymentOptions: "결제 옵션",
+    paymentOptionsHint: "지출을 여러 날짜 또는 월별 결제로 나눕니다.",
     installmentHint: "총 결제 금액을 이 날짜부터 매월 나누어 기록합니다.",
     installmentCount: "할부 개월",
     installmentPreview: "할부 미리보기",
@@ -837,6 +857,11 @@ const COPY = {
     greeting: "{name}さん、おかえりなさい。",
     greetingFallback: "おかえりなさい。",
     subtitle: "すべての通貨を、ひと目で明確に。",
+    startTitle: "基本から始めましょう",
+    startHint: "まず取引を1件記録しましょう。予算や定期取引は必要になったときに設定できます。",
+    startStepRecord: "収入または支出を記録",
+    startStepPlan: "月間支出上限を設定",
+    startStepAutomate: "定期支払いを登録",
     transactionsSubtitle: "すべての取引履歴を一か所で確認。",
     baseCurrency: "基準通貨",
     currencySearch: "通貨を検索",
@@ -849,6 +874,8 @@ const COPY = {
     rateProvider: "Frankfurterの参照レート",
     rateLatest: "利用可能な最新の参照レート",
     valuationMode: "換算基準",
+    displayOptions: "表示設定",
+    displayOptionsHint: "換算基準とレート情報",
     historicalValue: "取引日時点",
     currentValue: "現在レート換算",
     historicalUnavailable: "一部の取引日レートを取得できませんでした",
@@ -902,6 +929,7 @@ const COPY = {
     amount: "金額",
     currency: "通貨",
     converted: "換算額",
+    rateDetails: "為替レートの詳細",
     savedRate: "このレートは取引と一緒に保存されます。",
     save: "取引を保存",
     saving: "保存中…",
@@ -956,6 +984,8 @@ const COPY = {
     distributionEditHint: "変更はこの日付にのみ適用されます。削除すると分割取引全体が削除されます。",
     deleteDistributedConfirm: "{merchant}の分割取引{count}件をすべて削除しますか？",
     installmentExpense: "分割払い",
+    paymentOptions: "支払いオプション",
+    paymentOptionsHint: "支出を複数の日付または月々の支払いに分けます。",
     installmentHint: "合計金額をこの日から毎月の支払いに分けて記録します。",
     installmentCount: "支払回数",
     installmentPreview: "分割払いプレビュー",
@@ -979,6 +1009,11 @@ const COPY = {
     greeting: "С возвращением, {name}.",
     greetingFallback: "С возвращением.",
     subtitle: "Все валюты — в одной понятной картине.",
+    startTitle: "Начните с главного",
+    startHint: "Сначала добавьте одну операцию. Бюджеты и регулярные платежи можно настроить позже.",
+    startStepRecord: "Записать доход или расход",
+    startStepPlan: "Задать месячный лимит",
+    startStepAutomate: "Настроить регулярный платёж",
     transactionsSubtitle: "Полная история операций в одном месте.",
     baseCurrency: "Основная валюта",
     currencySearch: "Поиск валют",
@@ -991,6 +1026,8 @@ const COPY = {
     rateProvider: "Справочные курсы Frankfurter",
     rateLatest: "Последние доступные справочные курсы",
     valuationMode: "Курс для пересчёта",
+    displayOptions: "Настройки отображения",
+    displayOptionsHint: "Метод пересчёта и источник курса",
     historicalValue: "Курс на дату операции",
     currentValue: "Текущий курс",
     historicalUnavailable: "Некоторые курсы на дату операции недоступны",
@@ -1044,6 +1081,7 @@ const COPY = {
     amount: "Сумма",
     currency: "Валюта",
     converted: "Сумма после пересчёта",
+    rateDetails: "Подробнее о курсе",
     savedRate: "Этот курс сохранится вместе с операцией.",
     save: "Сохранить операцию",
     saving: "Сохранение…",
@@ -1098,6 +1136,8 @@ const COPY = {
     distributionEditHint: "Изменения относятся только к этой дате. Удаление удалит всё распределение.",
     deleteDistributedConfirm: "Удалить все распределённые операции ({count}) для {merchant}?",
     installmentExpense: "Оплата в рассрочку",
+    paymentOptions: "Параметры платежа",
+    paymentOptionsHint: "Распределите расход по дням или ежемесячным платежам.",
     installmentHint: "Разделить общую сумму на ежемесячные платежи с этой даты.",
     installmentCount: "Количество платежей",
     installmentPreview: "Предпросмотр рассрочки",
@@ -2901,7 +2941,8 @@ export function ExpenseTracker({
           </div>
           <div className="page-title">
             <p>{firstName ? template(copy.greeting, { name: firstName }) : copy.greetingFallback}</p>
-            <h1>{isTransactionsView ? copy.transactionsSubtitle : copy.subtitle}</h1>
+            <h1>{isTransactionsView ? copy.transactions : copy.overview}</h1>
+            <span>{isTransactionsView ? copy.transactionsSubtitle : copy.subtitle}</span>
           </div>
           <div className="topbar-actions">
             <div className="sync-state" aria-live="polite">
@@ -2951,54 +2992,80 @@ export function ExpenseTracker({
               )}
             </div>
           </div>
-          <div className="valuation-tools">
-            <div
-              className="valuation-switch"
-              role="group"
-              aria-label={copy.valuationMode}
-            >
-              <button
-                type="button"
-                className={valuationMode === "historical" ? "selected" : ""}
-                aria-pressed={valuationMode === "historical"}
-                onClick={() => setValuationMode("historical")}
+          <details className="valuation-disclosure">
+            <summary>
+              <span>{copy.displayOptions}</span>
+              <small>{valuationMode === "historical" ? copy.historicalValue : copy.currentValue}</small>
+            </summary>
+            <div className="valuation-tools">
+              <p>{copy.displayOptionsHint}</p>
+              <div
+                className="valuation-switch"
+                role="group"
+                aria-label={copy.valuationMode}
               >
-                {copy.historicalValue}
-              </button>
-              <button
-                type="button"
-                className={valuationMode === "current" ? "selected" : ""}
-                aria-pressed={valuationMode === "current"}
-                onClick={() => setValuationMode("current")}
+                <button
+                  type="button"
+                  className={valuationMode === "historical" ? "selected" : ""}
+                  aria-pressed={valuationMode === "historical"}
+                  onClick={() => setValuationMode("historical")}
+                >
+                  {copy.historicalValue}
+                </button>
+                <button
+                  type="button"
+                  className={valuationMode === "current" ? "selected" : ""}
+                  aria-pressed={valuationMode === "current"}
+                  onClick={() => setValuationMode("current")}
+                >
+                  {copy.currentValue}
+                </button>
+              </div>
+              {valuationMode === "historical" && historicalRatesStatus === "error" && (
+                <small className="valuation-warning">{copy.historicalUnavailable}</small>
+              )}
+              <div
+                className={`rate-note rate-note-${rateMeta.status}`}
+                role="status"
+                aria-live="polite"
               >
-                {copy.currentValue}
-              </button>
+                <span className="rate-indicator" aria-hidden="true">↻</span>
+                <span className="rate-note-copy">
+                  <strong>{copy.rateProvider}</strong>
+                  <span>{rateStatusMessage}</span>
+                  {(rateDateLabel || fetchedAtLabel) && (
+                    <small>
+                      {rateDateLabel ? `${copy.rateDate}: ${rateDateLabel}` : ""}
+                      {rateDateLabel && fetchedAtLabel ? " · " : ""}
+                      {fetchedAtLabel ? `${copy.fetchedAt}: ${fetchedAtLabel}` : ""}
+                    </small>
+                  )}
+                </span>
+              </div>
             </div>
-            {valuationMode === "historical" && historicalRatesStatus === "error" && (
-              <small className="valuation-warning">{copy.historicalUnavailable}</small>
-            )}
-            <div
-              className={`rate-note rate-note-${rateMeta.status}`}
-              role="status"
-              aria-live="polite"
-            >
-              <span className="rate-indicator" aria-hidden="true">↻</span>
-              <span className="rate-note-copy">
-                <strong>{copy.rateProvider}</strong>
-                <span>{rateStatusMessage}</span>
-                {(rateDateLabel || fetchedAtLabel) && (
-                  <small>
-                    {rateDateLabel ? `${copy.rateDate}: ${rateDateLabel}` : ""}
-                    {rateDateLabel && fetchedAtLabel ? " · " : ""}
-                    {fetchedAtLabel ? `${copy.fetchedAt}: ${fetchedAtLabel}` : ""}
-                  </small>
-                )}
-              </span>
-            </div>
-          </div>
+          </details>
         </section>
 
         {!isTransactionsView && <>
+        {!isSyncing && monthlyTransactions.length === 0 && (
+          <section className="getting-started" aria-labelledby="getting-started-title">
+            <div>
+              <span className="eyebrow">GlobeLedger</span>
+              <h2 id="getting-started-title">{copy.startTitle}</h2>
+              <p>{copy.startHint}</p>
+            </div>
+            <ol>
+              <li><span>1</span><strong>{copy.startStepRecord}</strong></li>
+              <li><span>2</span><strong>{copy.startStepPlan}</strong></li>
+              <li><span>3</span><strong>{copy.startStepAutomate}</strong></li>
+            </ol>
+            <div className="getting-started-actions">
+              <button type="button" className="primary-button" onClick={() => openAddDrawer()}>{copy.addExpense}</button>
+              <a href="/budgets">{copy.setBudget}</a>
+              <button type="button" onClick={() => openRecurringDrawer()}>{recurringFlowCopy.add}</button>
+            </div>
+          </section>
+        )}
         <section className="calendar-workspace" aria-label={calendarCopy.calendar}>
           <article className="panel calendar-panel" aria-busy={isSyncing}>
             <div className="calendar-panel-heading">
@@ -3482,19 +3549,22 @@ export function ExpenseTracker({
               </div>
               <div className="conversion-preview" id="conversion-preview" aria-live="polite">
                 <div><span>{copy.converted}</span><strong>{transactionDateRateReady ? formatCurrency(convertedPreview, baseCurrency, language) : "—"} <small>{baseCurrency}</small></strong></div>
-                <p>
-                  {!transactionDateRateReady
-                    ? formRateSnapshot.status === "loading"
-                      ? copy.transactionRateLoading
-                      : copy.transactionRateError
-                    : <>
-                        1 {currency} = {conversionRate < 0.01 ? conversionRate.toFixed(6) : conversionRate.toFixed(4)} {baseCurrency}
-                        {" · "}{usesStoredRate ? calendarCopy.historicalRate : currency === baseCurrency ? copy.sameCurrencyRate : currency === "USD" ? copy.identityRate : hasFrankfurterRate ? copy.rateProvider : copy.fallbackRate}
-                        {selectedRateDateLabel ? ` · ${copy.rateDate}: ${selectedRateDateLabel}` : ""}
-                        {isFutureTransaction && hasFrankfurterRate ? ` · ${copy.futureRateNotice}` : ""}
-                        {" · "}{copy.savedRate}
-                      </>}
-                </p>
+                <details className="conversion-details">
+                  <summary>{copy.rateDetails}</summary>
+                  <p>
+                    {!transactionDateRateReady
+                      ? formRateSnapshot.status === "loading"
+                        ? copy.transactionRateLoading
+                        : copy.transactionRateError
+                      : <>
+                          1 {currency} = {conversionRate < 0.01 ? conversionRate.toFixed(6) : conversionRate.toFixed(4)} {baseCurrency}
+                          {" · "}{usesStoredRate ? calendarCopy.historicalRate : currency === baseCurrency ? copy.sameCurrencyRate : currency === "USD" ? copy.identityRate : hasFrankfurterRate ? copy.rateProvider : copy.fallbackRate}
+                          {selectedRateDateLabel ? ` · ${copy.rateDate}: ${selectedRateDateLabel}` : ""}
+                          {isFutureTransaction && hasFrankfurterRate ? ` · ${copy.futureRateNotice}` : ""}
+                          {" · "}{copy.savedRate}
+                        </>}
+                  </p>
+                </details>
               </div>
               <div className="field category-field">
                   <span id="category-field-label">{copy.category}</span>
@@ -3608,111 +3678,93 @@ export function ExpenseTracker({
                 <input type="date" value={occurredOn} min="1900-01-01" disabled={locksInstallmentStructure} onChange={(event) => setOccurredOn(event.target.value)} required />
               </label>
               {!editingTransaction && kind === "expense" && !isRecurring && (
-                <div className={isDistributed ? "distribution-card active" : "distribution-card"}>
-                  <label className="distribution-toggle">
+                <details className="payment-options" open={isDistributed || isInstallment || undefined}>
+                  <summary>
                     <span>
-                      <strong>{copy.distributeExpense}</strong>
-                      <small>{copy.distributeHint}</small>
+                      <strong>{copy.paymentOptions}</strong>
+                      <small>{copy.paymentOptionsHint}</small>
                     </span>
-                    <input
-                      type="checkbox"
-                      aria-label={copy.distributeExpense}
-                      checked={isDistributed}
-                      onChange={(event) => {
-                        setIsDistributed(event.target.checked);
-                        if (event.target.checked) setIsInstallment(false);
-                      }}
-                    />
-                  </label>
-                  {isDistributed && (
-                    <div className="distribution-options">
-                      <label className="field distribution-count-field">
-                        <span>{copy.distributionCount}</span>
+                  </summary>
+                  <div className="payment-options-body">
+                    <div className={isDistributed ? "distribution-card active" : "distribution-card"}>
+                      <label className="distribution-toggle">
+                        <span>
+                          <strong>{copy.distributeExpense}</strong>
+                          <small>{copy.distributeHint}</small>
+                        </span>
                         <input
-                          type="number"
-                          inputMode="numeric"
-                          min="2"
-                          max={MAX_DISTRIBUTION_COUNT}
-                          step="1"
-                          value={distributionCount}
-                          onChange={(event) => setDistributionCount(event.target.value)}
+                          type="checkbox"
+                          aria-label={copy.distributeExpense}
+                          checked={isDistributed}
+                          onChange={(event) => {
+                            setIsDistributed(event.target.checked);
+                            if (event.target.checked) setIsInstallment(false);
+                          }}
                         />
                       </label>
-                      <div className="distribution-preview" aria-live="polite">
-                        <span>{copy.distributionPreview}</span>
-                        <strong>
-                          {template(copy.distributionRange, {
-                            count: Number.isInteger(parsedDistributionCount)
-                              ? parsedDistributionCount
-                              : 0,
-                            start: occurredOn,
-                            end: distributionPreviewEnd,
-                          })}
-                        </strong>
-                        <small>
-                          {template(copy.distributionEach, {
-                            amount: `${formatCurrency(distributionDailyPreview, currency, language)} ${currency}`,
-                            total: `${formatCurrency(Number(amount) || 0, currency, language)} ${currency}`,
-                          })}
-                        </small>
-                      </div>
+                      {isDistributed && (
+                        <div className="distribution-options">
+                          <label className="field distribution-count-field">
+                            <span>{copy.distributionCount}</span>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min="2"
+                              max={MAX_DISTRIBUTION_COUNT}
+                              step="1"
+                              value={distributionCount}
+                              onChange={(event) => setDistributionCount(event.target.value)}
+                            />
+                          </label>
+                          <div className="distribution-preview" aria-live="polite">
+                            <span>{copy.distributionPreview}</span>
+                            <strong>{template(copy.distributionRange, { count: Number.isInteger(parsedDistributionCount) ? parsedDistributionCount : 0, start: occurredOn, end: distributionPreviewEnd })}</strong>
+                            <small>{template(copy.distributionEach, { amount: `${formatCurrency(distributionDailyPreview, currency, language)} ${currency}`, total: `${formatCurrency(Number(amount) || 0, currency, language)} ${currency}` })}</small>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              )}
-              {!editingTransaction && kind === "expense" && !isRecurring && (
-                <div className={isInstallment ? "installment-card active" : "installment-card"}>
-                  <label className="distribution-toggle">
-                    <span>
-                      <strong>{copy.installmentExpense}</strong>
-                      <small>{copy.installmentHint}</small>
-                    </span>
-                    <input
-                      type="checkbox"
-                      aria-label={copy.installmentExpense}
-                      checked={isInstallment}
-                      onChange={(event) => {
-                        setIsInstallment(event.target.checked);
-                        if (event.target.checked) setIsDistributed(false);
-                      }}
-                    />
-                  </label>
-                  {isInstallment && (
-                    <div className="distribution-options">
-                      <label className="field distribution-count-field">
-                        <span>{copy.installmentCount}</span>
+                    <div className={isInstallment ? "installment-card active" : "installment-card"}>
+                      <label className="distribution-toggle">
+                        <span>
+                          <strong>{copy.installmentExpense}</strong>
+                          <small>{copy.installmentHint}</small>
+                        </span>
                         <input
-                          type="number"
-                          inputMode="numeric"
-                          min="2"
-                          max={MAX_INSTALLMENT_COUNT}
-                          step="1"
-                          value={installmentCount}
-                          onChange={(event) => setInstallmentCount(event.target.value)}
+                          type="checkbox"
+                          aria-label={copy.installmentExpense}
+                          checked={isInstallment}
+                          onChange={(event) => {
+                            setIsInstallment(event.target.checked);
+                            if (event.target.checked) setIsDistributed(false);
+                          }}
                         />
                       </label>
-                      <div className="distribution-preview" aria-live="polite">
-                        <span>{copy.installmentPreview}</span>
-                        <strong>
-                          {template(copy.installmentRange, {
-                            count: Number.isInteger(parsedInstallmentCount)
-                              ? parsedInstallmentCount
-                              : 0,
-                            start: occurredOn,
-                            end: installmentPreviewEnd,
-                          })}
-                        </strong>
-                        <small>
-                          {template(copy.installmentEach, {
-                            amount: `${formatCurrency(firstInstallmentPreview, currency, language)} ${currency}`,
-                            total: `${formatCurrency(Number(amount) || 0, currency, language)} ${currency}`,
-                          })}
-                        </small>
-                        <small>{copy.installmentRateHint}</small>
-                      </div>
+                      {isInstallment && (
+                        <div className="distribution-options">
+                          <label className="field distribution-count-field">
+                            <span>{copy.installmentCount}</span>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min="2"
+                              max={MAX_INSTALLMENT_COUNT}
+                              step="1"
+                              value={installmentCount}
+                              onChange={(event) => setInstallmentCount(event.target.value)}
+                            />
+                          </label>
+                          <div className="distribution-preview" aria-live="polite">
+                            <span>{copy.installmentPreview}</span>
+                            <strong>{template(copy.installmentRange, { count: Number.isInteger(parsedInstallmentCount) ? parsedInstallmentCount : 0, start: occurredOn, end: installmentPreviewEnd })}</strong>
+                            <small>{template(copy.installmentEach, { amount: `${formatCurrency(firstInstallmentPreview, currency, language)} ${currency}`, total: `${formatCurrency(Number(amount) || 0, currency, language)} ${currency}` })}</small>
+                            <small>{copy.installmentRateHint}</small>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                </details>
               )}
               {!editingTransaction && isRecurring && (
                 <div className="recurrence-card active">

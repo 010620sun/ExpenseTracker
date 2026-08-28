@@ -20,14 +20,11 @@ const COPY = {
     transactions: "Transactions",
     budgets: "Budgets",
     reports: "Reports",
-    settings: "Settings",
-    comingSoon: "Coming soon",
-    unavailable: "This section is being prepared.",
+    track: "Track",
+    planAndReview: "Plan & review",
     privateLedger: "Your private global ledger",
     guestName: "Global citizen",
     logout: "Log out",
-    helpTitle: "Built for borderless lives",
-    helpBody: "Original amounts stay intact while one base view keeps your plan clear.",
   },
   ko: {
     navigation: "주요 메뉴",
@@ -36,14 +33,11 @@ const COPY = {
     transactions: "거래 내역",
     budgets: "예산 관리",
     reports: "리포트",
-    settings: "설정",
-    comingSoon: "준비 중",
-    unavailable: "아직 준비 중인 메뉴입니다.",
+    track: "기록",
+    planAndReview: "계획 및 분석",
     privateLedger: "나만의 글로벌 가계부",
     guestName: "글로벌 사용자",
     logout: "로그아웃",
-    helpTitle: "국경 없는 일상을 위해",
-    helpBody: "원 결제 금액은 그대로 유지하고 기준 통화로 계획을 명확하게 관리하세요.",
   },
   ja: {
     navigation: "メインナビゲーション",
@@ -52,14 +46,11 @@ const COPY = {
     transactions: "取引履歴",
     budgets: "予算管理",
     reports: "レポート",
-    settings: "設定",
-    comingSoon: "準備中",
-    unavailable: "このメニューは現在準備中です。",
+    track: "記録",
+    planAndReview: "計画と分析",
     privateLedger: "自分だけのグローバル家計簿",
     guestName: "グローバルユーザー",
     logout: "ログアウト",
-    helpTitle: "国境を越える暮らしのために",
-    helpBody: "元の金額を保ちながら、基準通貨で計画を明確に管理できます。",
   },
   ru: {
     navigation: "Основная навигация",
@@ -68,14 +59,11 @@ const COPY = {
     transactions: "Операции",
     budgets: "Бюджеты",
     reports: "Отчёты",
-    settings: "Настройки",
-    comingSoon: "Скоро",
-    unavailable: "Этот раздел ещё готовится.",
+    track: "Учёт",
+    planAndReview: "Планирование и анализ",
     privateLedger: "Ваш личный глобальный учёт финансов",
     guestName: "Пользователь GlobeLedger",
     logout: "Выйти",
-    helpTitle: "Для жизни без границ",
-    helpBody: "Исходные суммы сохраняются, а основная валюта делает план понятным.",
   },
 } as const;
 
@@ -94,7 +82,6 @@ export function LedgerNavigation({
   const isLedgerRoute = pathname === "/" || pathname === "/transactions" || pathname === "/recurring" || pathname === "/budgets" || pathname === "/reports";
   const [language, setLanguage] = useState<Language>(initialLanguage);
   const [firstName, setFirstName] = useState<string | null>(null);
-  const [notice, setNotice] = useState("");
   const copy = COPY[language];
 
   useEffect(() => {
@@ -137,12 +124,6 @@ export function LedgerNavigation({
     };
   }, [isLedgerRoute]);
 
-  useEffect(() => {
-    if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(""), 3200);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
-
   if (!isLedgerRoute) return children;
 
   const overviewActive = pathname === "/";
@@ -153,13 +134,28 @@ export function LedgerNavigation({
     window.location.assign("/auth");
   }
 
-  const primaryLinks = [
+  const trackingLinks = [
     { href: "/", label: copy.overview, glyph: "●", active: overviewActive },
-    { href: "/recurring", label: copy.recurring, glyph: "↻", active: pathname === "/recurring" },
     { href: "/transactions", label: copy.transactions, glyph: "≡", active: transactionsActive },
+  ];
+  const planningLinks = [
+    { href: "/recurring", label: copy.recurring, glyph: "↻", active: pathname === "/recurring" },
     { href: "/budgets", label: copy.budgets, glyph: "◎", active: pathname === "/budgets" },
     { href: "/reports", label: copy.reports, glyph: "◫", active: pathname === "/reports" },
   ];
+  const primaryLinks = [...trackingLinks, ...planningLinks];
+
+  const renderLinks = (links: typeof primaryLinks) =>
+    links.map((item) => (
+      <a
+        href={item.href}
+        className={item.active ? "nav-item active" : "nav-item"}
+        aria-current={item.active ? "page" : undefined}
+        key={item.href}
+      >
+        <span aria-hidden="true">{item.glyph}</span>{item.label}
+      </a>
+    ));
 
   return (
     <div className="ledger-layout">
@@ -169,24 +165,12 @@ export function LedgerNavigation({
           <span className="brand-name">GlobeLedger</span>
         </a>
         <nav className="primary-nav">
-          {primaryLinks.map((item) => (
-            <a
-              href={item.href}
-              className={item.active ? "nav-item active" : "nav-item"}
-              aria-current={item.active ? "page" : undefined}
-              key={item.href}
-            >
-              <span aria-hidden="true">{item.glyph}</span>{item.label}
-            </a>
-          ))}
-          <button className="nav-item pending" type="button" title={copy.comingSoon} onClick={() => setNotice(`${copy.settings} · ${copy.unavailable}`)}><span aria-hidden="true">⚙</span>{copy.settings}<small>{copy.comingSoon}</small></button>
+          <span className="nav-section-label">{copy.track}</span>
+          {renderLinks(trackingLinks)}
+          <span className="nav-section-label">{copy.planAndReview}</span>
+          {renderLinks(planningLinks)}
         </nav>
         <div className="sidebar-spacer" />
-        <div className="borderless-note">
-          <span className="note-orbit" aria-hidden="true">◎</span>
-          <strong>{copy.helpTitle}</strong>
-          <p>{copy.helpBody}</p>
-        </div>
         <div className="account-chip">
           <span className="avatar">{firstName?.[0]?.toUpperCase() ?? "G"}</span>
           <span><strong>{firstName ?? copy.guestName}</strong><small>{copy.privateLedger}</small></span>
@@ -203,7 +187,6 @@ export function LedgerNavigation({
           </a>
         ))}
       </nav>
-      <div className={notice ? "toast visible" : "toast"} aria-live="polite">{notice}</div>
     </div>
   );
 }

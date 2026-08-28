@@ -725,3 +725,22 @@ test("allows future transactions and locks the latest available rate", async () 
     /isFutureTransaction && hasFrankfurterRate[\s\S]*?copy\.futureRateNotice/u,
   );
 });
+
+test("keeps advanced ledger controls behind clear progressive disclosure", async () => {
+  const [tracker, navigation, styles] = await Promise.all([
+    readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/ledger-navigation.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(tracker, /<details className="valuation-disclosure">/u);
+  assert.match(tracker, /<details className="conversion-details">/u);
+  assert.match(tracker, /<details className="payment-options"/u);
+  assert.match(tracker, /monthlyTransactions\.length === 0/u);
+  assert.match(navigation, /copy\.track/u);
+  assert.match(navigation, /copy\.planAndReview/u);
+  assert.doesNotMatch(navigation, /nav-item pending/u);
+  assert.doesNotMatch(navigation, /borderless-note/u);
+  assert.match(styles, /\.getting-started/u);
+  assert.match(styles, /\.payment-options/u);
+});
