@@ -736,7 +736,10 @@ test("keeps advanced ledger controls behind clear progressive disclosure", async
   assert.match(tracker, /<details className="valuation-disclosure">/u);
   assert.match(tracker, /<details className="conversion-details">/u);
   assert.match(tracker, /<details className="payment-options"/u);
-  assert.match(tracker, /monthlyTransactions\.length === 0/u);
+  assert.match(
+    tracker,
+    /viewMonth === currentDate\.slice\(0, 7\)[\s\S]*?monthlyTransactions\.length === 0/u,
+  );
   assert.match(navigation, /copy\.track/u);
   assert.match(navigation, /copy\.planAndReview/u);
   assert.doesNotMatch(navigation, /nav-item pending/u);

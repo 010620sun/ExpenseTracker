@@ -3047,7 +3047,7 @@ export function ExpenseTracker({
         </section>
 
         {!isTransactionsView && <>
-        {!isSyncing && monthlyTransactions.length === 0 && (
+        {!isSyncing && viewMonth === currentDate.slice(0, 7) && monthlyTransactions.length === 0 && (
           <section className="getting-started" aria-labelledby="getting-started-title">
             <div>
               <span className="eyebrow">GlobeLedger</span>
