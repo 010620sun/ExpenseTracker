@@ -760,6 +760,9 @@ test("uses a readable minimalist type scale across desktop and mobile", async ()
   assert.match(styles, /\.field input,[\s\S]*?font-size: 14px;/u);
   assert.match(styles, /@media \(max-width: 620px\) \{[\s\S]*?body \{[\s\S]*?font-size: 15px;/u);
   assert.match(styles, /--muted: #42514c;/u);
-  assert.match(styles, /\/\* Minimal visual treatment \*\//u);
+  assert.match(styles, /\/\* Minimal, light visual treatment \*\//u);
   assert.match(styles, /\.micro-bars \{[\s\S]*?display: none;/u);
+  assert.match(styles, /\.nav-item \{[\s\S]*?font-weight: 460;/u);
+  assert.match(styles, /\.page-title h1,[\s\S]*?font-weight: 540;/u);
+  assert.match(styles, /\.metric-card > strong,[\s\S]*?font-weight: 610;/u);
 });

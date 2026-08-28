@@ -3565,112 +3565,6 @@ a.nav-item {
   }
 }
 
-/* Minimal visual treatment */
-body {
-  background: var(--canvas);
-}
-
-.panel,
-.metric-card,
-.recurring-summary-grid article,
-.budget-summary-grid article,
-.report-summary-grid article,
-.recurring-list-panel,
-.budget-plan,
-.report-panel,
-.report-state {
-  border-color: var(--line);
-  box-shadow: 0 1px 2px rgba(24, 45, 38, 0.035);
-}
-
-.topbar,
-.recurring-topbar,
-.budget-topbar,
-.report-topbar {
-  min-height: 96px;
-}
-
-.page-title h1,
-.recurring-topbar h1,
-.budget-topbar h1,
-.report-topbar h1 {
-  font-weight: 680;
-}
-
-.eyebrow,
-.nav-section-label {
-  text-transform: none;
-}
-
-.metric-card,
-.recurring-summary-grid article,
-.budget-summary-grid article,
-.report-summary-grid article {
-  min-height: 128px;
-}
-
-.micro-bars {
-  display: none;
-}
-
-.calendar-day,
-.field input,
-.field select,
-.field textarea,
-.category-trigger,
-.payment-options,
-.conversion-preview,
-.transaction-search-field,
-.transaction-filter-select,
-.report-period-bar,
-.budget-period-bar {
-  box-shadow: none;
-}
-
-.calendar-day {
-  border-color: #e3e8e4;
-}
-
-.calendar-day:hover,
-.calendar-day.selected {
-  border-color: #a9b8b0;
-  box-shadow: none;
-}
-
-.primary-button {
-  box-shadow: none;
-  font-weight: 680;
-}
-
-.recurring-add-button,
-.calendar-today-button,
-.quiet-button {
-  box-shadow: none;
-}
-
-.transaction-row,
-.report-category-row,
-.report-currency-row,
-.report-merchant-list li {
-  border-color: #e5e9e6;
-}
-
-@media (max-width: 620px) {
-  .topbar,
-  .recurring-topbar,
-  .budget-topbar,
-  .report-topbar {
-    min-height: auto;
-  }
-
-  .metric-card,
-  .recurring-summary-grid article,
-  .budget-summary-grid article,
-  .report-summary-grid article {
-    min-height: 116px;
-  }
-}
-
 /* Readability and layout consistency */
 .panel,
 .metric-card,
@@ -4144,5 +4038,190 @@ body {
   .day-agenda-heading h2,
   .panel-heading h2 {
     font-size: 18px;
+  }
+}
+
+/* Minimal, light visual treatment */
+body {
+  background: var(--canvas);
+  font-weight: 400;
+}
+
+strong,
+b {
+  font-weight: 600;
+}
+
+.brand-name {
+  font-weight: 650;
+}
+
+.nav-item {
+  font-weight: 460;
+}
+
+.nav-item.active {
+  font-weight: 600;
+}
+
+.nav-section-label,
+.eyebrow {
+  font-weight: 560;
+  text-transform: none;
+}
+
+.page-title h1,
+.recurring-topbar h1,
+.budget-topbar h1,
+.report-topbar h1,
+.drawer-header h2 {
+  font-weight: 540;
+}
+
+.month-heading h2,
+.calendar-panel-heading h2,
+.day-agenda-heading h2,
+.panel-heading h2 {
+  font-weight: 600;
+}
+
+button,
+.primary-button,
+.secondary-button,
+.recurring-add-button,
+.calendar-today-button,
+.month-controls button,
+.valuation-switch button,
+.language-trigger,
+.currency-trigger {
+  font-weight: 540;
+}
+
+.field > span,
+.metric-label,
+.day-summary-cards span,
+.transaction-filter-select,
+.report-period-meta,
+.budget-period-actions > span {
+  font-weight: 520;
+}
+
+.field input,
+.field select,
+.field textarea,
+.transaction-search-field input {
+  font-weight: 400;
+}
+
+.metric-card > strong,
+.day-summary-cards strong,
+.day-entry-value,
+.original-value strong,
+.base-value strong,
+.series-value strong,
+.budget-category-balance strong,
+.report-summary-grid article > strong {
+  font-weight: 610;
+}
+
+.day-entry-copy strong,
+.transaction-name strong,
+.category-trigger-copy strong,
+.category-option > span:last-of-type,
+.series-primary > strong,
+.budget-category-copy > strong,
+.report-category-row > div > strong,
+.report-currency-row strong,
+.report-merchant-list li > div strong {
+  font-weight: 560;
+}
+
+.calendar-day-number,
+.calendar-day-totals b,
+.currency-stack span,
+.small-code,
+.series-status {
+  font-weight: 540;
+}
+
+.panel,
+.metric-card,
+.recurring-summary-grid article,
+.budget-summary-grid article,
+.report-summary-grid article,
+.recurring-list-panel,
+.budget-plan,
+.report-panel,
+.report-state {
+  border-color: var(--line);
+  box-shadow: 0 1px 2px rgba(24, 45, 38, 0.035);
+}
+
+.topbar,
+.recurring-topbar,
+.budget-topbar,
+.report-topbar {
+  min-height: 96px;
+}
+
+.metric-card,
+.recurring-summary-grid article,
+.budget-summary-grid article,
+.report-summary-grid article {
+  min-height: 128px;
+}
+
+.micro-bars {
+  display: none;
+}
+
+.calendar-day,
+.field input,
+.field select,
+.field textarea,
+.category-trigger,
+.payment-options,
+.conversion-preview,
+.transaction-search-field,
+.transaction-filter-select,
+.report-period-bar,
+.budget-period-bar,
+.primary-button,
+.recurring-add-button,
+.calendar-today-button,
+.quiet-button {
+  box-shadow: none;
+}
+
+.calendar-day {
+  border-color: #e3e8e4;
+}
+
+.calendar-day:hover,
+.calendar-day.selected {
+  border-color: #a9b8b0;
+  box-shadow: none;
+}
+
+.transaction-row,
+.report-category-row,
+.report-currency-row,
+.report-merchant-list li {
+  border-color: #e5e9e6;
+}
+
+@media (max-width: 620px) {
+  .topbar,
+  .recurring-topbar,
+  .budget-topbar,
+  .report-topbar {
+    min-height: auto;
+  }
+
+  .metric-card,
+  .recurring-summary-grid article,
+  .budget-summary-grid article,
+  .report-summary-grid article {
+    min-height: 116px;
   }
 }
