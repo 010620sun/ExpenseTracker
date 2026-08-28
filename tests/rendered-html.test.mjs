@@ -748,7 +748,7 @@ test("keeps advanced ledger controls behind clear progressive disclosure", async
   assert.match(styles, /\.payment-options/u);
 });
 
-test("uses a readable type scale across desktop and mobile", async () => {
+test("uses a readable minimalist type scale across desktop and mobile", async () => {
   const styles = await readFile(
     new URL("../app/globals.css", import.meta.url),
     "utf8",
@@ -756,8 +756,10 @@ test("uses a readable type scale across desktop and mobile", async () => {
 
   assert.match(styles, /body \{[\s\S]*?font-size: 15px;[\s\S]*?line-height: 1\.55;/u);
   assert.match(styles, /\/\* Accessible type scale \*\//u);
-  assert.match(styles, /\.nav-item \{[\s\S]*?font-size: 15px;/u);
-  assert.match(styles, /\.field input,[\s\S]*?font-size: 15px;/u);
-  assert.match(styles, /@media \(max-width: 620px\) \{[\s\S]*?body \{[\s\S]*?font-size: 16px;/u);
+  assert.match(styles, /\.nav-item \{[\s\S]*?font-size: 14px;/u);
+  assert.match(styles, /\.field input,[\s\S]*?font-size: 14px;/u);
+  assert.match(styles, /@media \(max-width: 620px\) \{[\s\S]*?body \{[\s\S]*?font-size: 15px;/u);
   assert.match(styles, /--muted: #42514c;/u);
+  assert.match(styles, /\/\* Minimal visual treatment \*\//u);
+  assert.match(styles, /\.micro-bars \{[\s\S]*?display: none;/u);
 });

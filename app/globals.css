@@ -3565,6 +3565,112 @@ a.nav-item {
   }
 }
 
+/* Minimal visual treatment */
+body {
+  background: var(--canvas);
+}
+
+.panel,
+.metric-card,
+.recurring-summary-grid article,
+.budget-summary-grid article,
+.report-summary-grid article,
+.recurring-list-panel,
+.budget-plan,
+.report-panel,
+.report-state {
+  border-color: var(--line);
+  box-shadow: 0 1px 2px rgba(24, 45, 38, 0.035);
+}
+
+.topbar,
+.recurring-topbar,
+.budget-topbar,
+.report-topbar {
+  min-height: 96px;
+}
+
+.page-title h1,
+.recurring-topbar h1,
+.budget-topbar h1,
+.report-topbar h1 {
+  font-weight: 680;
+}
+
+.eyebrow,
+.nav-section-label {
+  text-transform: none;
+}
+
+.metric-card,
+.recurring-summary-grid article,
+.budget-summary-grid article,
+.report-summary-grid article {
+  min-height: 128px;
+}
+
+.micro-bars {
+  display: none;
+}
+
+.calendar-day,
+.field input,
+.field select,
+.field textarea,
+.category-trigger,
+.payment-options,
+.conversion-preview,
+.transaction-search-field,
+.transaction-filter-select,
+.report-period-bar,
+.budget-period-bar {
+  box-shadow: none;
+}
+
+.calendar-day {
+  border-color: #e3e8e4;
+}
+
+.calendar-day:hover,
+.calendar-day.selected {
+  border-color: #a9b8b0;
+  box-shadow: none;
+}
+
+.primary-button {
+  box-shadow: none;
+  font-weight: 680;
+}
+
+.recurring-add-button,
+.calendar-today-button,
+.quiet-button {
+  box-shadow: none;
+}
+
+.transaction-row,
+.report-category-row,
+.report-currency-row,
+.report-merchant-list li {
+  border-color: #e5e9e6;
+}
+
+@media (max-width: 620px) {
+  .topbar,
+  .recurring-topbar,
+  .budget-topbar,
+  .report-topbar {
+    min-height: auto;
+  }
+
+  .metric-card,
+  .recurring-summary-grid article,
+  .budget-summary-grid article,
+  .report-summary-grid article {
+    min-height: 116px;
+  }
+}
+
 /* Readability and layout consistency */
 .panel,
 .metric-card,
@@ -3800,14 +3906,14 @@ a.nav-item {
 
 /* Accessible type scale */
 .nav-item {
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.35;
-  min-height: 48px;
+  min-height: 46px;
 }
 
 .nav-section-label {
-  font-size: 11px;
-  letter-spacing: 0.11em;
+  font-size: 12px;
+  letter-spacing: 0.07em;
 }
 
 .account-chip strong {
@@ -3821,7 +3927,7 @@ a.nav-item {
 }
 
 .page-title p {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .page-title > span,
@@ -3833,12 +3939,13 @@ a.nav-item {
 .currency-trigger,
 .primary-button,
 .secondary-button {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .eyebrow {
   font-size: 12px;
-  letter-spacing: 0.11em;
+  letter-spacing: 0.06em;
+  text-transform: none;
 }
 
 .month-controls .month-today,
@@ -3869,13 +3976,13 @@ a.nav-item {
 .calendar-panel-heading h2,
 .day-agenda-heading h2,
 .panel-heading h2 {
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .calendar-panel-heading p,
 .day-agenda-heading p,
 .panel-heading p {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -3892,7 +3999,7 @@ a.nav-item {
 .calendar-entry-preview em,
 .calendar-entry-previews small,
 .calendar-day-totals b {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .day-summary-cards span,
@@ -3956,7 +4063,7 @@ a.nav-item {
 .field select,
 .field textarea,
 .currency-option-name strong {
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .category-trigger-copy strong,
@@ -3983,7 +4090,7 @@ a.nav-item {
 .budget-plan-heading p,
 .report-panel-heading p,
 .report-empty-state p {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.55;
 }
 
@@ -4022,7 +4129,7 @@ a.nav-item {
 
 @media (max-width: 620px) {
   body {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .page-title > span {
@@ -4036,6 +4143,6 @@ a.nav-item {
   .calendar-panel-heading h2,
   .day-agenda-heading h2,
   .panel-heading h2 {
-    font-size: 19px;
+    font-size: 18px;
   }
 }

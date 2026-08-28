@@ -2942,7 +2942,6 @@ export function ExpenseTracker({
           <div className="page-title">
             <p>{firstName ? template(copy.greeting, { name: firstName }) : copy.greetingFallback}</p>
             <h1>{isTransactionsView ? copy.transactions : copy.overview}</h1>
-            <span>{isTransactionsView ? copy.transactionsSubtitle : copy.subtitle}</span>
           </div>
           <div className="topbar-actions">
             <div className="sync-state" aria-live="polite">
@@ -2971,7 +2970,6 @@ export function ExpenseTracker({
 
         <section className="month-heading" aria-labelledby="month-overview-title">
           <div className="month-heading-copy">
-            <span className="eyebrow">{isTransactionsView ? copy.transactions : copy.overview}</span>
             <div className="month-title-row">
               <h2 id="month-overview-title" aria-live="polite">{monthLabel}</h2>
               <div className="month-controls" role="group" aria-label={calendarCopy.calendar}>
