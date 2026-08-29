@@ -4,9 +4,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { LanguagePicker } from "@/components/language-picker";
+import { CategoryIcon } from "@/components/category-icon";
 import {
   categoryColor,
-  categoryGlyph,
   categoryLabel,
   categoryPathLabel,
   subcategoryLabel,
@@ -834,7 +834,7 @@ export function ReportManager({
                     const color = categoryColor(item.category);
                     return (
                       <div className="report-category-row" key={item.category}>
-                        <span className="report-category-glyph" style={{ backgroundColor: `${color}18`, color }} aria-hidden="true">{categoryGlyph(item.category)}</span>
+                        <span className="report-category-glyph" style={{ backgroundColor: `${color}18`, color }} aria-hidden="true"><CategoryIcon category={item.category} /></span>
                         <div><strong>{categoryName(item.category)}</strong><span>{formatLocalizedCount(item.transactionCount, language, "entry")}</span><div className="report-progress"><i style={{ backgroundColor: color, width: `${share}%` }} /></div></div>
                         <p><strong>{formatMoney(toBase(item.expenseUsdMinor), baseCurrency, language)}</strong><span>{copy.ofExpenses.replace("{share}", String(share))}</span></p>
                       </div>
@@ -885,7 +885,7 @@ export function ReportManager({
                     const color = categoryColor(item.category);
                     return (
                       <div className="report-subcategory-row" key={`${item.category}:${item.subcategory}`}>
-                        <span style={{ backgroundColor: `${color}18`, color }} aria-hidden="true">{categoryGlyph(item.category)}</span>
+                        <span style={{ backgroundColor: `${color}18`, color }} aria-hidden="true"><CategoryIcon category={item.category} /></span>
                         <div><strong>{subcategoryLabel(item.subcategory, language)}</strong><small>{categoryName(item.category)} · {formatLocalizedCount(item.transactionCount, language, "entry")}</small></div>
                         <p><strong>{formatMoney(toBase(item.expenseUsdMinor), baseCurrency, language)}</strong><small>{copy.ofExpenses.replace("{share}", String(share))}</small></p>
                       </div>

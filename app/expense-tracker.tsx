@@ -21,9 +21,9 @@ import {
   shiftInstallmentDate,
 } from "@/lib/installments";
 import { LanguagePicker } from "@/components/language-picker";
+import { CategoryIcon } from "@/components/category-icon";
 import {
   categoryColor,
-  categoryGlyph,
   categoryGroupLabel,
   categoryGroupsForKind,
   categoryIdsForKind,
@@ -3226,7 +3226,7 @@ export function ExpenseTracker({
                       aria-label={canModify ? template(calendarCopy.editLabel, { merchant: transaction.description }) : transaction.description}
                     >
                       <span className="transaction-glyph" style={{ backgroundColor: `${categoryColor(transaction.category)}18`, color: categoryColor(transaction.category) }} aria-hidden="true">
-                        {categoryGlyph(transaction.category)}
+                        <CategoryIcon category={transaction.category} />
                       </span>
                       <span className="day-entry-copy">
                         <strong>{transaction.description}</strong>
@@ -3326,7 +3326,7 @@ export function ExpenseTracker({
               {totals.categories.slice(0, 4).map(([item, value]) => (
                 <div className="category-row" key={item}>
                   <div className="category-name">
-                    <span style={{ backgroundColor: categoryColor(item) }}>{categoryGlyph(item)}</span>
+                    <span style={{ backgroundColor: `${categoryColor(item)}18`, color: categoryColor(item) }}><CategoryIcon category={item} /></span>
                     <strong>{categoryLabel(item, language)}</strong>
                   </div>
                   <div className="category-track" aria-hidden="true">
@@ -3422,7 +3422,7 @@ export function ExpenseTracker({
                     }}
                     aria-hidden="true"
                   >
-                    {categoryGlyph(transaction.category)}
+                    <CategoryIcon category={transaction.category} />
                   </span>
                   <div className="transaction-name">
                     <strong>{transaction.description}</strong>
@@ -3585,7 +3585,7 @@ export function ExpenseTracker({
                         }}
                         aria-hidden="true"
                       >
-                        {categoryGlyph(category)}
+                        <CategoryIcon category={category} />
                       </span>
                       <span id="selected-category-label" className="category-trigger-copy">
                         <strong>{categoryLabel(category, language)}</strong>
@@ -3629,7 +3629,7 @@ export function ExpenseTracker({
                                         style={{ backgroundColor: `${color}18`, color }}
                                         aria-hidden="true"
                                       >
-                                        {categoryGlyph(item)}
+                                        <CategoryIcon category={item} />
                                       </span>
                                       <span>{categoryLabel(item, language)}</span>
                                       {selected && <i aria-hidden="true">✓</i>}

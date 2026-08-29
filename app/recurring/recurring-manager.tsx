@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { LanguagePicker } from "@/components/language-picker";
+import { CategoryIcon } from "@/components/category-icon";
 import {
-  categoryGlyph,
   categoryGroupLabel,
   categoryGroupsForKind,
   categoryLabel,
@@ -595,7 +595,7 @@ export function RecurringManager({
                     aria-expanded={isCategoryPickerOpen}
                     onClick={() => setIsCategoryPickerOpen((open) => !open)}
                   >
-                    <span aria-hidden="true">{categoryGlyph(category)}</span>
+                    <span aria-hidden="true"><CategoryIcon category={category} /></span>
                     <strong>{categoryLabel(category, language)}</strong>
                     <i aria-hidden="true">⌄</i>
                   </button>
@@ -617,7 +617,7 @@ export function RecurringManager({
                                 setIsCategoryPickerOpen(false);
                               }}
                             >
-                              <span aria-hidden="true">{categoryGlyph(key)}</span>
+                              <span aria-hidden="true"><CategoryIcon category={key} /></span>
                               <strong>{categoryLabel(key, language)}</strong>
                               <i aria-hidden="true">{category === key ? "✓" : ""}</i>
                             </button>

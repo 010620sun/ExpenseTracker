@@ -60,12 +60,13 @@ test("pins direct Cloudflare Workers and D1 metadata", async () => {
 });
 
 test("provides grouped expense and income category pickers", async () => {
-  const [source, recurring, budgets, reports, categoriesSource, styles, schema, transactionsRoute, recurringRoute, migration] = await Promise.all([
+  const [source, recurring, budgets, reports, categoriesSource, categoryIcon, styles, schema, transactionsRoute, recurringRoute, migration] = await Promise.all([
     readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/recurring/recurring-manager.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/budgets/budget-manager.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/reports/report-manager.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/categories.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/category-icon.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/transactions/route.ts", import.meta.url), "utf8"),
@@ -93,15 +94,25 @@ test("provides grouped expense and income category pickers", async () => {
   assert.match(categoriesSource, /personal_care/u);
   assert.match(categoriesSource, /investment_income/u);
   assert.match(categoriesSource, /Record<LedgerCategoryId, CategoryDefinition>/u);
+  assert.match(categoriesSource, /glyph: CategoryGlyphName/u);
+  assert.doesNotMatch(categoriesSource, /glyph:\s*"[^"\n]*\p{Extended_Pictographic}/u);
+  assert.match(categoryIcon, /Record<CategoryGlyphName, ReactNode>/u);
+  assert.match(categoryIcon, /className="category-icon-svg"/u);
+  assert.match(categoryIcon, /strokeWidth="1\.7"/u);
   assert.match(source, /className="category-popover"/u);
+  assert.match(source, /<CategoryIcon category=\{item\}/u);
   assert.match(source, /categoryGroupsForKind\(kind\)/u);
   assert.match(source, /\n\s+category,\n/u);
   assert.match(recurring, /categoryGroupsForKind/u);
+  assert.match(recurring, /<CategoryIcon category=\{key\}/u);
   assert.match(budgets, /EXPENSE_CATEGORY_IDS/u);
+  assert.match(budgets, /<CategoryIcon category=\{category\}/u);
   assert.match(reports, /categoryColor/u);
+  assert.match(reports, /<CategoryIcon category=\{item\.category\}/u);
   assert.match(source, /role="listbox"/u);
   assert.match(styles, /\.category-option-groups/u);
   assert.match(styles, /\.category-option-grid/u);
+  assert.match(styles, /\/\* Unified category iconography \*\//u);
   assert.match(categoriesSource, /export const SUBCATEGORY_META/u);
   assert.match(categoriesSource, /export function subcategoryIdsForCategory/u);
   assert.match(categoriesSource, /export function categoryPathLabel/u);

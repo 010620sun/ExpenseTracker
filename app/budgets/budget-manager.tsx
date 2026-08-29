@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { LanguagePicker } from "@/components/language-picker";
+import { CategoryIcon } from "@/components/category-icon";
 import {
-  categoryGlyph,
+  categoryColor,
   categoryGroupLabel,
   categoryGroupsForKind,
   categoryLabel,
@@ -397,7 +398,7 @@ export function BudgetManager({
                   const progress = budgetUsdMinor > 0 ? Math.round((spentUsdMinor / budgetUsdMinor) * 100) : 0;
                   return (
                     <article className="budget-category-row" key={category}>
-                      <span className="budget-category-icon" aria-hidden="true">{categoryGlyph(category)}</span>
+                      <span className="budget-category-icon" style={{ backgroundColor: `${categoryColor(category)}18`, color: categoryColor(category) }} aria-hidden="true"><CategoryIcon category={category} /></span>
                       <div className="budget-category-copy">
                         <strong>{categoryLabel(category, language)}</strong>
                         <span>{copy.spent} {formatMoney(toBase(spentUsdMinor), baseCurrency, language)} · {budgetUsdMinor > 0 ? `${Math.max(0, progress)}% ${copy.used}` : copy.noBudget}</span>
