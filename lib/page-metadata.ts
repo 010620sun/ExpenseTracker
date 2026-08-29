@@ -8,7 +8,8 @@ export type LedgerPage =
   | "transactions"
   | "budgets"
   | "recurring"
-  | "reports";
+  | "reports"
+  | "guide";
 
 const PAGE_TITLES: Record<Language, Record<LedgerPage, string>> = {
   en: {
@@ -18,6 +19,7 @@ const PAGE_TITLES: Record<Language, Record<LedgerPage, string>> = {
     budgets: "Budgets",
     recurring: "Recurring transactions",
     reports: "Reports",
+    guide: "Guide",
   },
   ko: {
     auth: "계정",
@@ -26,6 +28,7 @@ const PAGE_TITLES: Record<Language, Record<LedgerPage, string>> = {
     budgets: "예산",
     recurring: "반복 거래",
     reports: "리포트",
+    guide: "사용 가이드",
   },
   ja: {
     auth: "アカウント",
@@ -34,6 +37,7 @@ const PAGE_TITLES: Record<Language, Record<LedgerPage, string>> = {
     budgets: "予算",
     recurring: "定期取引",
     reports: "レポート",
+    guide: "使い方ガイド",
   },
   ru: {
     auth: "Аккаунт",
@@ -42,6 +46,7 @@ const PAGE_TITLES: Record<Language, Record<LedgerPage, string>> = {
     budgets: "Бюджеты",
     recurring: "Регулярные операции",
     reports: "Отчёты",
+    guide: "Руководство",
   },
 };
 

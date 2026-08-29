@@ -21,18 +21,20 @@ test("provides login and registration", async () => {
 });
 
 test("protects member ledger pages", async () => {
-  const [dashboard, transactions, recurring, budgets, reports] = await Promise.all([
+  const [dashboard, transactions, recurring, budgets, reports, guide] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/transactions/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/recurring/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/budgets/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/reports/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/guide/page.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(dashboard, /if \(!member\) redirect\("\/auth\?return_to=\/"\)/u);
   assert.match(transactions, /if \(!member\) redirect\("\/auth\?return_to=\/transactions"\)/u);
   assert.match(recurring, /if \(!member\) redirect\("\/auth\?return_to=\/recurring"\)/u);
   assert.match(budgets, /if \(!member\) redirect\("\/auth\?return_to=\/budgets"\)/u);
   assert.match(reports, /if \(!member\) redirect\("\/auth\?return_to=\/reports"\)/u);
+  assert.match(guide, /if \(!member\) redirect\("\/auth\?return_to=\/guide"\)/u);
 });
 
 test("pins direct Cloudflare Workers and D1 metadata", async () => {
@@ -131,6 +133,7 @@ test("keeps every locale complete, grammatical, and durable", async () => {
     "app/recurring/recurring-manager.tsx",
     "app/budgets/budget-manager.tsx",
     "app/reports/report-manager.tsx",
+    "app/guide/guide-content.tsx",
   ];
   const sources = await Promise.all(
     localizedFiles.map((file) =>
@@ -455,6 +458,7 @@ test("uses one shared reliable ledger navigation", async () => {
   assert.doesNotMatch(navigation, /import Link from "next\/link"/u);
   assert.match(navigation, /<a href=\{item\.href\}/u);
   assert.match(navigation, /href: "\/reports"/u);
+  assert.match(navigation, /href: "\/guide"/u);
   assert.match(navigation, /href: "\/transactions"/u);
   assert.doesNotMatch(navigation, /setNotice\(`\$\{copy\.reports\}/u);
   assert.match(navigation, /className="ledger-mobile-nav"/u);
@@ -463,6 +467,33 @@ test("uses one shared reliable ledger navigation", async () => {
   assert.doesNotMatch(recurring, /<aside className="recurring-sidebar"/u);
   assert.doesNotMatch(budgets, /<aside className="budget-sidebar"/u);
   assert.match(styles, /\.ledger-mobile-nav/u);
+});
+
+test("provides a localized product guide with direct feature paths", async () => {
+  const [page, guide, navigation, metadata, styles] = await Promise.all([
+    readFile(new URL("../app/guide/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/guide/guide-content.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/ledger-navigation.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/page-metadata.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(page, /pageMetadata\("guide"/u);
+  assert.match(guide, /Get to know GlobeLedger/u);
+  assert.match(guide, /GlobeLedger 사용법/u);
+  assert.match(guide, /GlobeLedgerの使い方/u);
+  assert.match(guide, /Как пользоваться GlobeLedger/u);
+  assert.match(guide, /className="guide-steps"/u);
+  assert.match(guide, /className="guide-feature-grid"/u);
+  assert.match(guide, /className="guide-faq-list"/u);
+  assert.match(guide, /href: "\/budgets"/u);
+  assert.match(guide, /href: "\/reports"/u);
+  assert.match(navigation, /pathname === "\/guide"/u);
+  assert.match(navigation, /<small>\{item\.mobileLabel\}<\/small>/u);
+  assert.match(metadata, /guide: "사용 가이드"/u);
+  assert.match(styles, /\/\* Product guide \*\//u);
+  assert.match(styles, /\.guide-feature-grid/u);
+  assert.match(styles, /grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/u);
 });
 
 test("filters monthly transactions by search, kind, category, and currency", async () => {

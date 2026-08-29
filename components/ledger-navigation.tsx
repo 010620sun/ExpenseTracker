@@ -16,12 +16,20 @@ const COPY = {
   en: {
     navigation: "Primary navigation",
     overview: "Overview",
+    overviewShort: "Home",
     recurring: "Recurring transactions",
+    recurringShort: "Repeat",
     transactions: "Transactions",
+    transactionsShort: "History",
     budgets: "Budgets",
+    budgetsShort: "Budget",
     reports: "Reports",
+    reportsShort: "Reports",
+    guide: "Guide",
+    guideShort: "Guide",
     track: "Track",
     planAndReview: "Plan & review",
+    help: "Help",
     privateLedger: "Your private global ledger",
     guestName: "Global citizen",
     logout: "Log out",
@@ -29,12 +37,20 @@ const COPY = {
   ko: {
     navigation: "주요 메뉴",
     overview: "대시보드",
+    overviewShort: "홈",
     recurring: "반복 거래 관리",
+    recurringShort: "반복",
     transactions: "거래 내역",
+    transactionsShort: "거래",
     budgets: "예산 관리",
+    budgetsShort: "예산",
     reports: "리포트",
+    reportsShort: "분석",
+    guide: "사용법",
+    guideShort: "사용법",
     track: "기록",
     planAndReview: "계획 및 분석",
+    help: "도움말",
     privateLedger: "나만의 글로벌 가계부",
     guestName: "글로벌 사용자",
     logout: "로그아웃",
@@ -42,12 +58,20 @@ const COPY = {
   ja: {
     navigation: "メインナビゲーション",
     overview: "ダッシュボード",
+    overviewShort: "ホーム",
     recurring: "定期取引",
+    recurringShort: "定期",
     transactions: "取引履歴",
+    transactionsShort: "取引",
     budgets: "予算管理",
+    budgetsShort: "予算",
     reports: "レポート",
+    reportsShort: "分析",
+    guide: "使い方",
+    guideShort: "使い方",
     track: "記録",
     planAndReview: "計画と分析",
+    help: "ヘルプ",
     privateLedger: "自分だけのグローバル家計簿",
     guestName: "グローバルユーザー",
     logout: "ログアウト",
@@ -55,12 +79,20 @@ const COPY = {
   ru: {
     navigation: "Основная навигация",
     overview: "Обзор",
+    overviewShort: "Дом",
     recurring: "Регулярные операции",
+    recurringShort: "Повтор",
     transactions: "Операции",
+    transactionsShort: "Список",
     budgets: "Бюджеты",
+    budgetsShort: "Бюджет",
     reports: "Отчёты",
+    reportsShort: "Отчёт",
+    guide: "Справка",
+    guideShort: "Справка",
     track: "Учёт",
     planAndReview: "Планирование и анализ",
+    help: "Помощь",
     privateLedger: "Ваш личный глобальный учёт финансов",
     guestName: "Пользователь GlobeLedger",
     logout: "Выйти",
@@ -79,7 +111,7 @@ export function LedgerNavigation({
   initialLanguage?: Language;
 }) {
   const pathname = usePathname();
-  const isLedgerRoute = pathname === "/" || pathname === "/transactions" || pathname === "/recurring" || pathname === "/budgets" || pathname === "/reports";
+  const isLedgerRoute = pathname === "/" || pathname === "/transactions" || pathname === "/recurring" || pathname === "/budgets" || pathname === "/reports" || pathname === "/guide";
   const [language, setLanguage] = useState<Language>(initialLanguage);
   const [firstName, setFirstName] = useState<string | null>(null);
   const copy = COPY[language];
@@ -135,15 +167,18 @@ export function LedgerNavigation({
   }
 
   const trackingLinks = [
-    { href: "/", label: copy.overview, glyph: "●", active: overviewActive },
-    { href: "/transactions", label: copy.transactions, glyph: "≡", active: transactionsActive },
+    { href: "/", label: copy.overview, mobileLabel: copy.overviewShort, glyph: "●", active: overviewActive },
+    { href: "/transactions", label: copy.transactions, mobileLabel: copy.transactionsShort, glyph: "≡", active: transactionsActive },
   ];
   const planningLinks = [
-    { href: "/recurring", label: copy.recurring, glyph: "↻", active: pathname === "/recurring" },
-    { href: "/budgets", label: copy.budgets, glyph: "◎", active: pathname === "/budgets" },
-    { href: "/reports", label: copy.reports, glyph: "◫", active: pathname === "/reports" },
+    { href: "/recurring", label: copy.recurring, mobileLabel: copy.recurringShort, glyph: "↻", active: pathname === "/recurring" },
+    { href: "/budgets", label: copy.budgets, mobileLabel: copy.budgetsShort, glyph: "◎", active: pathname === "/budgets" },
+    { href: "/reports", label: copy.reports, mobileLabel: copy.reportsShort, glyph: "◫", active: pathname === "/reports" },
   ];
-  const primaryLinks = [...trackingLinks, ...planningLinks];
+  const helpLinks = [
+    { href: "/guide", label: copy.guide, mobileLabel: copy.guideShort, glyph: "?", active: pathname === "/guide" },
+  ];
+  const primaryLinks = [...trackingLinks, ...planningLinks, ...helpLinks];
 
   const renderLinks = (links: typeof primaryLinks) =>
     links.map((item) => (
@@ -169,6 +204,8 @@ export function LedgerNavigation({
           {renderLinks(trackingLinks)}
           <span className="nav-section-label">{copy.planAndReview}</span>
           {renderLinks(planningLinks)}
+          <span className="nav-section-label">{copy.help}</span>
+          {renderLinks(helpLinks)}
         </nav>
         <div className="sidebar-spacer" />
         <div className="account-chip">
@@ -183,7 +220,7 @@ export function LedgerNavigation({
       <nav className="ledger-mobile-nav" aria-label={copy.navigation}>
         {primaryLinks.map((item) => (
           <a href={item.href} className={item.active ? "active" : ""} aria-current={item.active ? "page" : undefined} key={item.href}>
-            <span aria-hidden="true">{item.glyph}</span><small>{item.label}</small>
+            <span aria-hidden="true">{item.glyph}</span><small>{item.mobileLabel}</small>
           </a>
         ))}
       </nav>
