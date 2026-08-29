@@ -18,6 +18,11 @@ test("provides login and registration", async () => {
   assert.match(screen, /나만의 가계부를 안전하게/u);
   assert.match(screen, /自分だけの家計簿を安全に/u);
   assert.match(screen, /Ваши финансы под надёжной защитой/u);
+  assert.match(
+    screen,
+    /const destination = mode === "register" \? "\/guide" : returnTo;/u,
+  );
+  assert.match(screen, /window\.location\.assign\(destination\)/u);
 });
 
 test("protects member ledger pages", async () => {

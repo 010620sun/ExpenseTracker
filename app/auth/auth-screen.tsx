@@ -199,7 +199,8 @@ export function AuthScreen({
           // Authentication succeeded; the dashboard can retry the preference.
         }
       }
-      window.location.assign(returnTo);
+      const destination = mode === "register" ? "/guide" : returnTo;
+      window.location.assign(destination);
     } catch {
       setError(copy.genericError);
     } finally {
