@@ -161,6 +161,7 @@ export function BudgetManager({
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [onboardingReturn, setOnboardingReturn] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const copy = COPY[language];
@@ -215,6 +216,13 @@ export function BudgetManager({
     document.documentElement.lang = language;
     if (languageReady) persistLanguagePreference(language);
   }, [language, languageReady]);
+
+  useEffect(() => {
+    const search = new URLSearchParams(window.location.search);
+    if (search.get("onboarding") !== "budget") return;
+    setOnboardingReturn(true);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
 
   const applyBudget = useCallback((payload: BudgetResponse, currency: string, currencyRate: number) => {
     const nextDrafts: Record<string, string> = {};
@@ -310,6 +318,9 @@ export function BudgetManager({
       if (!response.ok) throw new Error("SAVE");
       await loadMonth(month);
       setToast(copy.saved);
+      if (onboardingReturn && budgets.length > 0) {
+        window.location.assign("/guide");
+      }
     } catch (caught) {
       setError(caught instanceof Error && caught.message === "INVALID" ? copy.invalid : copy.saveFailed);
     } finally {

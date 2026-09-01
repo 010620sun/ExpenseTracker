@@ -233,6 +233,7 @@ function CurrencyPicker({
   pickerCopy,
   className = "",
   disabled = false,
+  autoOpen = false,
 }: {
   value: CurrencyCode;
   catalog: CurrencyMetadata[];
@@ -242,6 +243,7 @@ function CurrencyPicker({
   pickerCopy: CurrencyPickerCopy;
   className?: string;
   disabled?: boolean;
+  autoOpen?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -300,6 +302,12 @@ function CurrencyPicker({
   const selected =
     currencies.find((currency) => currency.metadata.code === value) ??
     currencies[0];
+
+  useEffect(() => {
+    if (!autoOpen || disabled) return;
+    const frame = window.requestAnimationFrame(() => setIsOpen(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [autoOpen, disabled]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1576,6 +1584,8 @@ export function ExpenseTracker({
   const [viewMonth, setViewMonth] = useState(today.slice(0, 7));
   const [selectedDate, setSelectedDate] = useState(today);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [baseCurrencyOnboarding, setBaseCurrencyOnboarding] = useState(false);
+  const [transactionOnboarding, setTransactionOnboarding] = useState(false);
   const [editingTransaction, setEditingTransaction] =
     useState<LedgerTransaction | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -2421,15 +2431,20 @@ export function ExpenseTracker({
         body: JSON.stringify(preference),
       });
       if (!response.ok) throw new Error("PREFERENCE_SAVE_FAILED");
+      return true;
     } catch {
       // The selected value remains active for this session and will be retried
       // the next time the member changes or uses a currency.
+      return false;
     }
   }
 
   function chooseBaseCurrency(nextCurrency: CurrencyCode) {
     setBaseCurrency(nextCurrency);
-    void saveCurrencyPreference({ baseCurrency: nextCurrency });
+    void (async () => {
+      const saved = await saveCurrencyPreference({ baseCurrency: nextCurrency });
+      if (saved && baseCurrencyOnboarding) window.location.assign("/guide");
+    })();
   }
 
   function chooseLanguage(nextLanguage: Language) {
@@ -2472,9 +2487,16 @@ export function ExpenseTracker({
 
   useEffect(() => {
     const search = new URLSearchParams(window.location.search);
-    if (search.get("new") !== "recurring") return;
+    const newItem = search.get("new");
+    const onboarding = search.get("onboarding");
+    if (newItem !== "recurring" && newItem !== "transaction" && onboarding !== "currency") return;
     const frame = window.requestAnimationFrame(() => {
-      openRecurringDrawer(currentDate);
+      if (newItem === "recurring") openRecurringDrawer(currentDate);
+      if (newItem === "transaction") {
+        setTransactionOnboarding(onboarding === "transaction");
+        openAddDrawer(currentDate);
+      }
+      if (onboarding === "currency") setBaseCurrencyOnboarding(true);
       window.history.replaceState(null, "", window.location.pathname);
     });
     return () => window.cancelAnimationFrame(frame);
@@ -2772,6 +2794,9 @@ export function ExpenseTracker({
       isSavingRef.current = false;
       setIsSaving(false);
       closeDrawer();
+      if (!editingTransaction && transactionOnboarding) {
+        window.location.assign("/guide");
+      }
     } catch (error) {
       setFormError(
         error instanceof Error
@@ -2961,6 +2986,7 @@ export function ExpenseTracker({
               language={language}
               label={copy.baseCurrency}
               pickerCopy={currencyPickerCopy}
+              autoOpen={baseCurrencyOnboarding}
             />
             <button className="primary-button desktop-add" onClick={() => openAddDrawer()} ref={addButtonRef}>
               <span aria-hidden="true">＋</span> {copy.addExpense}

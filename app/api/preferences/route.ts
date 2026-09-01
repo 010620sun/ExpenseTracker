@@ -33,13 +33,27 @@ export async function GET(request: Request) {
     const rows = await state.db
       .select({
         baseCurrency: userStates.baseCurrency,
+        baseCurrencyConfiguredAtMs: userStates.baseCurrencyConfiguredAtMs,
         lastTransactionCurrency: userStates.lastTransactionCurrency,
         language: userStates.language,
       })
       .from(userStates)
       .where(eq(userStates.ownerId, state.ownerId))
       .limit(1);
-    return Response.json({ data: rows[0] }, { headers: NO_STORE_HEADERS });
+    const row = rows[0];
+    return Response.json(
+      {
+        data: row
+          ? {
+              baseCurrency: row.baseCurrency,
+              baseCurrencyConfigured: row.baseCurrencyConfiguredAtMs !== null,
+              lastTransactionCurrency: row.lastTransactionCurrency,
+              language: row.language,
+            }
+          : undefined,
+      },
+      { headers: NO_STORE_HEADERS },
+    );
   } catch (error) {
     console.error("[preferences] GET failed", error);
     return authError("INTERNAL_ERROR", 500);
@@ -56,6 +70,7 @@ export async function PATCH(request: Request) {
 
     const updates: {
       baseCurrency?: string;
+      baseCurrencyConfiguredAtMs?: number;
       lastTransactionCurrency?: string;
       language?: "en" | "ko" | "ja" | "ru";
     } = {};
@@ -64,6 +79,7 @@ export async function PATCH(request: Request) {
         return authError("INVALID_CURRENCY", 400, "baseCurrency");
       }
       updates.baseCurrency = body.baseCurrency;
+      updates.baseCurrencyConfiguredAtMs = Date.now();
     }
     if (body.lastTransactionCurrency !== undefined) {
       if (!isCurrencyCode(body.lastTransactionCurrency)) {
@@ -91,10 +107,24 @@ export async function PATCH(request: Request) {
       .where(eq(userStates.ownerId, state.ownerId))
       .returning({
         baseCurrency: userStates.baseCurrency,
+        baseCurrencyConfiguredAtMs: userStates.baseCurrencyConfiguredAtMs,
         lastTransactionCurrency: userStates.lastTransactionCurrency,
         language: userStates.language,
       });
-    return Response.json({ data: rows[0] }, { headers: NO_STORE_HEADERS });
+    const row = rows[0];
+    return Response.json(
+      {
+        data: row
+          ? {
+              baseCurrency: row.baseCurrency,
+              baseCurrencyConfigured: row.baseCurrencyConfiguredAtMs !== null,
+              lastTransactionCurrency: row.lastTransactionCurrency,
+              language: row.language,
+            }
+          : undefined,
+      },
+      { headers: NO_STORE_HEADERS },
+    );
   } catch (error) {
     console.error("[preferences] PATCH failed", error);
     return authError("INTERNAL_ERROR", 500);

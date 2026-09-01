@@ -1,0 +1,1298 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "daee0c80-16eb-4f12-b58b-cd616219f93d",
+  "prevId": "9e0ecf93-81d8-43e4-98a3-69620e1d8e2b",
+  "tables": {
+    "auth_rate_limits": {
+      "name": "auth_rate_limits",
+      "columns": {
+        "key_hash": {
+          "name": "key_hash",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "window_started_at_ms": {
+          "name": "window_started_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "blocked_until_ms": {
+          "name": "blocked_until_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updated_at_ms": {
+          "name": "updated_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "auth_rate_limits_key_hash_length": {
+          "name": "auth_rate_limits_key_hash_length",
+          "value": "length(\"auth_rate_limits\".\"key_hash\") BETWEEN 32 AND 128"
+        },
+        "auth_rate_limits_attempts": {
+          "name": "auth_rate_limits_attempts",
+          "value": "\"auth_rate_limits\".\"attempts\" BETWEEN 0 AND 100"
+        },
+        "auth_rate_limits_timestamps": {
+          "name": "auth_rate_limits_timestamps",
+          "value": "\"auth_rate_limits\".\"window_started_at_ms\" > 0 AND \"auth_rate_limits\".\"updated_at_ms\" >= \"auth_rate_limits\".\"window_started_at_ms\" AND (\"auth_rate_limits\".\"blocked_until_ms\" IS NULL OR \"auth_rate_limits\".\"blocked_until_ms\" > \"auth_rate_limits\".\"window_started_at_ms\")"
+        }
+      }
+    },
+    "auth_sessions": {
+      "name": "auth_sessions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at_ms": {
+          "name": "expires_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at_ms": {
+          "name": "created_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_seen_at_ms": {
+          "name": "last_seen_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_auth_sessions_token_hash": {
+          "name": "uq_auth_sessions_token_hash",
+          "columns": [
+            "token_hash"
+          ],
+          "isUnique": true
+        },
+        "idx_auth_sessions_member_expires": {
+          "name": "idx_auth_sessions_member_expires",
+          "columns": [
+            "member_id",
+            "expires_at_ms"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "auth_sessions_member_id_members_id_fk": {
+          "name": "auth_sessions_member_id_members_id_fk",
+          "tableFrom": "auth_sessions",
+          "tableTo": "members",
+          "columnsFrom": [
+            "member_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "auth_sessions_id_length": {
+          "name": "auth_sessions_id_length",
+          "value": "length(\"auth_sessions\".\"id\") BETWEEN 1 AND 64"
+        },
+        "auth_sessions_token_hash_length": {
+          "name": "auth_sessions_token_hash_length",
+          "value": "length(\"auth_sessions\".\"token_hash\") BETWEEN 32 AND 128"
+        },
+        "auth_sessions_timestamps": {
+          "name": "auth_sessions_timestamps",
+          "value": "\"auth_sessions\".\"created_at_ms\" > 0 AND \"auth_sessions\".\"last_seen_at_ms\" >= \"auth_sessions\".\"created_at_ms\" AND \"auth_sessions\".\"expires_at_ms\" > \"auth_sessions\".\"created_at_ms\""
+        }
+      }
+    },
+    "exchange_rate_cache": {
+      "name": "exchange_rate_cache",
+      "columns": {
+        "quote_currency": {
+          "name": "quote_currency",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "base_currency": {
+          "name": "base_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'USD'"
+        },
+        "usd_per_unit": {
+          "name": "usd_per_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rate_date": {
+          "name": "rate_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fetched_at_ms": {
+          "name": "fetched_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'frankfurter'"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "exchange_rate_cache_quote_shape": {
+          "name": "exchange_rate_cache_quote_shape",
+          "value": "length(\"exchange_rate_cache\".\"quote_currency\") = 3 AND \"exchange_rate_cache\".\"quote_currency\" = upper(\"exchange_rate_cache\".\"quote_currency\")"
+        },
+        "exchange_rate_cache_base_usd": {
+          "name": "exchange_rate_cache_base_usd",
+          "value": "\"exchange_rate_cache\".\"base_currency\" = 'USD'"
+        },
+        "exchange_rate_cache_rate_length": {
+          "name": "exchange_rate_cache_rate_length",
+          "value": "length(\"exchange_rate_cache\".\"usd_per_unit\") BETWEEN 1 AND 32"
+        },
+        "exchange_rate_cache_rate_date_shape": {
+          "name": "exchange_rate_cache_rate_date_shape",
+          "value": "length(\"exchange_rate_cache\".\"rate_date\") = 10 AND \"exchange_rate_cache\".\"rate_date\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'"
+        },
+        "exchange_rate_cache_fetched_at_positive": {
+          "name": "exchange_rate_cache_fetched_at_positive",
+          "value": "\"exchange_rate_cache\".\"fetched_at_ms\" > 0"
+        },
+        "exchange_rate_cache_source": {
+          "name": "exchange_rate_cache_source",
+          "value": "\"exchange_rate_cache\".\"source\" = 'frankfurter'"
+        }
+      }
+    },
+    "exchange_rate_snapshots": {
+      "name": "exchange_rate_snapshots",
+      "columns": {
+        "snapshot_id": {
+          "name": "snapshot_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quote_currency": {
+          "name": "quote_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "base_currency": {
+          "name": "base_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'USD'"
+        },
+        "usd_per_unit": {
+          "name": "usd_per_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rate_date": {
+          "name": "rate_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fetched_at_ms": {
+          "name": "fetched_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'frankfurter'"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "exchange_rate_snapshots_id": {
+          "name": "exchange_rate_snapshots_id",
+          "value": "length(\"exchange_rate_snapshots\".\"snapshot_id\") BETWEEN 1 AND 64 AND \"exchange_rate_snapshots\".\"snapshot_id\" = \"exchange_rate_snapshots\".\"quote_currency\" || ':' || \"exchange_rate_snapshots\".\"rate_date\" || ':' || \"exchange_rate_snapshots\".\"usd_per_unit\""
+        },
+        "exchange_rate_snapshots_quote_shape": {
+          "name": "exchange_rate_snapshots_quote_shape",
+          "value": "length(\"exchange_rate_snapshots\".\"quote_currency\") = 3 AND \"exchange_rate_snapshots\".\"quote_currency\" = upper(\"exchange_rate_snapshots\".\"quote_currency\")"
+        },
+        "exchange_rate_snapshots_base_usd": {
+          "name": "exchange_rate_snapshots_base_usd",
+          "value": "\"exchange_rate_snapshots\".\"base_currency\" = 'USD'"
+        },
+        "exchange_rate_snapshots_rate_length": {
+          "name": "exchange_rate_snapshots_rate_length",
+          "value": "length(\"exchange_rate_snapshots\".\"usd_per_unit\") BETWEEN 1 AND 32"
+        },
+        "exchange_rate_snapshots_rate_date_shape": {
+          "name": "exchange_rate_snapshots_rate_date_shape",
+          "value": "length(\"exchange_rate_snapshots\".\"rate_date\") = 10 AND \"exchange_rate_snapshots\".\"rate_date\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'"
+        },
+        "exchange_rate_snapshots_fetched_at_positive": {
+          "name": "exchange_rate_snapshots_fetched_at_positive",
+          "value": "\"exchange_rate_snapshots\".\"fetched_at_ms\" > 0"
+        },
+        "exchange_rate_snapshots_source": {
+          "name": "exchange_rate_snapshots_source",
+          "value": "\"exchange_rate_snapshots\".\"source\" = 'frankfurter'"
+        }
+      }
+    },
+    "members": {
+      "name": "members",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "password_salt": {
+          "name": "password_salt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "password_iterations": {
+          "name": "password_iterations",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at_ms": {
+          "name": "created_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at_ms": {
+          "name": "updated_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_members_email": {
+          "name": "uq_members_email",
+          "columns": [
+            "email"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "members_id_length": {
+          "name": "members_id_length",
+          "value": "length(\"members\".\"id\") BETWEEN 1 AND 64"
+        },
+        "members_email_shape": {
+          "name": "members_email_shape",
+          "value": "length(\"members\".\"email\") BETWEEN 3 AND 254 AND \"members\".\"email\" = lower(\"members\".\"email\") AND instr(\"members\".\"email\", '@') > 1"
+        },
+        "members_display_name_length": {
+          "name": "members_display_name_length",
+          "value": "length(\"members\".\"display_name\") BETWEEN 1 AND 80"
+        },
+        "members_password_material": {
+          "name": "members_password_material",
+          "value": "length(\"members\".\"password_hash\") BETWEEN 32 AND 128 AND length(\"members\".\"password_salt\") BETWEEN 16 AND 64 AND \"members\".\"password_iterations\" BETWEEN 100000 AND 1000000"
+        },
+        "members_timestamps": {
+          "name": "members_timestamps",
+          "value": "\"members\".\"created_at_ms\" > 0 AND \"members\".\"updated_at_ms\" >= \"members\".\"created_at_ms\""
+        }
+      }
+    },
+    "monthly_budgets": {
+      "name": "monthly_budgets",
+      "columns": {
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "month": {
+          "name": "month",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "amount_usd_minor": {
+          "name": "amount_usd_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at_ms": {
+          "name": "created_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at_ms": {
+          "name": "updated_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_monthly_budgets_owner_month": {
+          "name": "idx_monthly_budgets_owner_month",
+          "columns": [
+            "owner_id",
+            "month"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "monthly_budgets_owner_id_user_states_owner_id_fk": {
+          "name": "monthly_budgets_owner_id_user_states_owner_id_fk",
+          "tableFrom": "monthly_budgets",
+          "tableTo": "user_states",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "owner_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "monthly_budgets_owner_id_month_category_pk": {
+          "columns": [
+            "owner_id",
+            "month",
+            "category"
+          ],
+          "name": "monthly_budgets_owner_id_month_category_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "monthly_budgets_month_shape": {
+          "name": "monthly_budgets_month_shape",
+          "value": "length(\"monthly_budgets\".\"month\") = 7 AND \"monthly_budgets\".\"month\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]'"
+        },
+        "monthly_budgets_category_supported": {
+          "name": "monthly_budgets_category_supported",
+          "value": "\"monthly_budgets\".\"category\" IN ('housing', 'utilities', 'communication', 'groceries', 'dining', 'transport', 'vehicle', 'travel', 'health', 'personal_care', 'education', 'shopping', 'entertainment', 'subscriptions', 'family', 'pets', 'gifts', 'insurance', 'taxes', 'financial', 'other')"
+        },
+        "monthly_budgets_amount_range": {
+          "name": "monthly_budgets_amount_range",
+          "value": "\"monthly_budgets\".\"amount_usd_minor\" > 0 AND \"monthly_budgets\".\"amount_usd_minor\" <= 9000000000000"
+        },
+        "monthly_budgets_timestamps": {
+          "name": "monthly_budgets_timestamps",
+          "value": "\"monthly_budgets\".\"created_at_ms\" > 0 AND \"monthly_budgets\".\"updated_at_ms\" >= \"monthly_budgets\".\"created_at_ms\""
+        }
+      }
+    },
+    "recurring_exceptions": {
+      "name": "recurring_exceptions",
+      "columns": {
+        "series_id": {
+          "name": "series_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "occurrence_on": {
+          "name": "occurrence_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at_ms": {
+          "name": "created_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_recurring_exceptions_series_occurrence": {
+          "name": "uq_recurring_exceptions_series_occurrence",
+          "columns": [
+            "series_id",
+            "occurrence_on"
+          ],
+          "isUnique": true
+        },
+        "idx_recurring_exceptions_owner_occurrence": {
+          "name": "idx_recurring_exceptions_owner_occurrence",
+          "columns": [
+            "owner_id",
+            "occurrence_on"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "recurring_exceptions_series_id_recurring_series_id_fk": {
+          "name": "recurring_exceptions_series_id_recurring_series_id_fk",
+          "tableFrom": "recurring_exceptions",
+          "tableTo": "recurring_series",
+          "columnsFrom": [
+            "series_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "recurring_exceptions_owner_id_user_states_owner_id_fk": {
+          "name": "recurring_exceptions_owner_id_user_states_owner_id_fk",
+          "tableFrom": "recurring_exceptions",
+          "tableTo": "user_states",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "owner_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "recurring_exceptions_date": {
+          "name": "recurring_exceptions_date",
+          "value": "length(\"recurring_exceptions\".\"occurrence_on\") = 10 AND \"recurring_exceptions\".\"occurrence_on\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'"
+        },
+        "recurring_exceptions_created_at": {
+          "name": "recurring_exceptions_created_at",
+          "value": "\"recurring_exceptions\".\"created_at_ms\" > 0"
+        }
+      }
+    },
+    "recurring_series": {
+      "name": "recurring_series",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "start_on": {
+          "name": "start_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "frequency": {
+          "name": "frequency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ends_on": {
+          "name": "ends_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "paused_at_ms": {
+          "name": "paused_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "original_amount_minor": {
+          "name": "original_amount_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "original_currency": {
+          "name": "original_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "original_currency_exponent": {
+          "name": "original_currency_exponent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fallback_fx_rate": {
+          "name": "fallback_fx_rate",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fallback_fx_source": {
+          "name": "fallback_fx_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fallback_fx_rate_date": {
+          "name": "fallback_fx_rate_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'other'"
+        },
+        "subcategory": {
+          "name": "subcategory",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "created_at_ms": {
+          "name": "created_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at_ms": {
+          "name": "updated_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_recurring_series_owner_dates": {
+          "name": "idx_recurring_series_owner_dates",
+          "columns": [
+            "owner_id",
+            "start_on",
+            "ends_on"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "recurring_series_owner_id_user_states_owner_id_fk": {
+          "name": "recurring_series_owner_id_user_states_owner_id_fk",
+          "tableFrom": "recurring_series",
+          "tableTo": "user_states",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "owner_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "recurring_series_id_length": {
+          "name": "recurring_series_id_length",
+          "value": "length(\"recurring_series\".\"id\") BETWEEN 1 AND 64"
+        },
+        "recurring_series_kind": {
+          "name": "recurring_series_kind",
+          "value": "\"recurring_series\".\"kind\" IN ('expense', 'income')"
+        },
+        "recurring_series_dates": {
+          "name": "recurring_series_dates",
+          "value": "length(\"recurring_series\".\"start_on\") = 10 AND \"recurring_series\".\"start_on\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' AND (\"recurring_series\".\"ends_on\" IS NULL OR (\"recurring_series\".\"ends_on\" >= \"recurring_series\".\"start_on\" AND length(\"recurring_series\".\"ends_on\") = 10 AND \"recurring_series\".\"ends_on\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'))"
+        },
+        "recurring_series_frequency": {
+          "name": "recurring_series_frequency",
+          "value": "\"recurring_series\".\"frequency\" IN ('weekly', 'monthly', 'yearly')"
+        },
+        "recurring_series_amount_range": {
+          "name": "recurring_series_amount_range",
+          "value": "\"recurring_series\".\"original_amount_minor\" > 0 AND \"recurring_series\".\"original_amount_minor\" <= 9000000000000"
+        },
+        "recurring_series_currency": {
+          "name": "recurring_series_currency",
+          "value": "length(\"recurring_series\".\"original_currency\") = 3 AND \"recurring_series\".\"original_currency\" = upper(\"recurring_series\".\"original_currency\") AND \"recurring_series\".\"original_currency_exponent\" BETWEEN 0 AND 4"
+        },
+        "recurring_series_fx": {
+          "name": "recurring_series_fx",
+          "value": "length(\"recurring_series\".\"fallback_fx_rate\") BETWEEN 1 AND 32 AND ((\"recurring_series\".\"fallback_fx_source\" = 'frankfurter' AND \"recurring_series\".\"fallback_fx_rate_date\" IS NOT NULL) OR (\"recurring_series\".\"fallback_fx_source\" <> 'frankfurter' AND \"recurring_series\".\"fallback_fx_rate_date\" IS NULL))"
+        },
+        "recurring_series_text": {
+          "name": "recurring_series_text",
+          "value": "length(\"recurring_series\".\"category\") BETWEEN 1 AND 40 AND length(\"recurring_series\".\"description\") BETWEEN 1 AND 120 AND length(\"recurring_series\".\"note\") <= 500"
+        },
+        "recurring_series_timestamps": {
+          "name": "recurring_series_timestamps",
+          "value": "\"recurring_series\".\"created_at_ms\" > 0 AND \"recurring_series\".\"updated_at_ms\" >= \"recurring_series\".\"created_at_ms\" AND (\"recurring_series\".\"paused_at_ms\" IS NULL OR \"recurring_series\".\"paused_at_ms\" > 0)"
+        }
+      }
+    },
+    "transactions": {
+      "name": "transactions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "occurred_on": {
+          "name": "occurred_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "original_amount_minor": {
+          "name": "original_amount_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "original_currency": {
+          "name": "original_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "original_currency_exponent": {
+          "name": "original_currency_exponent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fx_rate": {
+          "name": "fx_rate",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fx_source": {
+          "name": "fx_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fx_rate_date": {
+          "name": "fx_rate_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "fx_captured_at_ms": {
+          "name": "fx_captured_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "base_amount_minor": {
+          "name": "base_amount_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "base_currency": {
+          "name": "base_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'USD'"
+        },
+        "base_currency_exponent": {
+          "name": "base_currency_exponent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 2
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'other'"
+        },
+        "subcategory": {
+          "name": "subcategory",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "recurring_series_id": {
+          "name": "recurring_series_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "recurrence_date": {
+          "name": "recurrence_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "split_group_id": {
+          "name": "split_group_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "split_index": {
+          "name": "split_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "split_count": {
+          "name": "split_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "installment_group_id": {
+          "name": "installment_group_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "installment_index": {
+          "name": "installment_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "installment_count": {
+          "name": "installment_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "installment_total_original_minor": {
+          "name": "installment_total_original_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "client_request_id": {
+          "name": "client_request_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at_ms": {
+          "name": "created_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at_ms": {
+          "name": "updated_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_transactions_owner_occurred": {
+          "name": "idx_transactions_owner_occurred",
+          "columns": [
+            "owner_id",
+            "occurred_on",
+            "created_at_ms",
+            "id"
+          ],
+          "isUnique": false
+        },
+        "uq_transactions_owner_client_request": {
+          "name": "uq_transactions_owner_client_request",
+          "columns": [
+            "owner_id",
+            "client_request_id"
+          ],
+          "isUnique": true,
+          "where": "\"transactions\".\"client_request_id\" IS NOT NULL"
+        },
+        "uq_transactions_recurring_occurrence": {
+          "name": "uq_transactions_recurring_occurrence",
+          "columns": [
+            "owner_id",
+            "recurring_series_id",
+            "recurrence_date"
+          ],
+          "isUnique": true,
+          "where": "\"transactions\".\"recurring_series_id\" IS NOT NULL"
+        },
+        "idx_transactions_owner_split_group": {
+          "name": "idx_transactions_owner_split_group",
+          "columns": [
+            "owner_id",
+            "split_group_id"
+          ],
+          "isUnique": false
+        },
+        "idx_transactions_owner_installment_group": {
+          "name": "idx_transactions_owner_installment_group",
+          "columns": [
+            "owner_id",
+            "installment_group_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "transactions_owner_id_user_states_owner_id_fk": {
+          "name": "transactions_owner_id_user_states_owner_id_fk",
+          "tableFrom": "transactions",
+          "tableTo": "user_states",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "owner_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "transactions_recurring_series_id_recurring_series_id_fk": {
+          "name": "transactions_recurring_series_id_recurring_series_id_fk",
+          "tableFrom": "transactions",
+          "tableTo": "recurring_series",
+          "columnsFrom": [
+            "recurring_series_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "transactions_id_length": {
+          "name": "transactions_id_length",
+          "value": "length(\"transactions\".\"id\") BETWEEN 1 AND 64"
+        },
+        "transactions_kind": {
+          "name": "transactions_kind",
+          "value": "\"transactions\".\"kind\" IN ('expense', 'income')"
+        },
+        "transactions_occurred_on_shape": {
+          "name": "transactions_occurred_on_shape",
+          "value": "length(\"transactions\".\"occurred_on\") = 10 AND \"transactions\".\"occurred_on\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'"
+        },
+        "transactions_original_amount_range": {
+          "name": "transactions_original_amount_range",
+          "value": "\"transactions\".\"original_amount_minor\" > 0 AND \"transactions\".\"original_amount_minor\" <= 9000000000000"
+        },
+        "transactions_base_amount_range": {
+          "name": "transactions_base_amount_range",
+          "value": "\"transactions\".\"base_amount_minor\" >= 0 AND \"transactions\".\"base_amount_minor\" <= 9000000000000"
+        },
+        "transactions_original_currency_shape": {
+          "name": "transactions_original_currency_shape",
+          "value": "length(\"transactions\".\"original_currency\") = 3 AND \"transactions\".\"original_currency\" = upper(\"transactions\".\"original_currency\")"
+        },
+        "transactions_original_exponent_range": {
+          "name": "transactions_original_exponent_range",
+          "value": "\"transactions\".\"original_currency_exponent\" BETWEEN 0 AND 4"
+        },
+        "transactions_fx_rate_length": {
+          "name": "transactions_fx_rate_length",
+          "value": "length(\"transactions\".\"fx_rate\") BETWEEN 1 AND 32"
+        },
+        "transactions_fx_source": {
+          "name": "transactions_fx_source",
+          "value": "\"transactions\".\"fx_source\" IN ('identity', 'manual', 'sample', 'frankfurter')"
+        },
+        "transactions_fx_rate_date_shape": {
+          "name": "transactions_fx_rate_date_shape",
+          "value": "\"transactions\".\"fx_rate_date\" IS NULL OR (length(\"transactions\".\"fx_rate_date\") = 10 AND \"transactions\".\"fx_rate_date\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')"
+        },
+        "transactions_fx_provenance": {
+          "name": "transactions_fx_provenance",
+          "value": "(\"transactions\".\"fx_source\" = 'frankfurter' AND \"transactions\".\"fx_rate_date\" IS NOT NULL) OR (\"transactions\".\"fx_source\" <> 'frankfurter' AND \"transactions\".\"fx_rate_date\" IS NULL)"
+        },
+        "transactions_timestamps_positive": {
+          "name": "transactions_timestamps_positive",
+          "value": "\"transactions\".\"fx_captured_at_ms\" > 0 AND \"transactions\".\"created_at_ms\" > 0 AND \"transactions\".\"updated_at_ms\" >= \"transactions\".\"created_at_ms\""
+        },
+        "transactions_base_currency_usd": {
+          "name": "transactions_base_currency_usd",
+          "value": "\"transactions\".\"base_currency\" = 'USD' AND \"transactions\".\"base_currency_exponent\" = 2"
+        },
+        "transactions_identity_conversion": {
+          "name": "transactions_identity_conversion",
+          "value": "(\"transactions\".\"original_currency\" = 'USD' AND \"transactions\".\"fx_source\" = 'identity' AND \"transactions\".\"fx_rate\" = '1' AND \"transactions\".\"original_amount_minor\" = \"transactions\".\"base_amount_minor\") OR (\"transactions\".\"original_currency\" <> 'USD' AND \"transactions\".\"fx_source\" <> 'identity')"
+        },
+        "transactions_category_length": {
+          "name": "transactions_category_length",
+          "value": "length(\"transactions\".\"category\") BETWEEN 1 AND 40"
+        },
+        "transactions_description_length": {
+          "name": "transactions_description_length",
+          "value": "length(\"transactions\".\"description\") BETWEEN 1 AND 120"
+        },
+        "transactions_note_length": {
+          "name": "transactions_note_length",
+          "value": "length(\"transactions\".\"note\") <= 500"
+        },
+        "transactions_recurrence": {
+          "name": "transactions_recurrence",
+          "value": "(\"transactions\".\"recurring_series_id\" IS NULL AND \"transactions\".\"recurrence_date\" IS NULL) OR (\"transactions\".\"recurring_series_id\" IS NOT NULL AND length(\"transactions\".\"recurrence_date\") = 10 AND \"transactions\".\"recurrence_date\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')"
+        },
+        "transactions_split_shape": {
+          "name": "transactions_split_shape",
+          "value": "(\"transactions\".\"split_group_id\" IS NULL AND \"transactions\".\"split_index\" IS NULL AND \"transactions\".\"split_count\" IS NULL) OR (\"transactions\".\"split_group_id\" IS NOT NULL AND length(\"transactions\".\"split_group_id\") BETWEEN 1 AND 64 AND \"transactions\".\"split_index\" BETWEEN 0 AND \"transactions\".\"split_count\" - 1 AND \"transactions\".\"split_count\" BETWEEN 2 AND 365)"
+        },
+        "transactions_client_request_id_length": {
+          "name": "transactions_client_request_id_length",
+          "value": "\"transactions\".\"client_request_id\" IS NULL OR length(\"transactions\".\"client_request_id\") BETWEEN 1 AND 64"
+        }
+      }
+    },
+    "user_states": {
+      "name": "user_states",
+      "columns": {
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "samples_seeded_at_ms": {
+          "name": "samples_seeded_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "base_currency": {
+          "name": "base_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'USD'"
+        },
+        "base_currency_configured_at_ms": {
+          "name": "base_currency_configured_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "last_transaction_currency": {
+          "name": "last_transaction_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'KRW'"
+        },
+        "language": {
+          "name": "language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'en'"
+        },
+        "created_at_ms": {
+          "name": "created_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "user_states_owner_id_length": {
+          "name": "user_states_owner_id_length",
+          "value": "length(\"user_states\".\"owner_id\") BETWEEN 1 AND 255"
+        },
+        "user_states_created_at_positive": {
+          "name": "user_states_created_at_positive",
+          "value": "\"user_states\".\"created_at_ms\" > 0"
+        },
+        "user_states_base_currency_configured_at_positive": {
+          "name": "user_states_base_currency_configured_at_positive",
+          "value": "\"user_states\".\"base_currency_configured_at_ms\" IS NULL OR \"user_states\".\"base_currency_configured_at_ms\" > 0"
+        },
+        "user_states_base_currency_shape": {
+          "name": "user_states_base_currency_shape",
+          "value": "length(\"user_states\".\"base_currency\") = 3 AND \"user_states\".\"base_currency\" = upper(\"user_states\".\"base_currency\")"
+        },
+        "user_states_transaction_currency_shape": {
+          "name": "user_states_transaction_currency_shape",
+          "value": "length(\"user_states\".\"last_transaction_currency\") = 3 AND \"user_states\".\"last_transaction_currency\" = upper(\"user_states\".\"last_transaction_currency\")"
+        },
+        "user_states_language_supported": {
+          "name": "user_states_language_supported",
+          "value": "\"user_states\".\"language\" IN ('en', 'ko', 'ja', 'ru')"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

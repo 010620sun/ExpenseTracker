@@ -512,6 +512,40 @@ test("provides a localized product guide with direct feature paths", async () =>
   assert.match(styles, /grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/u);
 });
 
+test("tracks and guides the three account onboarding steps", async () => {
+  const [guide, onboardingRoute, preferencesRoute, tracker, budgets, schema, migration, styles] =
+    await Promise.all([
+      readFile(new URL("../app/guide/guide-content.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/api/onboarding/route.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/api/preferences/route.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/budgets/budget-manager.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+      readFile(new URL("../drizzle/0013_flimsy_franklin_storm.sql", import.meta.url), "utf8"),
+      readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    ]);
+
+  assert.match(onboardingRoute, /memberFromRequest/u);
+  assert.match(onboardingRoute, /eq\(transactions\.ownerId, member\.id\)/u);
+  assert.match(onboardingRoute, /eq\(monthlyBudgets\.ownerId, member\.id\)/u);
+  assert.match(onboardingRoute, /completed: completedCount === 3/u);
+  assert.match(schema, /baseCurrencyConfiguredAtMs: integer\("base_currency_configured_at_ms"\)/u);
+  assert.match(preferencesRoute, /updates\.baseCurrencyConfiguredAtMs = Date\.now\(\)/u);
+  assert.match(migration, /"base_currency", NULL, "last_transaction_currency"/u);
+  assert.match(guide, /fetch\("\/api\/onboarding"/u);
+  assert.match(guide, /role="progressbar"/u);
+  assert.match(guide, /\/\?onboarding=currency/u);
+  assert.match(guide, /\/\?new=transaction&onboarding=transaction/u);
+  assert.match(guide, /\/budgets\?onboarding=budget/u);
+  assert.match(tracker, /autoOpen=\{baseCurrencyOnboarding\}/u);
+  assert.match(tracker, /setTransactionOnboarding\(onboarding === "transaction"\)/u);
+  assert.match(tracker, /window\.location\.assign\("\/guide"\)/u);
+  assert.match(budgets, /search\.get\("onboarding"\) !== "budget"/u);
+  assert.match(budgets, /onboardingReturn && budgets\.length > 0/u);
+  assert.match(styles, /\.onboarding-progress-track/u);
+  assert.match(styles, /\.onboarding-complete-card/u);
+});
+
 test("filters monthly transactions by search, kind, category, and currency", async () => {
   const [tracker, styles] = await Promise.all([
     readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),

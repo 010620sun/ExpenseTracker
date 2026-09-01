@@ -104,6 +104,7 @@ export const userStates = sqliteTable(
     ownerId: text("owner_id").primaryKey(),
     samplesSeededAtMs: integer("samples_seeded_at_ms"),
     baseCurrency: text("base_currency").notNull().default("USD"),
+    baseCurrencyConfiguredAtMs: integer("base_currency_configured_at_ms"),
     lastTransactionCurrency: text("last_transaction_currency")
       .notNull()
       .default("KRW"),
@@ -120,6 +121,10 @@ export const userStates = sqliteTable(
     check(
       "user_states_created_at_positive",
       sql`${table.createdAtMs} > 0`,
+    ),
+    check(
+      "user_states_base_currency_configured_at_positive",
+      sql`${table.baseCurrencyConfiguredAtMs} IS NULL OR ${table.baseCurrencyConfiguredAtMs} > 0`,
     ),
     check(
       "user_states_base_currency_shape",

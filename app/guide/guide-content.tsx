@@ -15,6 +15,14 @@ import {
 
 type GuideItem = { title: string; body: string };
 type FeatureItem = GuideItem & { action: string };
+type OnboardingStatus = {
+  baseCurrency: string;
+  baseCurrencyConfigured: boolean;
+  hasTransaction: boolean;
+  hasBudget: boolean;
+  completedCount: number;
+  completed: boolean;
+};
 type GuideCopy = {
   title: string;
   subtitle: string;
@@ -23,6 +31,14 @@ type GuideCopy = {
   quickStart: string;
   quickStartHint: string;
   steps: GuideItem[];
+  progress: string;
+  complete: string;
+  chooseCurrency: string;
+  addFirstTransaction: string;
+  setFirstBudget: string;
+  allSetTitle: string;
+  allSetBody: string;
+  continueDashboard: string;
   explore: string;
   exploreHint: string;
   features: FeatureItem[];
@@ -49,8 +65,16 @@ const COPY = {
     steps: [
       { title: "Choose your base currency", body: "Pick the currency you use to understand your overall balance. Each transaction still keeps its original currency." },
       { title: "Add your first transaction", body: "Enter an expense or income, then choose its date, category, payment currency, and optional details." },
-      { title: "Review the month", body: "Use the calendar, recent activity, budgets, and reports to see where your money moved." },
+      { title: "Set your first budget", body: "Choose a monthly category limit. You can adjust it at any time as your spending plan changes." },
     ],
+    progress: "{done} of {total} complete",
+    complete: "Complete",
+    chooseCurrency: "Choose currency",
+    addFirstTransaction: "Add transaction",
+    setFirstBudget: "Set budget",
+    allSetTitle: "Your ledger is ready",
+    allSetBody: "The essentials are in place. Continue to the dashboard to review your month.",
+    continueDashboard: "Continue to dashboard",
     explore: "What you can do",
     exploreHint: "Open a feature to put it into practice.",
     features: [
@@ -90,8 +114,16 @@ const COPY = {
     steps: [
       { title: "기준 통화 선택", body: "전체 자산 흐름을 확인할 기준 통화를 선택하세요. 각 거래의 원래 결제 통화는 그대로 보존됩니다." },
       { title: "첫 거래 추가", body: "지출 또는 수입을 선택하고 날짜, 카테고리, 결제 통화와 필요한 세부 내용을 입력하세요." },
-      { title: "한 달의 흐름 확인", body: "달력과 최근 거래, 예산, 리포트를 통해 돈의 흐름을 확인하세요." },
+      { title: "첫 예산 설정", body: "카테고리별 월간 한도를 하나 설정하세요. 지출 계획이 바뀌면 언제든 조정할 수 있습니다." },
     ],
+    progress: "{total}개 중 {done}개 완료",
+    complete: "완료",
+    chooseCurrency: "통화 선택",
+    addFirstTransaction: "거래 추가",
+    setFirstBudget: "예산 설정",
+    allSetTitle: "가계부 준비가 끝났어요",
+    allSetBody: "필수 설정을 모두 마쳤습니다. 대시보드에서 이번 달의 흐름을 확인하세요.",
+    continueDashboard: "대시보드로 이동",
     explore: "주요 기능",
     exploreHint: "설명이 필요한 기능을 바로 열어 사용해 보세요.",
     features: [
@@ -131,8 +163,16 @@ const COPY = {
     steps: [
       { title: "基本通貨を選ぶ", body: "家計全体を把握するための通貨を選びます。各取引の元の決済通貨はそのまま保存されます。" },
       { title: "最初の取引を追加", body: "支出または収入を選び、日付、カテゴリー、決済通貨、必要な詳細を入力します。" },
-      { title: "1か月の流れを確認", body: "カレンダー、最近の取引、予算、レポートでお金の動きを確認します。" },
+      { title: "最初の予算を設定", body: "カテゴリーごとの月間上限を1つ設定します。支出計画に合わせていつでも変更できます。" },
     ],
+    progress: "{total}件中{done}件完了",
+    complete: "完了",
+    chooseCurrency: "通貨を選ぶ",
+    addFirstTransaction: "取引を追加",
+    setFirstBudget: "予算を設定",
+    allSetTitle: "家計簿の準備ができました",
+    allSetBody: "基本設定は完了です。ダッシュボードで今月の流れを確認しましょう。",
+    continueDashboard: "ダッシュボードへ",
     explore: "主な機能",
     exploreHint: "気になる機能を開いて実際に使ってみましょう。",
     features: [
@@ -172,8 +212,16 @@ const COPY = {
     steps: [
       { title: "Выберите основную валюту", body: "Выберите валюту для общей картины финансов. Исходная валюта каждой операции при этом сохраняется." },
       { title: "Добавьте первую операцию", body: "Укажите расход или доход, дату, категорию, валюту платежа и при необходимости дополнительные сведения." },
-      { title: "Оцените итоги месяца", body: "Просматривайте движение денег в календаре, последних операциях, бюджетах и отчётах." },
+      { title: "Задайте первый бюджет", body: "Установите месячный лимит хотя бы для одной категории. Его можно изменить в любое время." },
     ],
+    progress: "Выполнено: {done} из {total}",
+    complete: "Готово",
+    chooseCurrency: "Выбрать валюту",
+    addFirstTransaction: "Добавить операцию",
+    setFirstBudget: "Задать бюджет",
+    allSetTitle: "Учёт готов к работе",
+    allSetBody: "Основные шаги выполнены. Перейдите к обзору, чтобы увидеть итоги месяца.",
+    continueDashboard: "Перейти к обзору",
     explore: "Возможности",
     exploreHint: "Откройте нужный раздел и попробуйте его в работе.",
     features: [
@@ -216,6 +264,12 @@ const FEATURE_META = [
 
 const NOTE_GLYPHS = ["¤", "↔", "⌂"] as const;
 
+const ONBOARDING_META = [
+  { key: "baseCurrencyConfigured", href: "/?onboarding=currency", action: "chooseCurrency" },
+  { key: "hasTransaction", href: "/?new=transaction&onboarding=transaction", action: "addFirstTransaction" },
+  { key: "hasBudget", href: "/budgets?onboarding=budget", action: "setFirstBudget" },
+] as const;
+
 export function GuideContent({
   initialLanguage = DEFAULT_LANGUAGE,
 }: {
@@ -223,6 +277,7 @@ export function GuideContent({
 }) {
   const router = useRouter();
   const [language, setLanguage] = useState<Language>(initialLanguage);
+  const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
   const copy = COPY[language];
 
   useEffect(() => {
@@ -236,6 +291,35 @@ export function GuideContent({
   useEffect(() => {
     document.documentElement.lang = language;
   }, [language]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadOnboarding() {
+      try {
+        const response = await fetch("/api/onboarding", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as { data?: OnboardingStatus };
+        if (response.ok && payload.data) setOnboarding(payload.data);
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setOnboarding(null);
+        }
+      }
+    }
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void loadOnboarding();
+    };
+    void loadOnboarding();
+    window.addEventListener("focus", loadOnboarding);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      controller.abort();
+      window.removeEventListener("focus", loadOnboarding);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, []);
 
   function chooseLanguage(nextLanguage: Language) {
     persistLanguagePreference(nextLanguage);
@@ -265,14 +349,50 @@ export function GuideContent({
             <span>01</span>
             <div><h2 id="guide-quick-start">{copy.quickStart}</h2><p>{copy.quickStartHint}</p></div>
           </div>
+          <div className="onboarding-progress">
+            <div>
+              <span>{copy.progress.replace("{done}", String(onboarding?.completedCount ?? 0)).replace("{total}", "3")}</span>
+              <strong>{Math.round(((onboarding?.completedCount ?? 0) / 3) * 100)}%</strong>
+            </div>
+            <div
+              className="onboarding-progress-track"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={3}
+              aria-valuenow={onboarding?.completedCount ?? 0}
+            >
+              <span style={{ width: `${((onboarding?.completedCount ?? 0) / 3) * 100}%` }} />
+            </div>
+          </div>
           <ol className="guide-steps">
             {copy.steps.map((step, index) => (
-              <li key={step.title}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <div><h3>{step.title}</h3><p>{step.body}</p></div>
+              <li
+                key={step.title}
+                className={onboarding?.[ONBOARDING_META[index].key] ? "complete" : ""}
+              >
+                <span className="onboarding-step-number" aria-hidden="true">
+                  {onboarding?.[ONBOARDING_META[index].key] ? "✓" : String(index + 1).padStart(2, "0")}
+                </span>
+                <div>
+                  <h3>{step.title}</h3>
+                  <p>{step.body}</p>
+                  {onboarding?.[ONBOARDING_META[index].key] ? (
+                    <span className="onboarding-step-complete">✓ {copy.complete}</span>
+                  ) : (
+                    <Link className="onboarding-step-action" href={ONBOARDING_META[index].href}>
+                      {copy[ONBOARDING_META[index].action]}<span aria-hidden="true">→</span>
+                    </Link>
+                  )}
+                </div>
               </li>
             ))}
           </ol>
+          {onboarding?.completed && (
+            <div className="onboarding-complete-card" role="status">
+              <div><span aria-hidden="true">✓</span><div><h3>{copy.allSetTitle}</h3><p>{copy.allSetBody}</p></div></div>
+              <Link href="/">{copy.continueDashboard}<span aria-hidden="true">→</span></Link>
+            </div>
+          )}
         </section>
 
         <section className="guide-section" aria-labelledby="guide-features">
