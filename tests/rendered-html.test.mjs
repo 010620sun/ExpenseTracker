@@ -531,7 +531,9 @@ test("tracks and guides the three account onboarding steps", async () => {
   assert.match(onboardingRoute, /completed: completedCount === 3/u);
   assert.match(schema, /baseCurrencyConfiguredAtMs: integer\("base_currency_configured_at_ms"\)/u);
   assert.match(preferencesRoute, /updates\.baseCurrencyConfiguredAtMs = Date\.now\(\)/u);
-  assert.match(migration, /"base_currency", NULL, "last_transaction_currency"/u);
+  assert.match(migration, /ALTER TABLE `user_states`/u);
+  assert.match(migration, /ADD COLUMN `base_currency_configured_at_ms`/u);
+  assert.doesNotMatch(migration, /DROP TABLE `user_states`/u);
   assert.match(guide, /fetch\("\/api\/onboarding"/u);
   assert.match(guide, /role="progressbar"/u);
   assert.match(guide, /\/\?onboarding=currency/u);
@@ -541,7 +543,7 @@ test("tracks and guides the three account onboarding steps", async () => {
   assert.match(tracker, /setTransactionOnboarding\(onboarding === "transaction"\)/u);
   assert.match(tracker, /window\.location\.assign\("\/guide"\)/u);
   assert.match(budgets, /search\.get\("onboarding"\) !== "budget"/u);
-  assert.match(budgets, /onboardingReturn && budgets\.length > 0/u);
+  assert.match(budgets, /onboardingReturnRef\.current && budgets\.length > 0/u);
   assert.match(styles, /\.onboarding-progress-track/u);
   assert.match(styles, /\.onboarding-complete-card/u);
 });

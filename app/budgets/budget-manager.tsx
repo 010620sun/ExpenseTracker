@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { LanguagePicker } from "@/components/language-picker";
 import { CategoryIcon } from "@/components/category-icon";
@@ -161,7 +161,7 @@ export function BudgetManager({
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [onboardingReturn, setOnboardingReturn] = useState(false);
+  const onboardingReturnRef = useRef(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const copy = COPY[language];
@@ -220,7 +220,7 @@ export function BudgetManager({
   useEffect(() => {
     const search = new URLSearchParams(window.location.search);
     if (search.get("onboarding") !== "budget") return;
-    setOnboardingReturn(true);
+    onboardingReturnRef.current = true;
     window.history.replaceState(null, "", window.location.pathname);
   }, []);
 
@@ -318,7 +318,7 @@ export function BudgetManager({
       if (!response.ok) throw new Error("SAVE");
       await loadMonth(month);
       setToast(copy.saved);
-      if (onboardingReturn && budgets.length > 0) {
+      if (onboardingReturnRef.current && budgets.length > 0) {
         window.location.assign("/guide");
       }
     } catch (caught) {
