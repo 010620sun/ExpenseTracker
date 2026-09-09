@@ -1,30 +1,63 @@
 # GlobeLedger
 
-GlobeLedger is a bilingual, multi-currency household ledger. It keeps every
-transaction in its original currency, saves the exchange-rate snapshot used at
-entry time, and presents a consistent budget view in the user's selected base
-currency.
+[GlobeLedger](https://globeledger.mizz-globeledger.workers.dev) is a private,
+multi-currency household ledger for recording, planning, and reviewing money
+without losing the original amount or payment currency.
 
-## Product scope
+English is the default interface language. Korean, Japanese, and Russian are
+also available and each member's last-used language is remembered.
 
-- English by default with a persistent Korean language switch
-- Every currency currently exposed by Frankfurter, discovered dynamically
-- Base-currency dashboard conversion without changing the UI language
-- Monthly spending, budget, net-flow, category, and currency-mix summaries
-- Weekly, monthly, and yearly recurring expenses and regular income
-- Recurring schedule management with monthly forecasts, pause/resume, editing,
-  status filters, and full-series deletion
-- User-isolated D1 storage with exact minor-unit monetary calculations
-- Idempotent transaction creation and owner-scoped deletion
-- Responsive desktop, tablet, and mobile layouts
-- Site-specific Open Graph and X preview card
+## What members can do
 
-## Deployment baseline
+- Create an independent, password-protected ledger for each member
+- Choose an app-wide base currency separately from the last-used transaction
+  currency
+- Record income and expenses on past, current, or future dates in any currency
+  currently supplied by Frankfurter
+- Use the monthly calendar to add, edit, and review transactions by date
+- Search the full transaction history by text, type, category, and currency
+- Use detailed expense and income categories; subcategories are optional
+- Split one purchase across consecutive dates or make an exact monthly
+  installment plan
+- Manage weekly, monthly, and yearly recurring income or expenses
+- Set monthly category budgets and reuse the previous month's plan
+- Review cash flow and spending by day, category, currency, and merchant
+- Follow a three-step first-run guide: choose a base currency, add a
+  transaction, and set a budget
 
-The app uses the stable Next.js 16.2 App Router API surface and Cloudflare's
-official Vite plugin for direct Workers deployment. Package versions are
-pinned, the Next lint rules are aligned to `16.2.12`, and experimental Next.js
-APIs are not used. Node.js `22.13.0` or newer is required.
+## Exchange rates and amounts
+
+GlobeLedger stores the amount and currency entered for every transaction. It
+also stores the applied USD reference rate, source, and rate date, so historical
+totals do not silently change when a provider later updates its data.
+
+[Frankfurter v2](https://frankfurter.dev/) supplies the reference rates. The
+server discovers its currencies dynamically, caches a complete successful
+response for one hour, and falls back to the last complete cache if the
+provider cannot be reached.
+
+The app normalizes all rates as `1 original currency = USD rate`. No conversion
+is performed when a transaction currency is the same as the selected base
+currency. Reports can value historical entries using their transaction-date
+rate or the current reference rate.
+
+Rates are published by external providers, not continuously. Some currencies,
+including Albanian lek (`ALL`), can retain the previous provider date for part
+of a day. The interface shows the provider's actual rate date; it does not
+invent an intraday rate. See the [Frankfurter ALL reference](https://frankfurter.dev/currencies/all/)
+for source coverage.
+
+## Technology
+
+- App Router-compatible React application built with Vinext
+- Cloudflare Workers for the web runtime
+- Cloudflare D1 with Drizzle ORM for member-owned data
+- Workers Web Crypto for PBKDF2 password hashes and session-token hashing
+- Frankfurter v2 for reference exchange rates
+- TypeScript, ESLint, and Node's built-in test runner
+
+The project targets the stable Next.js 16.2 App Router API surface through
+Vinext. Node.js `22.13.0` or newer is required.
 
 ## Local development
 
@@ -33,80 +66,55 @@ npm ci
 npm run dev
 ```
 
-The local preview is available at `http://localhost:3000`. Cloudflare Workers
-binds the application to D1 as `DB`. Create a member through `/auth`; every
-transaction and recurring schedule is scoped to that member's server session.
-
-Generate a migration after changing `db/schema.ts`:
+Open `http://localhost:3000`, then create a member through `/auth`.
 
 ```bash
-npm run db:generate
-```
-
-Run the production build and rendered-output tests:
-
-```bash
+npm run lint
 npm test
 ```
 
-## Authentication and member isolation
+`npm test` runs the production build and the rendered-output regression suite.
 
-GlobeLedger uses app-owned email/password authentication designed for the
-Cloudflare Workers runtime. Passwords are stored only as PBKDF2-SHA-256 hashes
-with a unique random salt. Random session tokens are delivered in HttpOnly,
-SameSite cookies, while D1 stores only their SHA-256 hashes. Authentication
-attempts are rate-limited by hashed email/IP keys.
+## Authentication and privacy
 
-Every ledger query takes its owner ID exclusively from the validated server
-session. The browser cannot choose or override an owner ID, so transactions,
-recurring schedules, exceptions, and per-user state remain member-isolated.
+GlobeLedger uses app-owned email/password authentication. Passwords are stored
+only as PBKDF2-SHA-256 hashes with a unique random salt. Browser session tokens
+are HttpOnly and SameSite cookies; D1 retains only their SHA-256 hashes.
 
-## Direct Cloudflare Workers + D1 deployment
+The server derives the owner ID solely from the validated session. A browser
+cannot select an owner ID, so transactions, budgets, recurring schedules,
+preferences, and onboarding status are isolated per member.
 
-This project is configured for direct Workers deployment through
-`wrangler.jsonc`. Deployment remains manual:
+## Deploying to Cloudflare Workers + D1
 
-1. Run `npm run db:create` once and copy the returned D1 database ID into
-   `wrangler.jsonc`.
-2. Apply migrations with `npm run db:migrate:remote`.
-3. Deploy with `npm run deploy` when ready.
+The Workers configuration is in [`wrangler.jsonc`](./wrangler.jsonc). The D1
+binding is named `DB` and uses migrations in `drizzle/`.
 
-For local D1 migrations, use `npm run db:migrate:local`. Never commit a real
-session token or password; no application secret is required for password
-hashing because Workers Web Crypto handles PBKDF2 directly.
+```bash
+# First-time setup only
+npm run db:create
 
-## Exchange-rate model
+# Validate a schema migration against local D1
+npm run db:generate
+npm run db:migrate:local
 
-Frankfurter v2 is the default reference-rate source. The server discovers every
-currency in the provider's latest USD rate response instead of maintaining a
-fixed allowlist. It uses a one-hour freshness window, refreshes rates on demand,
-and stores the last successful complete result in D1. If an upstream refresh
-fails, the last-known-good result remains available with a stale status until a
-refresh succeeds.
+# Apply the migration to production, then publish the Worker
+npm run db:migrate:remote
+npm run deploy
+```
 
-The application direction is always `1 original currency = rate USD`, even
-though Frankfurter returns quote units per USD. The server normalizes that
-direction before sending rates to the browser. Transaction inputs are decimal
-strings, monetary calculations use integers, and the applied rate, source,
-rate date, transaction capture time, and converted USD amount are stored with
-each transaction. Frankfurter-labelled snapshots must exactly match the D1
-snapshot history. This keeps historical totals stable when later reference
-rates change, including when a form was opened before the latest refresh.
+Read [operations guidance](./docs/operations.md) before applying a production
+schema migration. In particular, do not rebuild `user_states`: it is the parent
+of member ledger tables and replacing it can trigger cascading deletes.
 
-## Recurring transactions
+## Project structure
 
-A recurring transaction stores its schedule and original-currency template as
-a separate series. Opening a month materializes only the occurrences required
-for that month, protected by a unique series/date key so repeated requests do
-not duplicate entries. Each generated occurrence captures the latest cached
-exchange rate available at that time, with the series' original rate snapshot
-as an offline fallback.
-
-Editing affects only the selected occurrence. Deleting an occurrence records
-an exception so it is not recreated, while stopping a series keeps the selected
-and past entries and removes any already-materialized future entries.
-
-The recurring-transactions page provides an owner-scoped view of every active,
-paused, and ended schedule. Schedule edits affect future materialized entries;
-pausing preserves recorded history, resuming continues generation, and deleting
-a schedule removes the series and all of its linked occurrences.
+```text
+app/                 Pages, UI, and Worker API routes
+app/api/             Authentication, ledger, budget, report, rate, and onboarding APIs
+db/schema.ts         Drizzle schema
+drizzle/             D1 migrations and Drizzle metadata
+lib/                 Currency, category, authentication, and date helpers
+tests/                Rendered-output and behavior regression tests
+docs/operations.md   Production migration and recovery guidance
+```
