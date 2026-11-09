@@ -303,6 +303,8 @@ test("discovers every current Frankfurter currency dynamically", async () => {
   assert.match(ratesRoute, /searchParams\.set\("base", BASE_CURRENCY\)/u);
   assert.doesNotMatch(ratesRoute, /searchParams\.set\("quotes"/u);
   assert.match(ratesRoute, /payload\.length < MIN_REMOTE_CURRENCY_COUNT/u);
+  assert.match(ratesRoute, /typeof quote !== "string" \|\| !isCurrencyCode\(quote\)/u);
+  assert.match(ratesRoute, /rates\.length \+ 1 < MIN_REMOTE_CURRENCY_COUNT/u);
   assert.match(tracker, /payload\.currencies\.length < 100/u);
   assert.match(tracker, /function CurrencyPicker/u);
   assert.match(tracker, /currencySearchPlaceholder/u);

@@ -240,9 +240,15 @@ async function fetchFrankfurterRates(requestedDate?: string): Promise<Normalized
       const rateDate = row.date;
       const numericRate = row.rate;
       const token = rateTokens[index];
+
+      // Frankfurter also returns crypto assets such as AAVE and USDC. The
+      // ledger schema intentionally accepts ISO 4217-style three-letter
+      // currencies only, so an unsupported asset must not reject the whole
+      // otherwise-valid fiat-rate response.
+      if (typeof quote !== "string" || !isCurrencyCode(quote)) continue;
+
       if (
         row.base !== BASE_CURRENCY ||
-        !isCurrencyCode(quote) ||
         seenQuotes.has(quote) ||
         typeof rateDate !== "string" ||
         !isValidDate(rateDate) ||
@@ -270,7 +276,12 @@ async function fetchFrankfurterRates(requestedDate?: string): Promise<Normalized
       });
     }
 
-    return [...ratesByQuote.values()].sort((left, right) =>
+    const rates = [...ratesByQuote.values()];
+    if (rates.length + 1 < MIN_REMOTE_CURRENCY_COUNT) {
+      throw new Error("Provider returned too few supported currencies");
+    }
+
+    return rates.sort((left, right) =>
       left.quoteCurrency.localeCompare(right.quoteCurrency),
     );
   } finally {

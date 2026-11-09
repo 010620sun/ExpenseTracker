@@ -13,7 +13,7 @@ also available and each member's last-used language is remembered.
 - Choose an app-wide base currency separately from the last-used transaction
   currency
 - Record income and expenses on past, current, or future dates in any currency
-  currently supplied by Frankfurter
+  with a supported ISO 4217-style three-letter code supplied by Frankfurter
 - Use the monthly calendar to add, edit, and review transactions by date
 - Search the full transaction history by text, type, category, and currency
 - Use detailed expense and income categories; subcategories are optional
@@ -32,7 +32,8 @@ also stores the applied USD reference rate, source, and rate date, so historical
 totals do not silently change when a provider later updates its data.
 
 [Frankfurter v2](https://frankfurter.dev/) supplies the reference rates. The
-server discovers its currencies dynamically, caches a complete successful
+server discovers its supported three-letter currencies dynamically, ignores
+non-ISO crypto assets in the provider response, caches a complete successful
 response for one hour, and falls back to the last complete cache if the
 provider cannot be reached.
 
