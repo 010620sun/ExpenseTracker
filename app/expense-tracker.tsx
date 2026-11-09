@@ -2355,30 +2355,15 @@ export function ExpenseTracker({
     : ratesToUsd;
   const formRateToUsd = usesStoredRate
     ? Number(editingTransaction?.fxRate)
-    : formRatesToUsd[currency];
-  const formBaseRateToUsd = formRatesToUsd[baseCurrency];
+    : formRatesToUsd[currency] ?? 1;
   const conversionRate = currency === baseCurrency
     ? 1
-    : formRateToUsd && formBaseRateToUsd
-      ? formRateToUsd / formBaseRateToUsd
-      : Number.NaN;
-  const convertedPreview =
-    Number(amount) && Number.isFinite(conversionRate)
-      ? Number(amount) * conversionRate
-      : 0;
-  const hasSelectedTransactionRate = Boolean(
+    : formRateToUsd / (formRatesToUsd[baseCurrency] ?? 1);
+  const convertedPreview = Number(amount) ? Number(amount) * conversionRate : 0;
+  const hasFrankfurterRate = Boolean(
     hasTransactionDateRates &&
       formRateSnapshot.rates[currency] &&
       formRateSnapshot.rateDates[currency],
-  );
-  const hasBaseTransactionRate = Boolean(
-    hasTransactionDateRates &&
-      formRateSnapshot.rates[baseCurrency] &&
-      formRateSnapshot.rateDates[baseCurrency],
-  );
-  const hasFrankfurterRate = Boolean(
-    hasSelectedTransactionRate &&
-      (currency === baseCurrency || hasBaseTransactionRate),
   );
   const selectedRateSource =
     usesStoredRate
@@ -2393,9 +2378,7 @@ export function ExpenseTracker({
   const selectedRateDate = !usesStoredRate && currency !== "USD" && hasFrankfurterRate
     ? formRateSnapshot.rateDates[currency] ?? formRateSnapshot.asOf
     : null;
-  const requiresTransactionDateRate = Boolean(
-    !usesStoredRate && (currency !== "USD" || baseCurrency !== "USD"),
-  );
+  const requiresTransactionDateRate = currency !== "USD" && !usesStoredRate;
   const transactionDateRateReady =
     !requiresTransactionDateRate || hasTransactionDateRates;
   const isFutureTransaction = occurredOn > currentDate;
@@ -2674,7 +2657,7 @@ export function ExpenseTracker({
       setFormError(copy.dateError);
       return;
     }
-    if (requiresTransactionDateRate && !hasFrankfurterRate) {
+    if (requiresTransactionDateRate && !hasTransactionDateRates) {
       setFormError(
         formRateSnapshot.status === "loading"
           ? copy.transactionRateLoading
