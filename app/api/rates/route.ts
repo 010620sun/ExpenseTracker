@@ -517,6 +517,18 @@ export async function GET(request: Request) {
       return rateResponse(historicalRates, false);
     } catch (error) {
       console.error("[rates] Historical lookup failed", error);
+      // A transaction drawer should not become unusable just because the
+      // provider cannot answer one historical-date request. The regular
+      // cache is complete, validated as a single cohort, and is the next
+      // best available reference. Its own rate date is preserved in the
+      // response so the client never represents it as a transaction-date
+      // quote.
+      try {
+        const cached = await readCompleteCache(db, now);
+        if (cached) return rateResponse(cached, true);
+      } catch (cacheError) {
+        console.error("[rates] Historical fallback cache read failed", cacheError);
+      }
       return unavailableResponse();
     }
   }
