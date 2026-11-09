@@ -507,11 +507,10 @@ export async function GET(request: Request) {
         console.error("[rates] Historical cache read failed", error);
       }
       const historicalRates = await fetchFrankfurterRates(requestedDate);
-      try {
-        await writeSnapshots(db, historicalRates);
-      } catch (error) {
-        console.error("[rates] Historical cache write failed", error);
-      }
+      // A transaction can only save a Frankfurter rate that exists in the
+      // authoritative snapshot table. Do not return an unpersisted rate to
+      // the form: if persistence fails, surface the lookup as unavailable.
+      await writeSnapshots(db, historicalRates);
       return rateResponse(historicalRates, false);
     } catch (error) {
       console.error("[rates] Historical lookup failed", error);

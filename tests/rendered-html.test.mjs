@@ -642,7 +642,14 @@ test("supports transaction-date and current exchange-rate valuations", async () 
 
   assert.match(ratesRoute, /endpoint\.searchParams\.set\("date", requestedDate\)/u);
   assert.match(ratesRoute, /readHistoricalSnapshot/u);
-  assert.match(ratesRoute, /await writeSnapshots\(db, historicalRates\)/u);
+  assert.match(
+    ratesRoute,
+    /const historicalRates = await fetchFrankfurterRates\(requestedDate\);[\s\S]*?await writeSnapshots\(db, historicalRates\);[\s\S]*?return rateResponse\(historicalRates, false\)/u,
+  );
+  assert.doesNotMatch(
+    ratesRoute,
+    /const historicalRates = await fetchFrankfurterRates\(requestedDate\);\s*try\s*\{/u,
+  );
   assert.match(historyRoute, /endpoint\.searchParams\.set\("from"/u);
   assert.match(historyRoute, /direction: "USD_PER_ORIGINAL"/u);
   assert.match(tracker, /type ValuationMode = "historical" \| "current"/u);
@@ -811,6 +818,19 @@ test("allows future transactions and locks the latest available rate", async () 
     tracker,
     /const rateEndpoint = occurredOn > currentDate[\s\S]*?\? "\/api\/rates"[\s\S]*?: `\/api\/rates\?date=/u,
   );
+  assert.match(
+    tracker,
+    /const hasFrankfurterRate = Boolean\([\s\S]*?hasSelectedTransactionRate[\s\S]*?hasBaseTransactionRate/u,
+  );
+  assert.match(
+    tracker,
+    /requiresTransactionDateRate && !hasFrankfurterRate/u,
+  );
+  assert.match(
+    tracker,
+    /!usesStoredRate && \(currency !== "USD" \|\| baseCurrency !== "USD"\)/u,
+  );
+  assert.doesNotMatch(tracker, /formRatesToUsd\[currency\] \?\? 1/u);
   assert.match(
     tracker,
     /isFutureTransaction && hasFrankfurterRate[\s\S]*?copy\.futureRateNotice/u,
