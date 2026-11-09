@@ -809,7 +809,7 @@ test("allows future transactions and locks the latest available rate", async () 
   );
   assert.match(
     tracker,
-    /const rateEndpoint = occurredOn > currentDate[\s\S]*?\? "\/api\/rates"[\s\S]*?: `\/api\/rates\?date=/u,
+    /const rateEndpoint = occurredOn >= currentDate[\s\S]*?\? "\/api\/rates"[\s\S]*?: `\/api\/rates\?date=/u,
   );
   assert.match(
     tracker,

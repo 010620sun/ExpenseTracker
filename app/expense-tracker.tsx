@@ -1934,7 +1934,7 @@ export function ExpenseTracker({
         asOf: null,
       });
       try {
-        const rateEndpoint = occurredOn > currentDate
+        const rateEndpoint = occurredOn >= currentDate
           ? "/api/rates"
           : `/api/rates?date=${encodeURIComponent(occurredOn)}`;
         const response = await fetch(
