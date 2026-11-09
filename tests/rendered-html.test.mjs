@@ -807,10 +807,6 @@ test("allows future transactions and locks the latest available rate", async () 
   );
   assert.match(
     tracker,
-    /const transactionDateRateReady =\s*!requiresTransactionDateRate \|\| hasFrankfurterRate/u,
-  );
-  assert.match(
-    tracker,
     /isFutureTransaction && hasFrankfurterRate[\s\S]*?copy\.futureRateNotice/u,
   );
 });

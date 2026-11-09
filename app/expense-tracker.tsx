@@ -2380,7 +2380,7 @@ export function ExpenseTracker({
     : null;
   const requiresTransactionDateRate = currency !== "USD" && !usesStoredRate;
   const transactionDateRateReady =
-    !requiresTransactionDateRate || hasFrankfurterRate;
+    !requiresTransactionDateRate || hasTransactionDateRates;
   const isFutureTransaction = occurredOn > currentDate;
   const parsedDistributionCount = Number(distributionCount);
   const distributionPreviewEnd =
