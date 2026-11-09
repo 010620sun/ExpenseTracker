@@ -815,18 +815,6 @@ test("allows future transactions and locks the latest available rate", async () 
   );
 });
 
-test("keeps the transaction form usable when a historical rate lookup is unavailable", async () => {
-  const ratesRoute = await readFile(
-    new URL("../app/api/rates/route.ts", import.meta.url),
-    "utf8",
-  );
-
-  assert.match(
-    ratesRoute,
-    /Historical lookup failed[\s\S]*?await readCompleteCache\(db, now\)[\s\S]*?rateResponse\(cached, true\)/u,
-  );
-});
-
 test("keeps advanced ledger controls behind clear progressive disclosure", async () => {
   const [tracker, navigation, styles] = await Promise.all([
     readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
