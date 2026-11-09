@@ -815,6 +815,13 @@ test("allows future transactions and locks the latest available rate", async () 
     tracker,
     /const rateEndpoint = occurredOn >= currentDate[\s\S]*?\? "\/api\/rates"[\s\S]*?: `\/api\/rates\?\$\{historicalRateSearch\}`/u,
   );
+  assert.doesNotMatch(tracker, /formRatesToUsd\[currency\] \?\? 1/u);
+  assert.doesNotMatch(tracker, /formRatesToUsd\[baseCurrency\] \?\? 1/u);
+  assert.match(
+    tracker,
+    /hasSelectedTransactionRate[\s\S]*?hasBaseTransactionRate[\s\S]*?const hasFrankfurterRate/u,
+  );
+  assert.match(tracker, /if \(!transactionDateRateReady\)/u);
   assert.match(
     tracker,
     /isFutureTransaction && hasFrankfurterRate[\s\S]*?copy\.futureRateNotice/u,
