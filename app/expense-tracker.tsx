@@ -1934,9 +1934,13 @@ export function ExpenseTracker({
         asOf: null,
       });
       try {
+        const historicalRateSearch = new URLSearchParams({
+          date: occurredOn,
+          quotes: [...new Set([currency, baseCurrency])].join(","),
+        });
         const rateEndpoint = occurredOn >= currentDate
           ? "/api/rates"
-          : `/api/rates?date=${encodeURIComponent(occurredOn)}`;
+          : `/api/rates?${historicalRateSearch}`;
         const response = await fetch(
           rateEndpoint,
           { signal: controller.signal, cache: "no-store" },
@@ -1995,7 +1999,7 @@ export function ExpenseTracker({
       controller.abort();
       window.cancelAnimationFrame(frame);
     };
-  }, [currentDate, isDrawerOpen, occurredOn]);
+  }, [baseCurrency, currency, currentDate, isDrawerOpen, occurredOn]);
 
   useEffect(() => {
     const controller = new AbortController();

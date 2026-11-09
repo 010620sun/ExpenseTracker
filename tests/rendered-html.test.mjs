@@ -642,6 +642,9 @@ test("supports transaction-date and current exchange-rate valuations", async () 
 
   assert.match(ratesRoute, /endpoint\.searchParams\.set\("date", requestedDate\)/u);
   assert.match(ratesRoute, /readHistoricalSnapshot/u);
+  assert.match(ratesRoute, /containsRequiredQuotes/u);
+  assert.match(ratesRoute, /latestByQuote\.has\(quote\)/u);
+  assert.match(ratesRoute, /requiredQuotes\.some\(\(quote\) => !isCurrencyCode\(quote\)\)/u);
   assert.match(ratesRoute, /await writeSnapshots\(db, historicalRates\)/u);
   assert.match(historyRoute, /endpoint\.searchParams\.set\("from"/u);
   assert.match(historyRoute, /direction: "USD_PER_ORIGINAL"/u);
@@ -651,6 +654,7 @@ test("supports transaction-date and current exchange-rate valuations", async () 
     tracker,
     /fetch\(\s*rateEndpoint/u,
   );
+  assert.match(tracker, /quotes: \[\.\.\.new Set\(\[currency, baseCurrency\]\)\]\.join/u);
   assert.match(tracker, /valuationMode === "current"/u);
   assert.match(tracker, /historicalBaseRates\[transaction\.occurredOn\]/u);
   assert.match(transactionRoute, /proposedBody\.occurredOn === existing\.occurredOn/u);
@@ -809,7 +813,7 @@ test("allows future transactions and locks the latest available rate", async () 
   );
   assert.match(
     tracker,
-    /const rateEndpoint = occurredOn >= currentDate[\s\S]*?\? "\/api\/rates"[\s\S]*?: `\/api\/rates\?date=/u,
+    /const rateEndpoint = occurredOn >= currentDate[\s\S]*?\? "\/api\/rates"[\s\S]*?: `\/api\/rates\?\$\{historicalRateSearch\}`/u,
   );
   assert.match(
     tracker,

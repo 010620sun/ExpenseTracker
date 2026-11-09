@@ -29,6 +29,7 @@ const INVERSE_DECIMAL_PLACES = 12;
 const BIGINT_ZERO = BigInt(0);
 const BIGINT_TWO = BigInt(2);
 const BIGINT_TEN = BigInt(10);
+const DEFAULT_HISTORICAL_QUOTES = ["EUR", "KRW", "JPY", "GBP"];
 const RESPONSE_HEADERS = {
   "Cache-Control": "private, no-store",
 };
@@ -386,7 +387,11 @@ async function writeSnapshots(db: AppDatabase, rates: NormalizedRate[]) {
   }
 }
 
-async function readHistoricalSnapshot(db: AppDatabase, requestedDate: string) {
+async function readHistoricalSnapshot(
+  db: AppDatabase,
+  requestedDate: string,
+  requiredQuotes: string[],
+) {
   const rows = await db
     .select()
     .from(exchangeRateSnapshots)
@@ -404,7 +409,11 @@ async function readHistoricalSnapshot(db: AppDatabase, requestedDate: string) {
     }
   }
   const snapshot = [...latestByQuote.values()];
-  return snapshot.length >= MIN_REMOTE_CURRENCY_COUNT &&
+  const containsRequiredQuotes = requiredQuotes.every(
+    (quote) => quote === BASE_CURRENCY || latestByQuote.has(quote),
+  );
+  return containsRequiredQuotes &&
+    snapshot.length >= MIN_REMOTE_CURRENCY_COUNT &&
     snapshot.length <= MAX_REMOTE_CURRENCY_COUNT
     ? snapshot.sort((left, right) =>
         left.quoteCurrency.localeCompare(right.quoteCurrency),
@@ -488,20 +497,35 @@ export async function GET(request: Request) {
   }
   const now = Date.now();
   const db = getDb();
-  const requestedDate = new URL(request.url).searchParams.get("date");
+  const url = new URL(request.url);
+  const requestedDate = url.searchParams.get("date");
   if (requestedDate !== null) {
+    const rawRequiredQuotes = url.searchParams.get("quotes");
+    const requiredQuotes = rawRequiredQuotes === null
+      ? DEFAULT_HISTORICAL_QUOTES
+      : [...new Set(rawRequiredQuotes.split(","))];
     const latestAllowedDate = new Date(now + 36 * 60 * 60 * 1_000)
       .toISOString()
       .slice(0, 10);
-    if (!isValidDate(requestedDate) || requestedDate > latestAllowedDate) {
+    if (
+      !isValidDate(requestedDate) ||
+      requestedDate > latestAllowedDate ||
+      requiredQuotes.length < 1 ||
+      requiredQuotes.length > 4 ||
+      requiredQuotes.some((quote) => !isCurrencyCode(quote))
+    ) {
       return Response.json(
-        { error: { code: "INVALID_RATE_DATE", field: "date" } },
+        { error: { code: "INVALID_RATE_REQUEST" } },
         { status: 400, headers: RESPONSE_HEADERS },
       );
     }
     try {
       try {
-        const stored = await readHistoricalSnapshot(db, requestedDate);
+        const stored = await readHistoricalSnapshot(
+          db,
+          requestedDate,
+          requiredQuotes,
+        );
         if (stored) return rateResponse(stored, false);
       } catch (error) {
         console.error("[rates] Historical cache read failed", error);
