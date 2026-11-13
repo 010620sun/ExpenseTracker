@@ -36,6 +36,12 @@ server discovers its currencies dynamically, caches a complete successful
 response for one hour, and falls back to the last complete cache if the
 provider cannot be reached.
 
+Transaction-date rates use a separate demand-driven shared cache keyed by
+requested date and currency. Only currencies that members actually use are
+stored. The transaction API resolves the authoritative rate itself instead of
+trusting a browser-submitted value, and every saved transaction retains the
+rate, provider date, source, and capture time that were actually applied.
+
 The app normalizes all rates as `1 original currency = USD rate`. No conversion
 is performed when a transaction currency is the same as the selected base
 currency. Reports can value historical entries using their transaction-date
@@ -114,7 +120,7 @@ app/                 Pages, UI, and Worker API routes
 app/api/             Authentication, ledger, budget, report, rate, and onboarding APIs
 db/schema.ts         Drizzle schema
 drizzle/             D1 migrations and Drizzle metadata
-lib/                 Currency, category, authentication, and date helpers
+lib/                 Currency, exchange-rate, category, authentication, and date helpers
 tests/                Rendered-output and behavior regression tests
 docs/operations.md   Production migration and recovery guidance
 ```

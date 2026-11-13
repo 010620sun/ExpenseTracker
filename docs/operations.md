@@ -40,6 +40,11 @@ replacement table, or an altered foreign-key relationship. Treat any of those
 as a data-risking change that needs a reviewed backup and explicit recovery
 plan.
 
+Migration `0014_vengeful_metal_master.sql` replaces the legacy all-currency
+snapshot table with a shared `(requested date, currency)` cache. It migrates the
+latest value for every existing date/currency pair before dropping only the
+legacy rate table; it does not alter or delete member transactions.
+
 ## Post-migration verification
 
 Use read-only counts for the ledger tables that matter to members:

@@ -629,10 +629,13 @@ test("uses original amounts when the transaction and service currencies match", 
 });
 
 test("supports transaction-date and current exchange-rate valuations", async () => {
-  const [tracker, ratesRoute, historyRoute, transactionRoute, reportsRoute, reportManager, styles] =
+  const [tracker, ratesRoute, rateService, schema, rateMigration, historyRoute, transactionRoute, reportsRoute, reportManager, styles] =
     await Promise.all([
       readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/api/rates/route.ts", import.meta.url), "utf8"),
+      readFile(new URL("../lib/exchange-rates.ts", import.meta.url), "utf8"),
+      readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+      readFile(new URL("../drizzle/0014_vengeful_metal_master.sql", import.meta.url), "utf8"),
       readFile(new URL("../app/api/rates/history/route.ts", import.meta.url), "utf8"),
       readFile(new URL("../app/api/transactions/route.ts", import.meta.url), "utf8"),
       readFile(new URL("../app/api/reports/route.ts", import.meta.url), "utf8"),
@@ -640,12 +643,19 @@ test("supports transaction-date and current exchange-rate valuations", async () 
       readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     ]);
 
-  assert.match(ratesRoute, /endpoint\.searchParams\.set\("date", requestedDate\)/u);
-  assert.match(ratesRoute, /readHistoricalSnapshot/u);
-  assert.match(ratesRoute, /containsRequiredQuotes/u);
-  assert.match(ratesRoute, /latestByQuote\.has\(quote\)/u);
+  assert.match(rateService, /endpoint\.searchParams\.set\("date", options\.requestedDate\)/u);
+  assert.match(ratesRoute, /resolveRequestedRates/u);
+  assert.match(rateService, /pairKey\(requestedDate, rate\.quoteCurrency\)/u);
+  assert.match(rateService, /requestedQuotes\.every\(\(quote\) => cachedByQuote\.has\(quote\)\)/u);
   assert.match(ratesRoute, /requiredQuotes\.some\(\(quote\) => !isCurrencyCode\(quote\)\)/u);
-  assert.match(ratesRoute, /await writeSnapshots\(db, historicalRates\)/u);
+  assert.match(rateService, /target: exchangeRatePairs\.cacheKey/u);
+  assert.match(schema, /export const exchangeRatePairs/u);
+  assert.doesNotMatch(schema, /exchangeRateSnapshots/u);
+  assert.match(rateMigration, /row_number\(\) OVER/u);
+  assert.match(rateMigration, /INSERT INTO `exchange_rate_pairs`/u);
+  assert.match(rateMigration, /DROP TABLE `exchange_rate_snapshots`/u);
+  assert.match(transactionRoute, /resolveTransactionRate\(db, rawDate, currency\)/u);
+  assert.doesNotMatch(transactionRoute, /exchangeRateSnapshots/u);
   assert.match(historyRoute, /endpoint\.searchParams\.set\("from"/u);
   assert.match(historyRoute, /direction: "USD_PER_ORIGINAL"/u);
   assert.match(tracker, /type ValuationMode = "historical" \| "current"/u);

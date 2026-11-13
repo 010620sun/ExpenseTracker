@@ -11,7 +11,6 @@ import {
 
 import { getDb, type AppDatabase } from "@/db";
 import {
-  exchangeRateSnapshots,
   exchangeRateCache,
   recurringExceptions,
   recurringSeries,
@@ -23,6 +22,7 @@ import {
   type Transaction,
 } from "@/db/schema";
 import { currencyExponent } from "@/lib/currency";
+import { resolveTransactionRate } from "@/lib/exchange-rates";
 import { memberFromRequest } from "@/lib/auth";
 import {
   MAX_INSTALLMENT_COUNT,
@@ -783,6 +783,12 @@ async function buildNewTransaction(
   ownerId: string,
   body: JsonRecord,
   db: AppDatabase,
+  options?: {
+    storedFx?: Pick<
+      Transaction,
+      "fxRate" | "fxSource" | "fxRateDate" | "fxCapturedAtMs"
+    >;
+  },
 ): Promise<NewTransaction> {
   const rawKind = firstDefined(body, ["kind", "type"]);
   const kind =
@@ -807,98 +813,35 @@ async function buildNewTransaction(
   }
 
   const originalMinor = parseAmount(body.amount, exponent);
-  const rawSource = firstDefined(body, [
-    "exchangeRateSource",
-    "fxSource",
-    "rateSource",
-  ]);
-  const requestedSource =
-    typeof rawSource === "string" ? rawSource.trim().toLowerCase() : rawSource;
-  let fxSource: "identity" | "manual" | "frankfurter";
+  let fxSource: "identity" | "manual" | "sample" | "frankfurter";
+  let fxRateDate: string | null;
+  let fxCapturedAtMs: number;
+  let rate: ParsedRate;
   if (currency === BASE_CURRENCY) {
-    if (requestedSource !== undefined && requestedSource !== "identity") {
-      throw new ApiValidationError(
-        "INVALID_EXCHANGE_RATE_SOURCE",
-        400,
-        "fxSource",
-      );
-    }
     fxSource = "identity";
+    fxRateDate = null;
+    fxCapturedAtMs = Date.now();
+    rate = parseRate("1");
+  } else if (options?.storedFx) {
+    fxSource = options.storedFx.fxSource;
+    fxRateDate = options.storedFx.fxRateDate;
+    fxCapturedAtMs = options.storedFx.fxCapturedAtMs;
+    rate = parseRate(options.storedFx.fxRate);
   } else {
-    if (requestedSource === undefined || requestedSource === "manual") {
-      fxSource = "manual";
-    } else if (requestedSource === "frankfurter") {
+    try {
+      const resolved = await resolveTransactionRate(db, rawDate, currency);
       fxSource = "frankfurter";
-    } else {
-      throw new ApiValidationError(
-        "INVALID_EXCHANGE_RATE_SOURCE",
-        400,
-        "fxSource",
-      );
-    }
-  }
-
-  const rawRateDate = firstDefined(body, [
-    "rateDate",
-    "fxRateDate",
-    "exchangeRateDate",
-  ]);
-  let fxRateDate: string | null = null;
-  if (fxSource === "frankfurter") {
-    if (typeof rawRateDate !== "string" || !isValidDate(rawRateDate)) {
-      throw new ApiValidationError("INVALID_RATE_DATE", 400, "rateDate");
-    }
-    fxRateDate = rawRateDate;
-  } else if (rawRateDate !== undefined && rawRateDate !== null) {
-    throw new ApiValidationError("INVALID_RATE_DATE", 400, "rateDate");
-  }
-
-  const rawRate = firstDefined(body, ["exchangeRate", "fxRate", "rate"]);
-  let rate = parseRate(
-    rawRate === undefined && currency === BASE_CURRENCY ? "1" : rawRate,
-  );
-  if (currency === BASE_CURRENCY && rate.canonical !== "1") {
-    throw new ApiValidationError(
-      "INVALID_IDENTITY_EXCHANGE_RATE",
-      400,
-      "exchangeRate",
-    );
-  }
-
-  if (fxSource === "frankfurter") {
-    const snapshotId = `${currency}:${fxRateDate}:${rate.canonical}`;
-    const snapshotRows = await db
-      .select({
-        quoteCurrency: exchangeRateSnapshots.quoteCurrency,
-        usdPerUnit: exchangeRateSnapshots.usdPerUnit,
-        rateDate: exchangeRateSnapshots.rateDate,
-      })
-      .from(exchangeRateSnapshots)
-      .where(eq(exchangeRateSnapshots.snapshotId, snapshotId))
-      .limit(1);
-    const snapshot = snapshotRows[0];
-    if (!snapshot) {
+      fxRateDate = resolved.rateDate;
+      fxCapturedAtMs = resolved.fetchedAtMs;
+      rate = parseRate(resolved.usdPerUnit);
+    } catch (error) {
+      console.error("[transactions] Rate resolution failed", error);
       throw new ApiValidationError(
         "FRANKFURTER_RATE_UNAVAILABLE",
-        409,
+        503,
         "currency",
       );
     }
-
-    const authoritativeRate = parseRate(snapshot.usdPerUnit);
-    if (
-      snapshot.quoteCurrency !== currency ||
-      rate.canonical !== authoritativeRate.canonical ||
-      fxRateDate !== snapshot.rateDate
-    ) {
-      throw new ApiValidationError(
-        "RATE_SNAPSHOT_CHANGED",
-        409,
-        "exchangeRate",
-      );
-    }
-    rate = authoritativeRate;
-    fxRateDate = snapshot.rateDate;
   }
 
   const baseMinor =
@@ -965,7 +908,7 @@ async function buildNewTransaction(
     fxRate: rate.canonical,
     fxSource,
     fxRateDate,
-    fxCapturedAtMs: now,
+    fxCapturedAtMs,
     baseAmountMinor: Number(baseMinor),
     baseCurrency: BASE_CURRENCY,
     baseCurrencyExponent: BASE_CURRENCY_EXPONENT,
@@ -1688,13 +1631,18 @@ export async function PATCH(request: Request) {
 
     if (preserveStoredFx) {
       proposedBody.currency = existing.originalCurrency;
-      proposedBody.exchangeRate = existing.fxRate;
-      proposedBody.exchangeRateSource =
-        existing.originalCurrency === BASE_CURRENCY ? "identity" : "manual";
-      proposedBody.rateDate = null;
     }
 
-    const proposed = await buildNewTransaction(ownerId, proposedBody, db);
+    const proposed = await buildNewTransaction(ownerId, proposedBody, db, {
+      storedFx: preserveStoredFx
+        ? {
+            fxRate: existing.fxRate,
+            fxSource: existing.fxSource,
+            fxRateDate: existing.fxRateDate,
+            fxCapturedAtMs: existing.fxCapturedAtMs,
+          }
+        : undefined,
+    });
     if (
       existing.installmentGroupId &&
       (proposed.kind !== existing.kind ||

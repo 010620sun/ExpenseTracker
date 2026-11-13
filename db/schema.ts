@@ -241,13 +241,15 @@ export const exchangeRateCache = sqliteTable(
   ],
 );
 
-// Immutable rate/date combinations that have been served to clients. Keeping
-// these snapshots lets a transaction remain verifiable after the current cache
-// advances to a newer reference date.
-export const exchangeRateSnapshots = sqliteTable(
-  "exchange_rate_snapshots",
+// Shared, demand-driven cache. One row is kept for each requested date and
+// currency, regardless of how many members use it. Transactions keep their
+// applied rate separately, so cached values can be refreshed without changing
+// ledger history.
+export const exchangeRatePairs = sqliteTable(
+  "exchange_rate_pairs",
   {
-    snapshotId: text("snapshot_id").primaryKey(),
+    cacheKey: text("cache_key").primaryKey(),
+    requestedDate: text("requested_date").notNull(),
     quoteCurrency: text("quote_currency").notNull(),
     baseCurrency: text("base_currency").notNull().default("USD"),
     usdPerUnit: text("usd_per_unit").notNull(),
@@ -259,32 +261,40 @@ export const exchangeRateSnapshots = sqliteTable(
   },
   (table) => [
     check(
-      "exchange_rate_snapshots_id",
-      sql`length(${table.snapshotId}) BETWEEN 1 AND 64 AND ${table.snapshotId} = ${table.quoteCurrency} || ':' || ${table.rateDate} || ':' || ${table.usdPerUnit}`,
+      "exchange_rate_pairs_key",
+      sql`length(${table.cacheKey}) = 14 AND ${table.cacheKey} = ${table.requestedDate} || ':' || ${table.quoteCurrency}`,
     ),
     check(
-      "exchange_rate_snapshots_quote_shape",
+      "exchange_rate_pairs_requested_date_shape",
+      sql`length(${table.requestedDate}) = 10 AND ${table.requestedDate} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`,
+    ),
+    check(
+      "exchange_rate_pairs_quote_shape",
       sql`length(${table.quoteCurrency}) = 3 AND ${table.quoteCurrency} = upper(${table.quoteCurrency})`,
     ),
     check(
-      "exchange_rate_snapshots_base_usd",
+      "exchange_rate_pairs_base_usd",
       sql`${table.baseCurrency} = 'USD'`,
     ),
     check(
-      "exchange_rate_snapshots_rate_length",
+      "exchange_rate_pairs_rate_length",
       sql`length(${table.usdPerUnit}) BETWEEN 1 AND 32`,
     ),
     check(
-      "exchange_rate_snapshots_rate_date_shape",
+      "exchange_rate_pairs_rate_date_shape",
       sql`length(${table.rateDate}) = 10 AND ${table.rateDate} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`,
     ),
     check(
-      "exchange_rate_snapshots_fetched_at_positive",
+      "exchange_rate_pairs_fetched_at_positive",
       sql`${table.fetchedAtMs} > 0`,
     ),
     check(
-      "exchange_rate_snapshots_source",
+      "exchange_rate_pairs_source",
       sql`${table.source} = 'frankfurter'`,
+    ),
+    index("idx_exchange_rate_pairs_requested_date").on(
+      table.requestedDate,
+      table.quoteCurrency,
     ),
   ],
 );
@@ -553,7 +563,7 @@ export const transactions = sqliteTable(
 export type Transaction = typeof transactions.$inferSelect;
 export type NewTransaction = typeof transactions.$inferInsert;
 export type ExchangeRateCache = typeof exchangeRateCache.$inferSelect;
-export type ExchangeRateSnapshot = typeof exchangeRateSnapshots.$inferSelect;
+export type ExchangeRatePair = typeof exchangeRatePairs.$inferSelect;
 export type RecurringSeries = typeof recurringSeries.$inferSelect;
 export type NewRecurringSeries = typeof recurringSeries.$inferInsert;
 export type MonthlyBudget = typeof monthlyBudgets.$inferSelect;

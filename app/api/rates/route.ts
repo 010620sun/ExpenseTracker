@@ -1,12 +1,10 @@
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { getDb, type AppDatabase } from "@/db";
 import { memberFromRequest } from "@/lib/auth";
 import {
   exchangeRateCache,
-  exchangeRateSnapshots,
   type ExchangeRateCache,
-  type ExchangeRateSnapshot,
 } from "@/db/schema";
 import {
   currencyExponent,
@@ -14,13 +12,14 @@ import {
   currencySymbol,
   isCurrencyCode,
 } from "@/lib/currency";
+import { resolveRequestedRates } from "@/lib/exchange-rates";
 
 export const dynamic = "force-dynamic";
 
 const BASE_CURRENCY = "USD";
 const MIN_REMOTE_CURRENCY_COUNT = 100;
 const MAX_REMOTE_CURRENCY_COUNT = 250;
-// D1 limits a statement to 100 bound parameters. Snapshot rows bind seven.
+// D1 limits a statement to 100 bound parameters. Latest-cache rows bind six.
 const CACHE_WRITE_CHUNK_SIZE = 10;
 const CACHE_TTL_MS = 60 * 60 * 1_000;
 const FETCH_TIMEOUT_MS = 5_000;
@@ -189,10 +188,6 @@ function invertUsdToQuoteRate(token: string) {
   return normalized;
 }
 
-function snapshotId(rate: Pick<NormalizedRate, "quoteCurrency" | "rateDate" | "usdPerUnit">) {
-  return `${rate.quoteCurrency}:${rate.rateDate}:${rate.usdPerUnit}`;
-}
-
 async function fetchFrankfurterRates(requestedDate?: string): Promise<NormalizedRate[]> {
   const endpoint = new URL("https://api.frankfurter.dev/v2/rates");
   endpoint.searchParams.set("base", BASE_CURRENCY);
@@ -335,8 +330,6 @@ async function readCompleteCache(db: AppDatabase, now: number) {
 }
 
 async function writeCache(db: AppDatabase, rates: NormalizedRate[]) {
-  await writeSnapshots(db, rates);
-
   for (let index = 0; index < rates.length; index += CACHE_WRITE_CHUNK_SIZE) {
     const chunk = rates.slice(index, index + CACHE_WRITE_CHUNK_SIZE);
     await db
@@ -364,66 +357,10 @@ async function writeCache(db: AppDatabase, rates: NormalizedRate[]) {
   }
 }
 
-async function writeSnapshots(db: AppDatabase, rates: NormalizedRate[]) {
-  for (let index = 0; index < rates.length; index += CACHE_WRITE_CHUNK_SIZE) {
-    const chunk = rates.slice(index, index + CACHE_WRITE_CHUNK_SIZE);
-    await db
-      .insert(exchangeRateSnapshots)
-      .values(
-        chunk.map((rate) => ({
-          snapshotId: snapshotId(rate),
-          quoteCurrency: rate.quoteCurrency,
-          baseCurrency: BASE_CURRENCY,
-          usdPerUnit: rate.usdPerUnit,
-          rateDate: rate.rateDate,
-          fetchedAtMs: rate.fetchedAtMs,
-          source: rate.source,
-        })),
-      )
-      .onConflictDoUpdate({
-        target: exchangeRateSnapshots.snapshotId,
-        set: { fetchedAtMs: chunk[0].fetchedAtMs },
-      });
-  }
-}
-
-async function readHistoricalSnapshot(
-  db: AppDatabase,
-  requestedDate: string,
-  requiredQuotes: string[],
-) {
-  const rows = await db
-    .select()
-    .from(exchangeRateSnapshots)
-    .where(
-      and(
-        eq(exchangeRateSnapshots.baseCurrency, BASE_CURRENCY),
-        eq(exchangeRateSnapshots.rateDate, requestedDate),
-      ),
-    );
-  const latestByQuote = new Map<string, ExchangeRateSnapshot>();
-  for (const row of rows) {
-    const current = latestByQuote.get(row.quoteCurrency);
-    if (!current || current.fetchedAtMs < row.fetchedAtMs) {
-      latestByQuote.set(row.quoteCurrency, row);
-    }
-  }
-  const snapshot = [...latestByQuote.values()];
-  const containsRequiredQuotes = requiredQuotes.every(
-    (quote) => quote === BASE_CURRENCY || latestByQuote.has(quote),
-  );
-  return containsRequiredQuotes &&
-    snapshot.length >= MIN_REMOTE_CURRENCY_COUNT &&
-    snapshot.length <= MAX_REMOTE_CURRENCY_COUNT
-    ? snapshot.sort((left, right) =>
-        left.quoteCurrency.localeCompare(right.quoteCurrency),
-      )
-    : null;
-}
-
 function rateResponse(
   rows: Array<NormalizedRate | ExchangeRateCache>,
   stale: boolean,
+  requestedDate?: string,
 ) {
   const rates: Record<string, string> = { USD: "1" };
   const remoteRateDates: Record<string, string> = {};
@@ -438,7 +375,7 @@ function rateResponse(
 
   const asOf = Object.values(remoteRateDates).reduce(
     (oldest, date) => (!oldest || date < oldest ? date : oldest),
-    "",
+    requestedDate ?? "",
   );
   const rateDates = {
     USD: asOf,
@@ -469,7 +406,9 @@ function rateResponse(
         rateDates,
         currencies,
         asOf,
-        fetchedAt: new Date(fetchedAtMs).toISOString(),
+        fetchedAt: new Date(
+          fetchedAtMs === Number.MAX_SAFE_INTEGER ? Date.now() : fetchedAtMs,
+        ).toISOString(),
         stale,
         source: "frankfurter",
       },
@@ -520,23 +459,18 @@ export async function GET(request: Request) {
       );
     }
     try {
-      try {
-        const stored = await readHistoricalSnapshot(
-          db,
-          requestedDate,
-          requiredQuotes,
-        );
-        if (stored) return rateResponse(stored, false);
-      } catch (error) {
-        console.error("[rates] Historical cache read failed", error);
+      const nonUsdQuotes = requiredQuotes.filter(
+        (quote) => quote !== BASE_CURRENCY,
+      );
+      if (nonUsdQuotes.length === 0) {
+        return rateResponse([], false, requestedDate);
       }
-      const historicalRates = await fetchFrankfurterRates(requestedDate);
-      try {
-        await writeSnapshots(db, historicalRates);
-      } catch (error) {
-        console.error("[rates] Historical cache write failed", error);
-      }
-      return rateResponse(historicalRates, false);
+      const historical = await resolveRequestedRates(
+        db,
+        requestedDate,
+        nonUsdQuotes,
+      );
+      return rateResponse(historical.rates, historical.stale, requestedDate);
     } catch (error) {
       console.error("[rates] Historical lookup failed", error);
       return unavailableResponse();

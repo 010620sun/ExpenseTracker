@@ -99,6 +99,13 @@
       "when": 1788250467120,
       "tag": "0013_flimsy_franklin_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1794593036056,
+      "tag": "0014_vengeful_metal_master",
+      "breakpoints": true
     }
   ]
 }
