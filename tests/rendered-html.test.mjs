@@ -143,10 +143,12 @@ test("allows transactions without an optional subcategory", async () => {
   assert.match(transactionRoute, /subcategory = normalizedSubcategory \|\| null/u);
 });
 
-test("classifies new transactions with Workers AI and keeps a safe fallback", async () => {
-  const [classifier, transactionRoute, wrangler, schema, migration] = await Promise.all([
+test("previews and saves automatic classifications with Workers AI and a safe fallback", async () => {
+  const [classifier, classificationRoute, transactionRoute, tracker, wrangler, schema, migration] = await Promise.all([
     readFile(new URL("../lib/transaction-classifier.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/transactions/classify/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/transactions/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
     readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(new URL("../drizzle/0015_clean_thena.sql", import.meta.url), "utf8"),
@@ -155,8 +157,19 @@ test("classifies new transactions with Workers AI and keeps a safe fallback", as
   assert.match(classifier, /@cf\/meta\/llama-3\.2-3b-instruct/u);
   assert.match(classifier, /Return only compact JSON/u);
   assert.match(classifier, /source: "fallback"/u);
+  assert.match(classificationRoute, /await classifyTransaction/u);
+  assert.match(classificationRoute, /memberFromRequest/u);
+  assert.match(classificationRoute, /isSameOrigin/u);
+  assert.match(classificationRoute, /eq\(transactions\.ownerId, member\.id\)/u);
+  assert.match(classificationRoute, /known\.tags/u);
   assert.match(transactionRoute, /await classifyTransaction/u);
+  assert.match(transactionRoute, /suggestedSource === "ai"/u);
   assert.match(transactionRoute, /classificationSource/u);
+  assert.match(tracker, /\/api\/transactions\/classify/u);
+  assert.match(tracker, /classificationSuggestion\?\.queryKey === classificationQueryKey/u);
+  assert.match(tracker, /TRANSACTION_TAG_IDS\.map/u);
+  assert.match(tracker, /classificationCacheRef/u);
+  assert.match(tracker, /controller\.abort\(\)/u);
   assert.equal([...schema.matchAll(/tags: text\("tags"/gu)].length, 2);
   assert.match(migration, /CREATE TABLE `category_v1_transactions`/u);
   assert.match(migration, /`classification_source` = 'legacy'/u);

@@ -921,8 +921,31 @@ async function buildNewTransaction(
     }
     subcategory = normalizedSubcategory || null;
     tags = normalizeTags(body.tags);
-    classificationSource = "manual";
-    classificationConfidence = null;
+    const suggestedSource = body.classificationSource;
+    if (
+      suggestedSource === "rule" ||
+      suggestedSource === "ai" ||
+      suggestedSource === "fallback"
+    ) {
+      const rawConfidence = body.classificationConfidence;
+      if (
+        typeof rawConfidence !== "number" ||
+        !Number.isInteger(rawConfidence) ||
+        rawConfidence < 0 ||
+        rawConfidence > 100
+      ) {
+        throw new ApiValidationError(
+          "INVALID_CLASSIFICATION_CONFIDENCE",
+          400,
+          "classificationConfidence",
+        );
+      }
+      classificationSource = suggestedSource;
+      classificationConfidence = rawConfidence;
+    } else {
+      classificationSource = "manual";
+      classificationConfidence = null;
+    }
   } else {
     const rawLanguage = body.language;
     const classification = await classifyTransaction({

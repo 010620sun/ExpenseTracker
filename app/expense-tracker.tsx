@@ -43,7 +43,7 @@ import {
   persistLanguagePreference,
   type Language,
 } from "@/lib/language";
-import { transactionTagLabel } from "@/lib/tags";
+import { TRANSACTION_TAG_IDS, transactionTagLabel } from "@/lib/tags";
 
 const MAX_DISTRIBUTION_COUNT = 120;
 
@@ -100,6 +100,21 @@ type TransactionApiResponse = {
   data?: LedgerTransaction[] | LedgerTransaction;
   transaction?: LedgerTransaction;
   pagination?: { nextCursor?: string | null };
+  error?: { code?: string; field?: string };
+};
+
+type ClassificationSuggestion = {
+  category: string;
+  subcategory: string;
+  tags: string[];
+  confidence: number;
+  source: "rule" | "ai" | "fallback";
+  version: number;
+  queryKey: string;
+};
+
+type ClassificationSuggestionResponse = {
+  data?: Omit<ClassificationSuggestion, "queryKey">;
   error?: { code?: string; field?: string };
 };
 
@@ -635,7 +650,15 @@ const COPY = {
     chooseCategory: "Choose a category",
     categoryHint: "Choose the closest match for this transaction.",
     autoCategory: "Automatic category",
-    autoCategoryHint: "The title will be classified when you save. You can correct it later.",
+    autoCategoryHint: "Enter a title to preview a category and tags before saving.",
+    recommendationLoading: "Finding the best match…",
+    recommendationReady: "Recommended from the title",
+    recommendationReview: "Low confidence — please review this suggestion.",
+    manualClassification: "Your category and tag selection",
+    editRecommendation: "Change",
+    closeRecommendationEditor: "Done",
+    suggestedTags: "Tags",
+    noSuggestedTags: "No tags suggested",
     subcategory: "Subcategory (optional)",
     subcategoryHint: "Add a more precise label, or leave it unset.",
     noSubcategory: "None",
@@ -789,7 +812,15 @@ const COPY = {
     chooseCategory: "카테고리 선택",
     categoryHint: "이 거래에 가장 알맞은 항목을 선택하세요.",
     autoCategory: "자동 카테고리",
-    autoCategoryHint: "저장할 때 제목을 분류합니다. 이후 언제든 수정할 수 있습니다.",
+    autoCategoryHint: "제목을 입력하면 저장 전에 카테고리와 태그를 추천합니다.",
+    recommendationLoading: "알맞은 항목을 찾고 있어요…",
+    recommendationReady: "제목을 바탕으로 추천했어요",
+    recommendationReview: "확신이 낮은 추천입니다. 내용을 확인해 주세요.",
+    manualClassification: "직접 선택한 카테고리와 태그예요",
+    editRecommendation: "수정",
+    closeRecommendationEditor: "완료",
+    suggestedTags: "태그",
+    noSuggestedTags: "추천 태그 없음",
     subcategory: "세부 카테고리(선택)",
     subcategoryHint: "필요한 경우에만 더 구체적인 항목을 선택하세요.",
     noSubcategory: "선택 안 함",
@@ -943,7 +974,15 @@ const COPY = {
     chooseCategory: "カテゴリーを選択",
     categoryHint: "この取引に最も合う項目を選んでください。",
     autoCategory: "自動カテゴリー",
-    autoCategoryHint: "保存時にタイトルから分類します。後から修正できます。",
+    autoCategoryHint: "タイトルを入力すると、保存前にカテゴリーとタグを提案します。",
+    recommendationLoading: "最適な項目を探しています…",
+    recommendationReady: "タイトルからのおすすめ",
+    recommendationReview: "確度が低い提案です。内容を確認してください。",
+    manualClassification: "選択したカテゴリーとタグ",
+    editRecommendation: "変更",
+    closeRecommendationEditor: "完了",
+    suggestedTags: "タグ",
+    noSuggestedTags: "おすすめタグなし",
     subcategory: "サブカテゴリー（任意）",
     subcategoryHint: "必要な場合のみ、より具体的な項目を選択してください。",
     noSubcategory: "未指定",
@@ -1097,7 +1136,15 @@ const COPY = {
     chooseCategory: "Выберите категорию",
     categoryHint: "Выберите наиболее подходящую категорию операции.",
     autoCategory: "Автокатегория",
-    autoCategoryHint: "Категория определяется по названию при сохранении. Её можно исправить позже.",
+    autoCategoryHint: "Введите название, чтобы увидеть категорию и теги до сохранения.",
+    recommendationLoading: "Подбираем лучший вариант…",
+    recommendationReady: "Рекомендация по названию",
+    recommendationReview: "Низкая уверенность — проверьте рекомендацию.",
+    manualClassification: "Выбранные вами категория и теги",
+    editRecommendation: "Изменить",
+    closeRecommendationEditor: "Готово",
+    suggestedTags: "Теги",
+    noSuggestedTags: "Теги не предложены",
     subcategory: "Подкатегория (необязательно)",
     subcategoryHint: "При необходимости выберите более точный вариант.",
     noSubcategory: "Без уточнения",
@@ -1614,6 +1661,14 @@ export function ExpenseTracker({
     useState<CurrencyCode>("KRW");
   const [category, setCategory] = useState("other");
   const [subcategory, setSubcategory] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [classificationSuggestion, setClassificationSuggestion] =
+    useState<ClassificationSuggestion | null>(null);
+  const [classificationStatus, setClassificationStatus] =
+    useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [isClassificationEditorOpen, setIsClassificationEditorOpen] =
+    useState(false);
+  const [isClassificationManual, setIsClassificationManual] = useState(false);
   const [isCategoryPickerOpen, setIsCategoryPickerOpen] = useState(false);
   const [note, setNote] = useState("");
   const [occurredOn, setOccurredOn] = useState(today);
@@ -1637,6 +1692,10 @@ export function ExpenseTracker({
   );
   const drawerReturnDateRef = useRef(today);
   const isSavingRef = useRef(false);
+  const isClassificationManualRef = useRef(false);
+  const classificationCacheRef = useRef(
+    new Map<string, Omit<ClassificationSuggestion, "queryKey">>(),
+  );
   const calendarButtonRefs = useRef<Record<string, HTMLButtonElement | null>>(
     {},
   );
@@ -1655,6 +1714,7 @@ export function ExpenseTracker({
   const activeCategoryGroups = categoryGroupsForKind(kind);
   const hasSelectedCategory = activeCategoryOptions.some((item) => item === category);
   const activeSubcategoryOptions = subcategoryIdsForCategory(category);
+  const classificationQueryKey = `${kind}\u0000${language}\u0000${description.trim()}`;
   const transactionCurrencyCatalog = useMemo(() => {
     if (currencyCatalog.some((item) => item.code === currency)) {
       return currencyCatalog;
@@ -1698,6 +1758,67 @@ export function ExpenseTracker({
     document.documentElement.lang = language;
     if (languageReady) persistLanguagePreference(language);
   }, [language, languageReady]);
+
+  useEffect(() => {
+    const title = description.trim();
+    if (!isDrawerOpen || editingTransaction || title.length < 2) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      const cached = classificationCacheRef.current.get(classificationQueryKey);
+      if (cached) {
+        const suggestion = { ...cached, queryKey: classificationQueryKey };
+        setClassificationSuggestion(suggestion);
+        setClassificationStatus("ready");
+        if (!isClassificationManualRef.current) {
+          setCategory(suggestion.category);
+          setSubcategory(suggestion.subcategory);
+          setSelectedTags(suggestion.tags);
+        }
+        return;
+      }
+      void (async () => {
+        try {
+          const response = await fetch("/api/transactions/classify", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ kind, description: title, language }),
+            signal: controller.signal,
+          });
+          const payload = (await response.json()) as ClassificationSuggestionResponse;
+          if (!response.ok || !payload.data) throw new Error(payload.error?.code ?? "CLASSIFICATION_FAILED");
+          const suggestion: ClassificationSuggestion = {
+            ...payload.data,
+            queryKey: classificationQueryKey,
+          };
+          if (classificationCacheRef.current.size >= 50) {
+            const oldestKey = classificationCacheRef.current.keys().next().value;
+            if (typeof oldestKey === "string") classificationCacheRef.current.delete(oldestKey);
+          }
+          classificationCacheRef.current.set(classificationQueryKey, payload.data);
+          setClassificationSuggestion(suggestion);
+          setClassificationStatus("ready");
+          if (!isClassificationManualRef.current) {
+            setCategory(suggestion.category);
+            setSubcategory(suggestion.subcategory);
+            setSelectedTags(suggestion.tags);
+          }
+        } catch (error) {
+          if (controller.signal.aborted) return;
+          console.error("[transaction-classifier] Preview failed", error);
+          setClassificationSuggestion(null);
+          setClassificationStatus("error");
+        }
+      })();
+    }, 650);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [classificationQueryKey, description, editingTransaction, isDrawerOpen, kind, language]);
 
   useEffect(() => {
     window.localStorage.setItem("globeledger-valuation-mode", valuationMode);
@@ -2511,6 +2632,12 @@ export function ExpenseTracker({
     setCurrency(lastTransactionCurrency);
     setCategory("other");
     setSubcategory("");
+    setSelectedTags([]);
+    setClassificationSuggestion(null);
+    setClassificationStatus("idle");
+    setIsClassificationEditorOpen(false);
+    setIsClassificationManual(false);
+    isClassificationManualRef.current = false;
     setNote("");
     setOccurredOn(date);
     setIsRecurring(false);
@@ -2565,6 +2692,12 @@ export function ExpenseTracker({
     setCurrency(transaction.originalCurrency);
     setCategory(transaction.category);
     setSubcategory(transaction.subcategory ?? "");
+    setSelectedTags(transaction.tags ?? []);
+    setClassificationSuggestion(null);
+    setClassificationStatus("idle");
+    setIsClassificationEditorOpen(false);
+    setIsClassificationManual(true);
+    isClassificationManualRef.current = true;
     setNote(transaction.note ?? "");
     setOccurredOn(transaction.occurredOn);
     setIsRecurring(false);
@@ -2581,8 +2714,26 @@ export function ExpenseTracker({
   function chooseCategory(nextCategory: string) {
     setCategory(nextCategory);
     setSubcategory("");
+    setIsClassificationManual(true);
+    isClassificationManualRef.current = true;
     setIsCategoryPickerOpen(false);
     window.requestAnimationFrame(() => categoryTriggerRef.current?.focus());
+  }
+
+  function chooseSubcategory(nextSubcategory: string) {
+    setSubcategory(nextSubcategory);
+    setIsClassificationManual(true);
+    isClassificationManualRef.current = true;
+  }
+
+  function toggleClassificationTag(tag: string) {
+    setSelectedTags((current) =>
+      current.includes(tag)
+        ? current.filter((item) => item !== tag)
+        : [...current, tag],
+    );
+    setIsClassificationManual(true);
+    isClassificationManualRef.current = true;
   }
 
   function handleCategoryKeyDown(
@@ -2750,6 +2901,11 @@ export function ExpenseTracker({
     setIsSaving(true);
     setFormError("");
     try {
+      const reusableSuggestion =
+        !editingTransaction &&
+        classificationSuggestion?.queryKey === classificationQueryKey
+          ? classificationSuggestion
+          : null;
       const endpoint = editingTransaction
         ? `/api/transactions?id=${encodeURIComponent(editingTransaction.id)}`
         : "/api/transactions";
@@ -2769,9 +2925,21 @@ export function ExpenseTracker({
             ? {
                 category,
                 subcategory: subcategory || null,
-                tags: editingTransaction.tags ?? [],
+                tags: selectedTags,
               }
-            : {}),
+            : reusableSuggestion
+              ? {
+                  category,
+                  subcategory: subcategory || null,
+                  tags: selectedTags,
+                  classificationSource: isClassificationManual
+                    ? "manual"
+                    : reusableSuggestion.source,
+                  classificationConfidence: isClassificationManual
+                    ? null
+                    : reusableSuggestion.confidence,
+                }
+              : {}),
           description: description.trim(),
           note: note.trim(),
           ...(!editingTransaction && isRecurring
@@ -3609,12 +3777,12 @@ export function ExpenseTracker({
             </div>
             <form onSubmit={handleSubmit}>
               <div className="kind-switch" aria-label={`${copy.expense} / ${copy.income}`}>
-                <button type="button" disabled={locksInstallmentStructure} aria-pressed={kind === "expense"} className={kind === "expense" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("expense"); if (!isExpenseCategory(category)) { setCategory("other"); setSubcategory(""); } }}>{copy.expense}</button>
-                <button type="button" disabled={locksInstallmentStructure} aria-pressed={kind === "income"} className={kind === "income" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("income"); if (!isIncomeCategory(category)) { setCategory("other_income"); setSubcategory(""); } setIsDistributed(false); }}>{copy.income}</button>
+                <button type="button" disabled={locksInstallmentStructure} aria-pressed={kind === "expense"} className={kind === "expense" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("expense"); setClassificationSuggestion(null); setClassificationStatus(description.trim().length >= 2 ? "loading" : "idle"); setIsClassificationManual(false); isClassificationManualRef.current = false; if (!isExpenseCategory(category)) { setCategory("other"); setSubcategory(""); setSelectedTags([]); } }}>{copy.expense}</button>
+                <button type="button" disabled={locksInstallmentStructure} aria-pressed={kind === "income"} className={kind === "income" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("income"); setClassificationSuggestion(null); setClassificationStatus(description.trim().length >= 2 ? "loading" : "idle"); setIsClassificationManual(false); isClassificationManualRef.current = false; if (!isIncomeCategory(category)) { setCategory("other_income"); setSubcategory(""); setSelectedTags([]); } setIsDistributed(false); }}>{copy.income}</button>
               </div>
               <label className="field">
                 <span>{copy.merchant}</span>
-                <input ref={descriptionRef} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={80} placeholder={kind === "expense" ? copy.merchantPlaceholderExpense : copy.merchantPlaceholderIncome} />
+                <input ref={descriptionRef} value={description} onChange={(event) => { const nextDescription = event.target.value; setDescription(nextDescription); setClassificationSuggestion(null); setClassificationStatus(nextDescription.trim().length >= 2 ? "loading" : "idle"); }} maxLength={80} placeholder={kind === "expense" ? copy.merchantPlaceholderExpense : copy.merchantPlaceholderIncome} />
               </label>
               <div className="field-row amount-row">
                 <label className="field">
@@ -3652,15 +3820,54 @@ export function ExpenseTracker({
                 </details>
               </div>
               {!editingTransaction && (
-                <div className="auto-category-notice" aria-live="polite">
-                  <CategoryIcon category={kind === "income" ? "other_income" : "other"} />
-                  <span>
-                    <strong>{copy.autoCategory}</strong>
-                    <small>{copy.autoCategoryHint}</small>
+                <div className={`auto-category-notice ${classificationStatus}`} aria-live="polite">
+                  <span
+                    className="auto-category-icon"
+                    style={{
+                      backgroundColor: `${categoryColor(category)}18`,
+                      color: categoryColor(category),
+                    }}
+                    aria-hidden="true"
+                  >
+                    <CategoryIcon category={category} />
                   </span>
+                  <span className="auto-category-copy">
+                    <strong>
+                      {classificationStatus === "ready" && classificationSuggestion?.queryKey === classificationQueryKey
+                        ? categoryPathLabel(category, subcategory, language)
+                        : copy.autoCategory}
+                    </strong>
+                    <small>
+                      {classificationStatus === "loading"
+                        ? copy.recommendationLoading
+                        : classificationStatus === "ready" && classificationSuggestion?.queryKey === classificationQueryKey
+                          ? isClassificationManual
+                            ? copy.manualClassification
+                            : classificationSuggestion.confidence < 60
+                            ? copy.recommendationReview
+                            : copy.recommendationReady
+                          : copy.autoCategoryHint}
+                    </small>
+                    {classificationStatus === "ready" && classificationSuggestion?.queryKey === classificationQueryKey && (
+                      <span className="suggested-tag-list">
+                        {selectedTags.length > 0
+                          ? selectedTags.map((tag) => <i key={tag}>{transactionTagLabel(tag, language)}</i>)
+                          : <i>{copy.noSuggestedTags}</i>}
+                      </span>
+                    )}
+                  </span>
+                  {classificationStatus === "ready" && classificationSuggestion?.queryKey === classificationQueryKey && (
+                    <button
+                      type="button"
+                      className="auto-category-edit"
+                      onClick={() => setIsClassificationEditorOpen((open) => !open)}
+                    >
+                      {isClassificationEditorOpen ? copy.closeRecommendationEditor : copy.editRecommendation}
+                    </button>
+                  )}
                 </div>
               )}
-              {editingTransaction && <div className="field category-field">
+              {(editingTransaction || isClassificationEditorOpen) && <div className="field category-field">
                   <span id="category-field-label">{copy.category}</span>
                   <div className="category-picker">
                     <button
@@ -3740,7 +3947,7 @@ export function ExpenseTracker({
                     )}
                   </div>
                 </div>}
-              {editingTransaction && activeSubcategoryOptions.length > 0 && (
+              {(editingTransaction || isClassificationEditorOpen) && activeSubcategoryOptions.length > 0 && (
                 <div className="field subcategory-field">
                   <span>{copy.subcategory}</span>
                   <small>{copy.subcategoryHint}</small>
@@ -3749,7 +3956,7 @@ export function ExpenseTracker({
                       type="button"
                       className={!subcategory ? "selected" : ""}
                       aria-pressed={!subcategory}
-                      onClick={() => setSubcategory("")}
+                      onClick={() => chooseSubcategory("")}
                     >
                       {copy.noSubcategory}
                     </button>
@@ -3759,9 +3966,27 @@ export function ExpenseTracker({
                         className={subcategory === item ? "selected" : ""}
                         aria-pressed={subcategory === item}
                         key={item}
-                        onClick={() => setSubcategory(item)}
+                        onClick={() => chooseSubcategory(item)}
                       >
                         {subcategoryLabel(item, language)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(editingTransaction || isClassificationEditorOpen) && (
+                <div className="field classification-tags-field">
+                  <span>{copy.suggestedTags}</span>
+                  <div className="subcategory-options" role="group" aria-label={copy.suggestedTags}>
+                    {TRANSACTION_TAG_IDS.map((tag) => (
+                      <button
+                        type="button"
+                        className={selectedTags.includes(tag) ? "selected" : ""}
+                        aria-pressed={selectedTags.includes(tag)}
+                        key={tag}
+                        onClick={() => toggleClassificationTag(tag)}
+                      >
+                        {transactionTagLabel(tag, language)}
                       </button>
                     ))}
                   </div>

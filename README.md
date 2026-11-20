@@ -16,8 +16,8 @@ also available and each member's last-used language is remembered.
   currently supplied by Frankfurter
 - Use the monthly calendar to add, edit, and review transactions by date
 - Search the full transaction history by text, type, category, and currency
-- Let the server classify a transaction title into a concise behavioral
-  category, then correct the result later when needed
+- Preview a recommended behavioral category and context tags while entering a
+  transaction, then adjust the suggestion before saving when needed
 - Keep context such as travel, family, pets, or gifts as independent tags
 - Split one purchase across consecutive dates or make an exact monthly
   installment plan
@@ -60,8 +60,8 @@ for source coverage.
 - App Router-compatible React application built with Vinext
 - Cloudflare Workers for the web runtime
 - Cloudflare D1 with Drizzle ORM for member-owned data
-- Cloudflare Workers AI for multilingual transaction classification, with
-  deterministic rules and a non-blocking fallback
+- Cloudflare Workers AI for multilingual category and tag recommendations,
+  with deterministic rules and a non-blocking fallback
 - Workers Web Crypto for PBKDF2 password hashes and session-token hashing
 - Frankfurter v2 for reference exchange rates
 - TypeScript, ESLint, and Node's built-in test runner
