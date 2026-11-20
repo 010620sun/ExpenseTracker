@@ -16,7 +16,9 @@ also available and each member's last-used language is remembered.
   currently supplied by Frankfurter
 - Use the monthly calendar to add, edit, and review transactions by date
 - Search the full transaction history by text, type, category, and currency
-- Use detailed expense and income categories; subcategories are optional
+- Let the server classify a transaction title into a concise behavioral
+  category, then correct the result later when needed
+- Keep context such as travel, family, pets, or gifts as independent tags
 - Split one purchase across consecutive dates or make an exact monthly
   installment plan
 - Manage weekly, monthly, and yearly recurring income or expenses
@@ -58,6 +60,8 @@ for source coverage.
 - App Router-compatible React application built with Vinext
 - Cloudflare Workers for the web runtime
 - Cloudflare D1 with Drizzle ORM for member-owned data
+- Cloudflare Workers AI for multilingual transaction classification, with
+  deterministic rules and a non-blocking fallback
 - Workers Web Crypto for PBKDF2 password hashes and session-token hashing
 - Frankfurter v2 for reference exchange rates
 - TypeScript, ESLint, and Node's built-in test runner
@@ -94,7 +98,8 @@ preferences, and onboarding status are isolated per member.
 ## Deploying to Cloudflare Workers + D1
 
 The Workers configuration is in [`wrangler.jsonc`](./wrangler.jsonc). The D1
-binding is named `DB` and uses migrations in `drizzle/`.
+binding is named `DB`, the Workers AI binding is named `AI`, and migrations are
+stored in `drizzle/`.
 
 ```bash
 # First-time setup only

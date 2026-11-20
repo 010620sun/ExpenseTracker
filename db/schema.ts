@@ -151,25 +151,15 @@ export const monthlyBudgets = sqliteTable(
     category: text("category", {
       enum: [
         "housing",
-        "utilities",
-        "communication",
-        "groceries",
-        "dining",
+        "food",
         "transport",
-        "vehicle",
-        "travel",
-        "health",
-        "personal_care",
+        "care",
         "education",
         "shopping",
-        "entertainment",
-        "subscriptions",
-        "family",
-        "pets",
-        "gifts",
-        "insurance",
-        "taxes",
-        "financial",
+        "leisure",
+        "digital",
+        "finance",
+        "giving",
         "other",
       ],
     }).notNull(),
@@ -186,7 +176,7 @@ export const monthlyBudgets = sqliteTable(
     ),
     check(
       "monthly_budgets_category_supported",
-      sql`${table.category} IN ('housing', 'utilities', 'communication', 'groceries', 'dining', 'transport', 'vehicle', 'travel', 'health', 'personal_care', 'education', 'shopping', 'entertainment', 'subscriptions', 'family', 'pets', 'gifts', 'insurance', 'taxes', 'financial', 'other')`,
+      sql`${table.category} IN ('housing', 'food', 'transport', 'care', 'education', 'shopping', 'leisure', 'digital', 'finance', 'giving', 'other')`,
     ),
     check(
       "monthly_budgets_amount_range",
@@ -325,6 +315,12 @@ export const recurringSeries = sqliteTable(
     fallbackFxRateDate: text("fallback_fx_rate_date"),
     category: text("category").notNull().default("other"),
     subcategory: text("subcategory"),
+    tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default([]),
+    categoryVersion: integer("category_version").notNull().default(2),
+    classificationSource: text("classification_source", {
+      enum: ["legacy", "rule", "ai", "manual", "fallback"],
+    }).notNull().default("manual"),
+    classificationConfidence: integer("classification_confidence"),
     description: text("description").notNull(),
     note: text("note").notNull().default(""),
     createdAtMs: integer("created_at_ms").notNull(),
@@ -356,6 +352,15 @@ export const recurringSeries = sqliteTable(
     check(
       "recurring_series_text",
       sql`length(${table.category}) BETWEEN 1 AND 40 AND length(${table.description}) BETWEEN 1 AND 120 AND length(${table.note}) <= 500`,
+    ),
+    check("recurring_series_category_version", sql`${table.categoryVersion} = 2`),
+    check(
+      "recurring_series_classification_source",
+      sql`${table.classificationSource} IN ('legacy', 'rule', 'ai', 'manual', 'fallback')`,
+    ),
+    check(
+      "recurring_series_classification_confidence",
+      sql`${table.classificationConfidence} IS NULL OR ${table.classificationConfidence} BETWEEN 0 AND 100`,
     ),
     check(
       "recurring_series_timestamps",
@@ -436,6 +441,12 @@ export const transactions = sqliteTable(
 
     category: text("category").notNull().default("other"),
     subcategory: text("subcategory"),
+    tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default([]),
+    categoryVersion: integer("category_version").notNull().default(2),
+    classificationSource: text("classification_source", {
+      enum: ["legacy", "rule", "ai", "manual", "fallback"],
+    }).notNull().default("manual"),
+    classificationConfidence: integer("classification_confidence"),
     description: text("description").notNull(),
     note: text("note").notNull().default(""),
     recurringSeriesId: text("recurring_series_id").references(
@@ -516,6 +527,15 @@ export const transactions = sqliteTable(
     check(
       "transactions_category_length",
       sql`length(${table.category}) BETWEEN 1 AND 40`,
+    ),
+    check("transactions_category_version", sql`${table.categoryVersion} = 2`),
+    check(
+      "transactions_classification_source",
+      sql`${table.classificationSource} IN ('legacy', 'rule', 'ai', 'manual', 'fallback')`,
+    ),
+    check(
+      "transactions_classification_confidence",
+      sql`${table.classificationConfidence} IS NULL OR ${table.classificationConfidence} BETWEEN 0 AND 100`,
     ),
     check(
       "transactions_description_length",

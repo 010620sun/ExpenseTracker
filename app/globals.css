@@ -2173,6 +2173,23 @@ a.nav-item {
   margin-top: 4px;
 }
 
+.transaction-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.transaction-tags i {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #eef4f1;
+  color: #506861;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 650;
+}
+
 .original-value,
 .base-value {
   text-align: right;
@@ -2665,6 +2682,38 @@ a.nav-item {
 
 .category-picker {
   position: relative;
+}
+
+.auto-category-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #d9e4df;
+  border-radius: 14px;
+  background: #f5f9f7;
+  color: #315d50;
+}
+
+.auto-category-notice > svg {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+}
+
+.auto-category-notice span {
+  display: grid;
+  gap: 3px;
+}
+
+.auto-category-notice strong,
+.auto-category-notice small {
+  display: block;
+}
+
+.auto-category-notice small {
+  color: #62736d;
+  line-height: 1.45;
 }
 
 .category-trigger {

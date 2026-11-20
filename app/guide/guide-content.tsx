@@ -64,7 +64,7 @@ const COPY = {
     quickStartHint: "You can change every setting later.",
     steps: [
       { title: "Choose your base currency", body: "Pick the currency you use to understand your overall balance. Each transaction still keeps its original currency." },
-      { title: "Add your first transaction", body: "Enter an expense or income, then choose its date, category, payment currency, and optional details." },
+      { title: "Add your first transaction", body: "Enter a clear title, amount, date, and currency. GlobeLedger assigns the category automatically." },
       { title: "Set your first budget", body: "Choose a monthly category limit. You can adjust it at any time as your spending plan changes." },
     ],
     progress: "{done} of {total} complete",
@@ -96,7 +96,7 @@ const COPY = {
     faqHint: "Quick answers for the parts that are easy to miss.",
     questions: [
       { title: "Can I record a future transaction?", body: "Yes. Future entries are allowed. When no future exchange rate exists, GlobeLedger clearly marks the available rate basis." },
-      { title: "Do I need to choose a subcategory?", body: "No. A main category is enough; subcategories are optional and only add detail to reports and searches." },
+      { title: "How are categories assigned?", body: "GlobeLedger classifies the title by what was bought or where income came from. You can correct the result when editing the transaction." },
       { title: "Does my transaction currency change my base currency?", body: "No. The last-used transaction currency and your app-wide base currency are remembered independently." },
     ],
     closingTitle: "Ready to make the month clearer?",
@@ -113,7 +113,7 @@ const COPY = {
     quickStartHint: "모든 설정은 나중에 다시 변경할 수 있습니다.",
     steps: [
       { title: "기준 통화 선택", body: "전체 자산 흐름을 확인할 기준 통화를 선택하세요. 각 거래의 원래 결제 통화는 그대로 보존됩니다." },
-      { title: "첫 거래 추가", body: "지출 또는 수입을 선택하고 날짜, 카테고리, 결제 통화와 필요한 세부 내용을 입력하세요." },
+      { title: "첫 거래 추가", body: "명확한 제목과 금액, 날짜, 통화를 입력하세요. 카테고리는 GlobeLedger가 자동으로 지정합니다." },
       { title: "첫 예산 설정", body: "카테고리별 월간 한도를 하나 설정하세요. 지출 계획이 바뀌면 언제든 조정할 수 있습니다." },
     ],
     progress: "{total}개 중 {done}개 완료",
@@ -145,7 +145,7 @@ const COPY = {
     faqHint: "놓치기 쉬운 기능을 빠르게 확인하세요.",
     questions: [
       { title: "미래 거래도 기록할 수 있나요?", body: "가능합니다. 미래 환율이 아직 없을 때는 현재 사용할 수 있는 환율 기준을 명확히 표시합니다." },
-      { title: "세부 카테고리를 반드시 선택해야 하나요?", body: "아닙니다. 기본 카테고리만으로 저장할 수 있으며 세부 카테고리는 리포트와 검색을 더 자세하게 만들 때 선택합니다." },
+      { title: "카테고리는 어떻게 정해지나요?", body: "구매한 대상이나 수입원을 제목에서 판단해 자동으로 분류합니다. 결과가 다르면 거래 수정 화면에서 바로잡을 수 있습니다." },
       { title: "거래 통화를 바꾸면 기준 통화도 바뀌나요?", body: "바뀌지 않습니다. 마지막 거래 통화와 앱의 기준 통화는 서로 독립적으로 기억됩니다." },
     ],
     closingTitle: "이번 달의 흐름을 정리해 볼까요?",
@@ -162,7 +162,7 @@ const COPY = {
     quickStartHint: "すべての設定は後から変更できます。",
     steps: [
       { title: "基本通貨を選ぶ", body: "家計全体を把握するための通貨を選びます。各取引の元の決済通貨はそのまま保存されます。" },
-      { title: "最初の取引を追加", body: "支出または収入を選び、日付、カテゴリー、決済通貨、必要な詳細を入力します。" },
+      { title: "最初の取引を追加", body: "分かりやすいタイトル、金額、日付、通貨を入力します。カテゴリーはGlobeLedgerが自動で設定します。" },
       { title: "最初の予算を設定", body: "カテゴリーごとの月間上限を1つ設定します。支出計画に合わせていつでも変更できます。" },
     ],
     progress: "{total}件中{done}件完了",
@@ -194,7 +194,7 @@ const COPY = {
     faqHint: "見落としやすい機能をすぐに確認できます。",
     questions: [
       { title: "未来の取引も記録できますか？", body: "はい。未来のレートがまだない場合は、現在利用できる為替レートの基準を明確に表示します。" },
-      { title: "サブカテゴリーは必須ですか？", body: "いいえ。メインカテゴリーだけで保存できます。サブカテゴリーはレポートや検索を詳しくしたいときに選択します。" },
+      { title: "カテゴリーはどう決まりますか？", body: "購入したものや収入源をタイトルから判断して自動分類します。結果が違う場合は取引の編集画面で修正できます。" },
       { title: "取引通貨を変えると基本通貨も変わりますか？", body: "変わりません。最後に使用した取引通貨とアプリの基本通貨は別々に記憶されます。" },
     ],
     closingTitle: "今月のお金の流れを整理しましょう",
@@ -211,7 +211,7 @@ const COPY = {
     quickStartHint: "Все настройки можно изменить позже.",
     steps: [
       { title: "Выберите основную валюту", body: "Выберите валюту для общей картины финансов. Исходная валюта каждой операции при этом сохраняется." },
-      { title: "Добавьте первую операцию", body: "Укажите расход или доход, дату, категорию, валюту платежа и при необходимости дополнительные сведения." },
+      { title: "Добавьте первую операцию", body: "Укажите понятное название, сумму, дату и валюту. GlobeLedger назначит категорию автоматически." },
       { title: "Задайте первый бюджет", body: "Установите месячный лимит хотя бы для одной категории. Его можно изменить в любое время." },
     ],
     progress: "Выполнено: {done} из {total}",
@@ -243,7 +243,7 @@ const COPY = {
     faqHint: "Короткие ответы о функциях, которые легко упустить.",
     questions: [
       { title: "Можно ли записать будущую операцию?", body: "Да. Если будущего курса ещё нет, GlobeLedger явно укажет, какой доступный курс используется." },
-      { title: "Подкатегория обязательна?", body: "Нет. Достаточно основной категории; подкатегория лишь добавляет подробности в отчёты и поиск." },
+      { title: "Как назначается категория?", body: "GlobeLedger определяет покупку или источник дохода по названию. Результат можно исправить при редактировании операции." },
       { title: "Валюта операции меняет основную валюту?", body: "Нет. Последняя валюта операции и основная валюта приложения запоминаются независимо друг от друга." },
     ],
     closingTitle: "Готовы увидеть месяц яснее?",

@@ -43,6 +43,7 @@ import {
   persistLanguagePreference,
   type Language,
 } from "@/lib/language";
+import { transactionTagLabel } from "@/lib/tags";
 
 const MAX_DISTRIBUTION_COUNT = 120;
 
@@ -73,6 +74,10 @@ type LedgerTransaction = {
   baseCurrency: "USD";
   category: string;
   subcategory?: string | null;
+  tags?: string[];
+  categoryVersion?: number;
+  classificationSource?: "legacy" | "rule" | "ai" | "manual" | "fallback";
+  classificationConfidence?: number | null;
   description: string;
   note?: string | null;
   recurringSeriesId?: string | null;
@@ -480,7 +485,8 @@ const FALLBACK_TRANSACTIONS: LedgerTransaction[] = [
     fxRate: "0.000722",
     baseAmountMinor: 542,
     baseCurrency: "USD",
-    category: "dining",
+    category: "food",
+    subcategory: "meals",
     description: "COEX Coffee",
   },
   {
@@ -506,7 +512,8 @@ const FALLBACK_TRANSACTIONS: LedgerTransaction[] = [
     fxRate: "1",
     baseAmountMinor: 8642,
     baseCurrency: "USD",
-    category: "groceries",
+    category: "food",
+    subcategory: "groceries",
     description: "Whole Foods",
   },
   {
@@ -545,7 +552,8 @@ const FALLBACK_TRANSACTIONS: LedgerTransaction[] = [
     fxRate: "1.154",
     baseAmountMinor: 369280,
     baseCurrency: "USD",
-    category: "income",
+    category: "employment",
+    subcategory: "salary",
     description: "Acme Studio",
   },
 ];
@@ -626,6 +634,8 @@ const COPY = {
     category: "Category",
     chooseCategory: "Choose a category",
     categoryHint: "Choose the closest match for this transaction.",
+    autoCategory: "Automatic category",
+    autoCategoryHint: "The title will be classified when you save. You can correct it later.",
     subcategory: "Subcategory (optional)",
     subcategoryHint: "Add a more precise label, or leave it unset.",
     noSubcategory: "None",
@@ -778,6 +788,8 @@ const COPY = {
     category: "카테고리",
     chooseCategory: "카테고리 선택",
     categoryHint: "이 거래에 가장 알맞은 항목을 선택하세요.",
+    autoCategory: "자동 카테고리",
+    autoCategoryHint: "저장할 때 제목을 분류합니다. 이후 언제든 수정할 수 있습니다.",
     subcategory: "세부 카테고리(선택)",
     subcategoryHint: "필요한 경우에만 더 구체적인 항목을 선택하세요.",
     noSubcategory: "선택 안 함",
@@ -930,6 +942,8 @@ const COPY = {
     category: "カテゴリー",
     chooseCategory: "カテゴリーを選択",
     categoryHint: "この取引に最も合う項目を選んでください。",
+    autoCategory: "自動カテゴリー",
+    autoCategoryHint: "保存時にタイトルから分類します。後から修正できます。",
     subcategory: "サブカテゴリー（任意）",
     subcategoryHint: "必要な場合のみ、より具体的な項目を選択してください。",
     noSubcategory: "未指定",
@@ -1082,6 +1096,8 @@ const COPY = {
     category: "Категория",
     chooseCategory: "Выберите категорию",
     categoryHint: "Выберите наиболее подходящую категорию операции.",
+    autoCategory: "Автокатегория",
+    autoCategoryHint: "Категория определяется по названию при сохранении. Её можно исправить позже.",
     subcategory: "Подкатегория (необязательно)",
     subcategoryHint: "При необходимости выберите более точный вариант.",
     noSubcategory: "Без уточнения",
@@ -1596,7 +1612,7 @@ export function ExpenseTracker({
   const [currency, setCurrency] = useState<CurrencyCode>("KRW");
   const [lastTransactionCurrency, setLastTransactionCurrency] =
     useState<CurrencyCode>("KRW");
-  const [category, setCategory] = useState("dining");
+  const [category, setCategory] = useState("other");
   const [subcategory, setSubcategory] = useState("");
   const [isCategoryPickerOpen, setIsCategoryPickerOpen] = useState(false);
   const [note, setNote] = useState("");
@@ -2493,7 +2509,7 @@ export function ExpenseTracker({
     setDescription("");
     setAmount("");
     setCurrency(lastTransactionCurrency);
-    setCategory("dining");
+    setCategory("other");
     setSubcategory("");
     setNote("");
     setOccurredOn(date);
@@ -2748,8 +2764,14 @@ export function ExpenseTracker({
           rate: String(formRateToUsd),
           rateSource: selectedRateSource,
           rateDate: selectedRateDate,
-          category,
-          subcategory: subcategory || null,
+          language,
+          ...(editingTransaction
+            ? {
+                category,
+                subcategory: subcategory || null,
+                tags: editingTransaction.tags ?? [],
+              }
+            : {}),
           description: description.trim(),
           note: note.trim(),
           ...(!editingTransaction && isRecurring
@@ -3294,7 +3316,9 @@ export function ExpenseTracker({
                             : transaction.splitGroupId
                               ? `${(transaction.splitIndex ?? 0) + 1}/${transaction.splitCount} · `
                               : ""}
-                          {categoryPathLabel(transaction.category, transaction.subcategory, language)} · {formatCurrency(originalMajor(transaction), transaction.originalCurrency, language)} {transaction.originalCurrency}
+                          {categoryPathLabel(transaction.category, transaction.subcategory, language)}
+                          {transaction.tags?.length ? ` · ${transaction.tags.map((tag) => transactionTagLabel(tag, language)).join(", ")}` : ""}
+                          {` · ${formatCurrency(originalMajor(transaction), transaction.originalCurrency, language)} ${transaction.originalCurrency}`}
                         </small>
                       </span>
                       <span className={transaction.kind === "income" ? "day-entry-value income" : "day-entry-value"}>
@@ -3492,6 +3516,13 @@ export function ExpenseTracker({
                           : ""}
                       {categoryPathLabel(transaction.category, transaction.subcategory, language)}
                     </span>
+                    {!!transaction.tags?.length && (
+                      <small className="transaction-tags">
+                        {transaction.tags.map((tag) => (
+                          <i key={tag}>{transactionTagLabel(tag, language)}</i>
+                        ))}
+                      </small>
+                    )}
                     {transaction.installmentGroupId && (
                       <small className="installment-remaining">
                         {template(copy.installmentRemaining, {
@@ -3578,8 +3609,8 @@ export function ExpenseTracker({
             </div>
             <form onSubmit={handleSubmit}>
               <div className="kind-switch" aria-label={`${copy.expense} / ${copy.income}`}>
-                <button type="button" disabled={locksInstallmentStructure} aria-pressed={kind === "expense"} className={kind === "expense" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("expense"); if (!isExpenseCategory(category)) { setCategory("dining"); setSubcategory(""); } }}>{copy.expense}</button>
-                <button type="button" disabled={locksInstallmentStructure} aria-pressed={kind === "income"} className={kind === "income" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("income"); if (!isIncomeCategory(category)) { setCategory("salary"); setSubcategory(""); } setIsDistributed(false); }}>{copy.income}</button>
+                <button type="button" disabled={locksInstallmentStructure} aria-pressed={kind === "expense"} className={kind === "expense" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("expense"); if (!isExpenseCategory(category)) { setCategory("other"); setSubcategory(""); } }}>{copy.expense}</button>
+                <button type="button" disabled={locksInstallmentStructure} aria-pressed={kind === "income"} className={kind === "income" ? "selected" : ""} onClick={() => { setIsCategoryPickerOpen(false); setKind("income"); if (!isIncomeCategory(category)) { setCategory("other_income"); setSubcategory(""); } setIsDistributed(false); }}>{copy.income}</button>
               </div>
               <label className="field">
                 <span>{copy.merchant}</span>
@@ -3620,7 +3651,16 @@ export function ExpenseTracker({
                   </p>
                 </details>
               </div>
-              <div className="field category-field">
+              {!editingTransaction && (
+                <div className="auto-category-notice" aria-live="polite">
+                  <CategoryIcon category={kind === "income" ? "other_income" : "other"} />
+                  <span>
+                    <strong>{copy.autoCategory}</strong>
+                    <small>{copy.autoCategoryHint}</small>
+                  </span>
+                </div>
+              )}
+              {editingTransaction && <div className="field category-field">
                   <span id="category-field-label">{copy.category}</span>
                   <div className="category-picker">
                     <button
@@ -3699,8 +3739,8 @@ export function ExpenseTracker({
                       </div>
                     )}
                   </div>
-                </div>
-              {activeSubcategoryOptions.length > 0 && (
+                </div>}
+              {editingTransaction && activeSubcategoryOptions.length > 0 && (
                 <div className="field subcategory-field">
                   <span>{copy.subcategory}</span>
                   <small>{copy.subcategoryHint}</small>

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import ts from "typescript";
 
@@ -59,7 +60,7 @@ test("pins direct Cloudflare Workers and D1 metadata", async () => {
   await assert.rejects(access(new URL("../.openai/hosting.json", templateRoot)));
 });
 
-test("provides grouped expense and income category pickers", async () => {
+test("provides concise behavioral categories with automatic classification", async () => {
   const [source, recurring, budgets, reports, categoriesSource, categoryIcon, styles, schema, transactionsRoute, recurringRoute, migration] = await Promise.all([
     readFile(new URL("../app/expense-tracker.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/recurring/recurring-manager.tsx", import.meta.url), "utf8"),
@@ -87,12 +88,12 @@ test("provides grouped expense and income category pickers", async () => {
   const incomeCategories = [...incomeBlock[1].matchAll(/"([a-z_]+)"/gu)].map(
     (match) => match[1],
   );
-  assert.equal(expenseCategories.length, 21);
-  assert.equal(incomeCategories.length, 7);
+  assert.equal(expenseCategories.length, 11);
+  assert.equal(incomeCategories.length, 6);
   assert.equal(new Set(expenseCategories).size, expenseCategories.length);
   assert.equal(new Set(incomeCategories).size, incomeCategories.length);
-  assert.match(categoriesSource, /personal_care/u);
-  assert.match(categoriesSource, /investment_income/u);
+  assert.match(categoriesSource, /meals/u);
+  assert.match(categoriesSource, /employment/u);
   assert.match(categoriesSource, /Record<LedgerCategoryId, CategoryDefinition>/u);
   assert.match(categoriesSource, /glyph: CategoryGlyphName/u);
   assert.doesNotMatch(categoriesSource, /glyph:\s*"[^"\n]*\p{Extended_Pictographic}/u);
@@ -102,7 +103,8 @@ test("provides grouped expense and income category pickers", async () => {
   assert.match(source, /className="category-popover"/u);
   assert.match(source, /<CategoryIcon category=\{item\}/u);
   assert.match(source, /categoryGroupsForKind\(kind\)/u);
-  assert.match(source, /\r?\n\s+category,\r?\n/u);
+  assert.match(source, /copy\.autoCategory/u);
+  assert.match(source, /\.\.\(editingTransaction[\s\S]*?category,/u);
   assert.match(recurring, /categoryGroupsForKind/u);
   assert.match(recurring, /<CategoryIcon category=\{key\}/u);
   assert.match(budgets, /EXPENSE_CATEGORY_IDS/u);
@@ -138,7 +140,101 @@ test("allows transactions without an optional subcategory", async () => {
     transactionRoute,
     /normalizeText\(\s*body\.subcategory \?\? undefined,\s*"subcategory",\s*64,\s*\{ fallback: "" \}/u,
   );
-  assert.match(transactionRoute, /const subcategory = normalizedSubcategory \|\| null/u);
+  assert.match(transactionRoute, /subcategory = normalizedSubcategory \|\| null/u);
+});
+
+test("classifies new transactions with Workers AI and keeps a safe fallback", async () => {
+  const [classifier, transactionRoute, wrangler, schema, migration] = await Promise.all([
+    readFile(new URL("../lib/transaction-classifier.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/transactions/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../drizzle/0015_clean_thena.sql", import.meta.url), "utf8"),
+  ]);
+  assert.match(wrangler, /"ai"\s*:\s*\{\s*"binding"\s*:\s*"AI"/u);
+  assert.match(classifier, /@cf\/meta\/llama-3\.2-3b-instruct/u);
+  assert.match(classifier, /Return only compact JSON/u);
+  assert.match(classifier, /source: "fallback"/u);
+  assert.match(transactionRoute, /await classifyTransaction/u);
+  assert.match(transactionRoute, /classificationSource/u);
+  assert.equal([...schema.matchAll(/tags: text\("tags"/gu)].length, 2);
+  assert.match(migration, /CREATE TABLE `category_v1_transactions`/u);
+  assert.match(migration, /`classification_source` = 'legacy'/u);
+});
+
+test("migrates legacy categories without changing ledger rows", async () => {
+  const migration = await readFile(
+    new URL("../drizzle/0015_clean_thena.sql", import.meta.url),
+    "utf8",
+  );
+  const db = new DatabaseSync(":memory:");
+  db.exec(`
+    CREATE TABLE user_states (owner_id text PRIMARY KEY);
+    CREATE TABLE transactions (
+      id text PRIMARY KEY, owner_id text NOT NULL, kind text NOT NULL,
+      category text NOT NULL, subcategory text, description text NOT NULL
+    );
+    CREATE TABLE recurring_series (
+      id text PRIMARY KEY, owner_id text NOT NULL, kind text NOT NULL,
+      category text NOT NULL, subcategory text, description text NOT NULL
+    );
+    CREATE TABLE monthly_budgets (
+      owner_id text NOT NULL, month text NOT NULL, category text NOT NULL,
+      amount_usd_minor integer NOT NULL, created_at_ms integer NOT NULL,
+      updated_at_ms integer NOT NULL,
+      PRIMARY KEY (owner_id, month, category)
+    );
+    INSERT INTO user_states VALUES ('owner');
+    INSERT INTO transactions VALUES
+      ('1','owner','expense','groceries','supermarket','Dinner'),
+      ('2','owner','expense','groceries','household_supplies','Supermarket'),
+      ('3','owner','expense','travel','accommodation','Hostel'),
+      ('4','owner','expense','travel','travel_transport','Bus to Lisbon'),
+      ('5','owner','expense','travel',NULL,'Ticket'),
+      ('6','owner','expense','other',NULL,'?'),
+      ('7','owner','expense','groceries','household_supplies','Cigarette'),
+      ('8','owner','expense','subscriptions',NULL,'Mobile data'),
+      ('9','owner','expense','dining',NULL,'Hotel'),
+      ('10','owner','expense','pets','pet_food','Snack for cat'),
+      ('11','owner','income','income',NULL,'Acme Salary');
+    INSERT INTO recurring_series VALUES
+      ('r1','owner','expense','family','school_support','School support');
+    INSERT INTO monthly_budgets VALUES
+      ('owner','2026-11','groceries',100,1,1),
+      ('owner','2026-11','dining',200,1,2);
+  `);
+  db.exec(migration);
+
+  const rows = db.prepare(
+    "SELECT id, category, subcategory, tags FROM transactions ORDER BY CAST(id AS integer)",
+  ).all();
+  assert.deepEqual(
+    rows.map((row) => [row.id, row.category, row.subcategory, row.tags]),
+    [
+      ["1", "food", "meals", "[]"],
+      ["2", "shopping", "essentials", "[]"],
+      ["3", "housing", "lodging", '["travel"]'],
+      ["4", "transport", "transit", '["travel"]'],
+      ["5", "leisure", "events", '["travel"]'],
+      ["6", "other", "unknown", "[]"],
+      ["7", "shopping", "tobacco", "[]"],
+      ["8", "digital", "mobile", "[]"],
+      ["9", "housing", "lodging", '["travel"]'],
+      ["10", "shopping", "pet_supplies", '["pet"]'],
+      ["11", "employment", "salary", "[]"],
+    ],
+  );
+  assert.deepEqual(
+    { ...db.prepare("SELECT category, subcategory FROM recurring_series").get() },
+    { category: "education", subcategory: "materials" },
+  );
+  assert.deepEqual(
+    { ...db.prepare("SELECT category, amount_usd_minor FROM monthly_budgets").get() },
+    { category: "food", amount_usd_minor: 300 },
+  );
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM transactions").get().count, 11);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM category_v1_transactions").get().count, 11);
+  db.close();
 });
 
 test("keeps every locale complete, grammatical, and durable", async () => {

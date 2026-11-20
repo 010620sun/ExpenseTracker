@@ -30,9 +30,16 @@ import {
   shiftInstallmentDate,
 } from "@/lib/installments";
 import {
+  CATEGORY_VERSION,
   isCategoryForKind,
   isSubcategoryForCategory,
 } from "@/lib/categories";
+import { isLanguage } from "@/lib/language";
+import {
+  classifyTransaction,
+  type ClassificationTag,
+} from "@/lib/transaction-classifier";
+import { TRANSACTION_TAG_IDS } from "@/lib/tags";
 
 export const dynamic = "force-dynamic";
 
@@ -131,6 +138,26 @@ function normalizeText(
   }
   if (hasControlCharacters(normalized)) {
     throw new ApiValidationError(`INVALID_${field.toUpperCase()}`, 400, field);
+  }
+  return normalized;
+}
+
+function normalizeTags(value: unknown): ClassificationTag[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.length > 10) {
+    throw new ApiValidationError("INVALID_TAGS", 400, "tags");
+  }
+  const normalized: ClassificationTag[] = [];
+  for (const item of value) {
+    if (
+      typeof item !== "string" ||
+      !TRANSACTION_TAG_IDS.some((allowed) => allowed === item) ||
+      normalized.includes(item as ClassificationTag)
+    ) {
+      if (typeof item === "string" && normalized.includes(item as ClassificationTag)) continue;
+      throw new ApiValidationError("INVALID_TAGS", 400, "tags");
+    }
+    normalized.push(item as ClassificationTag);
   }
   return normalized;
 }
@@ -580,6 +607,10 @@ function serializeTransaction(transaction: Transaction) {
     baseCurrencyExponent: transaction.baseCurrencyExponent,
     category: transaction.category,
     subcategory: transaction.subcategory,
+    tags: transaction.tags,
+    categoryVersion: transaction.categoryVersion,
+    classificationSource: transaction.classificationSource,
+    classificationConfidence: transaction.classificationConfidence,
     description: transaction.description,
     note: transaction.note,
     recurringSeriesId: transaction.recurringSeriesId,
@@ -640,6 +671,10 @@ function recurringSeriesFromTransaction(
       transaction.fxSource === "frankfurter" ? transaction.fxRateDate : null,
     category: transaction.category,
     subcategory: transaction.subcategory,
+    tags: transaction.tags,
+    categoryVersion: transaction.categoryVersion,
+    classificationSource: transaction.classificationSource,
+    classificationConfidence: transaction.classificationConfidence,
     description: transaction.description,
     note: transaction.note,
     createdAtMs: transaction.createdAtMs,
@@ -751,6 +786,10 @@ async function materializeRecurringTransactions(
         baseCurrencyExponent: BASE_CURRENCY_EXPONENT,
         category: series.category,
         subcategory: series.subcategory,
+        tags: series.tags,
+        categoryVersion: series.categoryVersion,
+        classificationSource: series.classificationSource,
+        classificationConfidence: series.classificationConfidence,
         description: series.description,
         note: series.note,
         recurringSeriesId: series.id,
@@ -849,29 +888,6 @@ async function buildNewTransaction(
       ? originalMinor
       : toBaseMinor(originalMinor, exponent, rate);
 
-  const category = normalizeText(body.category, "category", 40, {
-    fallback: kind === "income" ? "other_income" : "other",
-  });
-  if (!isCategoryForKind(category, kind)) {
-    throw new ApiValidationError("INVALID_CATEGORY", 400, "category");
-  }
-  const normalizedSubcategory = normalizeText(
-    body.subcategory ?? undefined,
-    "subcategory",
-    64,
-    { fallback: "" },
-  );
-  if (
-    normalizedSubcategory &&
-    !isSubcategoryForCategory(category, normalizedSubcategory)
-  ) {
-    throw new ApiValidationError(
-      "INVALID_SUBCATEGORY",
-      400,
-      "subcategory",
-    );
-  }
-  const subcategory = normalizedSubcategory || null;
   const description = normalizeText(
     firstDefined(body, ["description", "merchant"]),
     "description",
@@ -879,6 +895,49 @@ async function buildNewTransaction(
     { required: true },
   );
   const note = normalizeText(body.note, "note", 500, { fallback: "" });
+  const hasManualCategory = typeof body.category === "string" && body.category.trim() !== "";
+  let category: string;
+  let subcategory: string | null;
+  let tags: ClassificationTag[];
+  let classificationSource: "rule" | "ai" | "manual" | "fallback";
+  let classificationConfidence: number | null;
+
+  if (hasManualCategory) {
+    category = normalizeText(body.category, "category", 40);
+    if (!isCategoryForKind(category, kind)) {
+      throw new ApiValidationError("INVALID_CATEGORY", 400, "category");
+    }
+    const normalizedSubcategory = normalizeText(
+      body.subcategory ?? undefined,
+      "subcategory",
+      64,
+      { fallback: "" },
+    );
+    if (
+      normalizedSubcategory &&
+      !isSubcategoryForCategory(category, normalizedSubcategory)
+    ) {
+      throw new ApiValidationError("INVALID_SUBCATEGORY", 400, "subcategory");
+    }
+    subcategory = normalizedSubcategory || null;
+    tags = normalizeTags(body.tags);
+    classificationSource = "manual";
+    classificationConfidence = null;
+  } else {
+    const rawLanguage = body.language;
+    const classification = await classifyTransaction({
+      kind,
+      description,
+      ...(typeof rawLanguage === "string" && isLanguage(rawLanguage)
+        ? { language: rawLanguage }
+        : {}),
+    });
+    category = classification.category;
+    subcategory = classification.subcategory;
+    tags = classification.tags;
+    classificationSource = classification.source;
+    classificationConfidence = classification.confidence;
+  }
 
   const rawClientRequestId = body.clientRequestId;
   let clientRequestId: string | null = null;
@@ -914,6 +973,10 @@ async function buildNewTransaction(
     baseCurrencyExponent: BASE_CURRENCY_EXPONENT,
     category,
     subcategory,
+    tags,
+    categoryVersion: CATEGORY_VERSION,
+    classificationSource,
+    classificationConfidence,
     description,
     note,
     recurringSeriesId: null,
@@ -1680,6 +1743,10 @@ export async function PATCH(request: Request) {
         baseCurrencyExponent: proposed.baseCurrencyExponent,
         category: proposed.category,
         subcategory: proposed.subcategory,
+        tags: proposed.tags,
+        categoryVersion: proposed.categoryVersion,
+        classificationSource: proposed.classificationSource,
+        classificationConfidence: proposed.classificationConfidence,
         description: proposed.description,
         note: proposed.note,
         updatedAtMs,
