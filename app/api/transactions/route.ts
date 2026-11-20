@@ -49,8 +49,8 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 const MAX_BODY_LENGTH = 16_384;
 // D1 accepts at most 100 bound parameters per prepared statement. A complete
-// transaction row binds roughly 30 values, so three rows is the safe ceiling.
-const D1_TRANSACTION_INSERT_CHUNK_SIZE = 3;
+// transaction now binds more than 30 values, so two rows is the safe ceiling.
+const D1_TRANSACTION_INSERT_CHUNK_SIZE = 2;
 const MAX_DISTRIBUTION_COUNT = 120;
 const BIGINT_ZERO = BigInt(0);
 const BIGINT_TWO = BigInt(2);

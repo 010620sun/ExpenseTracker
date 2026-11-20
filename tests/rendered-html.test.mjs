@@ -156,6 +156,9 @@ test("previews and saves automatic classifications with Workers AI and a safe fa
   assert.match(wrangler, /"ai"\s*:\s*\{\s*"binding"\s*:\s*"AI"/u);
   assert.match(classifier, /@cf\/meta\/llama-3\.2-3b-instruct/u);
   assert.match(classifier, /Return only compact JSON/u);
+  assert.match(classifier, /data\.ambiguous !== false/u);
+  assert.match(classifier, /confidence < 75/u);
+  assert.match(classifier, /groundedEvidence/u);
   assert.match(classifier, /source: "fallback"/u);
   assert.match(classificationRoute, /await classifyTransaction/u);
   assert.match(classificationRoute, /memberFromRequest/u);
@@ -827,7 +830,7 @@ test("distributes one expense exactly across consecutive calendar dates", async 
   assert.match(schema, /idx_transactions_owner_split_group/u);
   assert.match(route, /function parseDistribution/u);
   assert.match(route, /function distributedTransactionsFromTransaction/u);
-  assert.match(route, /D1_TRANSACTION_INSERT_CHUNK_SIZE = 3/u);
+  assert.match(route, /D1_TRANSACTION_INSERT_CHUNK_SIZE = 2/u);
   assert.match(route, /MAX_DISTRIBUTION_COUNT = 120/u);
   assert.match(route, /originalEach \+ \(index < originalRemainder \? 1 : 0\)/u);
   assert.match(route, /baseEach \+ \(index < baseRemainder \? 1 : 0\)/u);
