@@ -196,7 +196,8 @@ test("migrates legacy categories without changing ledger rows", async () => {
       ('8','owner','expense','subscriptions',NULL,'Mobile data'),
       ('9','owner','expense','dining',NULL,'Hotel'),
       ('10','owner','expense','pets','pet_food','Snack for cat'),
-      ('11','owner','income','income',NULL,'Acme Salary');
+      ('11','owner','income','income',NULL,'Acme Salary'),
+      ('12','owner','expense','personal_care',NULL,'Laundry');
     INSERT INTO recurring_series VALUES
       ('r1','owner','expense','family','school_support','School support');
     INSERT INTO monthly_budgets VALUES
@@ -222,6 +223,7 @@ test("migrates legacy categories without changing ledger rows", async () => {
       ["9", "housing", "lodging", '["travel"]'],
       ["10", "shopping", "pet_supplies", '["pet"]'],
       ["11", "employment", "salary", "[]"],
+      ["12", "other", "laundry", "[]"],
     ],
   );
   assert.deepEqual(
@@ -232,8 +234,8 @@ test("migrates legacy categories without changing ledger rows", async () => {
     { ...db.prepare("SELECT category, amount_usd_minor FROM monthly_budgets").get() },
     { category: "food", amount_usd_minor: 300 },
   );
-  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM transactions").get().count, 11);
-  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM category_v1_transactions").get().count, 11);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM transactions").get().count, 12);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM category_v1_transactions").get().count, 12);
   db.close();
 });
 
