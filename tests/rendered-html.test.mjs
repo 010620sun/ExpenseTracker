@@ -159,6 +159,9 @@ test("previews and saves automatic classifications with Workers AI and a safe fa
   assert.match(classifier, /data\.ambiguous !== false/u);
   assert.match(classifier, /confidence < 75/u);
   assert.match(classifier, /groundedEvidence/u);
+  assert.match(classifier, /hasCategoryEvidence/u);
+  assert.match(classifier, /EXPENSE_CATEGORY_EVIDENCE/u);
+  assert.match(classifier, /INCOME_CATEGORY_EVIDENCE/u);
   assert.match(classifier, /source: "fallback"/u);
   assert.match(classificationRoute, /await classifyTransaction/u);
   assert.match(classificationRoute, /memberFromRequest/u);
